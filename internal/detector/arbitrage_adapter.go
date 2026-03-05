@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/qw225967/auto-monitor/internal/detector/registry"
 	"github.com/qw225967/auto-monitor/internal/model"
 	"github.com/qw225967/auto-monitor/internal/onchain/bridge"
 )
@@ -14,11 +15,18 @@ var _ Detector = (*ArbitrageAdapter)(nil)
 
 type ArbitrageAdapter struct {
 	bridgeMgr *bridge.Manager
+	reg       registry.NetworkRegistry
+	builder   *PipelineBuilder
 }
 
 // NewArbitrageAdapter 创建适配器，bridgeMgr 可为 nil（跨链段将标记为不可用）
 func NewArbitrageAdapter(bridgeMgr *bridge.Manager) *ArbitrageAdapter {
-	return &ArbitrageAdapter{bridgeMgr: bridgeMgr}
+	reg := registry.NewStaticRegistry()
+	return &ArbitrageAdapter{
+		bridgeMgr: bridgeMgr,
+		reg:       reg,
+		builder:   NewPipelineBuilder(reg),
+	}
 }
 
 // exchangeToNodeID 交易所名转节点 ID（SeeingStone 用大写如 BITGET，pipeline 用小写如 bitget）
@@ -54,12 +62,14 @@ func (a *ArbitrageAdapter) DetectRoutes(ctx context.Context, symbol, buyExchange
 		asset = "USDT"
 	}
 
-	// 构建路径：直连 + 经链
-	paths := [][]string{
-		{buy, sell}, // 直连（交易所间转账，实际会走某条链）
-	}
-	for _, chain := range commonChains {
-		paths = append(paths, []string{buy, chain, sell})
+	// 使用 NetworkRegistry + PipelineBuilder 生成路径
+	paths, err := a.builder.BuildPaths(asset, buyExchange, sellExchange)
+	if err != nil || len(paths) == 0 {
+		// 回退：简单直连 + 经常见链
+		paths = [][]string{{buy, sell}}
+		for _, chain := range commonChains {
+			paths = append(paths, []string{buy, chain, sell})
+		}
 	}
 
 	var result []model.PhysicalPath
