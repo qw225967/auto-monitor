@@ -1,0 +1,16 @@
+# Env
+.env
+
+# Build
+bin/
+
+# Go
+*.exe
+*.test
+*.out
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo

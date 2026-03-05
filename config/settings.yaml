@@ -1,0 +1,17 @@
+# 加密货币搬砖监控系统 - 默认配置
+# 可通过环境变量覆盖
+
+server:
+  port: 8080
+
+seeingstone:
+  api_url: https://seeingstone.cloud
+  api_token: ""
+  request_timeout: 10
+
+threshold:
+  spread: 1.0
+
+intervals:
+  fetch: 10   # 价差拉取间隔 (秒)
+  detect: 30  # 全 symbol 通路探测间隔 (秒)

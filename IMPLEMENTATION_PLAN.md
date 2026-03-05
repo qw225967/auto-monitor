@@ -306,7 +306,7 @@ type PhysicalPath struct {
 | 4.4 | 下钻详情 | 该 symbol 下所有 PhysicalPath，按 path_id 排序 | 可展开查看 |
 | 4.5 | 数据出口 | 组装为前端可直接消费的 JSON | 结构稳定 |
 
-**主表输出结构：**
+**主表输出结构（对应阶段 5 表格 UI）：**
 
 ```json
 {
@@ -321,8 +321,13 @@ type PhysicalPath struct {
       "detail_paths": [
         {
           "path_id": "Path_01",
-          "physical_flow": "BITGET → (提现BSC) → BSC链 → ... → GATE",
+          "physical_flow": "BITGET → (提现BSC) → BSC链 → (跨链桥A) → ETH链 → (充值ETH) → GATE",
           "status": "ok"
+        },
+        {
+          "path_id": "Path_02",
+          "physical_flow": "BITGET → (提现TRC20) → TRON链 → (充值TRON) → GATE",
+          "status": "maintenance"
         }
       ]
     }
@@ -330,13 +335,35 @@ type PhysicalPath struct {
 }
 ```
 
+`status` 与前端展示映射：`ok` → ✅ 畅通，`maintenance` → ⚠️ 维护中，`unavailable` → ❌ 不可用
+
 ---
 
 ### 阶段 5：前端监控界面 (预计 2 天)
 
+#### 5.0 表格结构示意（UI 规范）
+
+**主表：聚合概览**
+
+| 币种 | 路径 (买入 → 卖出) | 原始价差 | 可用通路数 | 操作 |
+| :--- | :--- | :--- | :--- | :--- |
+| POWERUSDT | BITGET → GATE | 20.38% | 2条 | [查看详情] |
+| ... | ... | ... | ... | ... |
+
+**下钻详情：点击 [查看详情] 后展开**
+
+| 链路 ID | 具体可用链路 (物理流) | 状态 |
+| :--- | :--- | :--- |
+| Path_01 | BITGET → (提现BSC) → BSC链 → (跨链桥A) → ETH链 → (充值ETH) → GATE | ✅ 畅通 |
+| Path_02 | BITGET → (提现TRC20) → TRON链 → (充值TRON) → GATE | ⚠️ 维护中 |
+
+**状态说明**：✅ 畅通 / ⚠️ 维护中 / ❌ 不可用
+
+---
+
 | 序号 | 任务 | 实现要点 | 验收标准 |
 |------|------|----------|----------|
-| 5.1 | 聚合概览表 | 表格列：币种、路径、原始价差、可用通路数、操作 | 符合 UI 需求 |
+| 5.1 | 聚合概览表 | 表格列：币种、路径、原始价差、可用通路数、操作 | 符合上述 UI 规范 |
 | 5.2 | 自动刷新 | 价差 10s 更新，通路状态 30s 更新（或 WebSocket 推送） | 数据更新 |
 | 5.3 | 下钻详情 | 点击 [查看详情] 展开/折叠该行详情 | 折叠交互正常 |
 | 5.4 | 状态显示 | ✅ 畅通、⚠️ 维护中、❌ 不可用 | 颜色/图标区分 |
