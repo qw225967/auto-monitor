@@ -10,9 +10,10 @@
 |------|------|
 | 系统名称 | 加密货币搬砖监控系统 (Arbitrage Path Monitor) |
 | 核心功能 | 价格发现 + 物理通路监控 + 监控面板 |
-| 数据源 | SeeingStone API (`/api/spreads`) |
+| 数据源 | SeeingStone API (`/api/spreads`)，架构支持后续多数据源 |
 | 数据获取频率 | 10 秒 |
 | 全 symbol 通路探测频率 | 30 秒 |
+| 架构特性 | 多数据源、多监控表格可扩展 |
 | 当前状态 | 空白项目，需从零搭建 |
 
 ---
@@ -60,6 +61,108 @@
 
 ---
 
+## 三（补充）、架构可扩展性设计
+
+> 为支持后续**多数据源**与**多监控表格**扩展，各层采用接口抽象，避免与具体实现强耦合。
+
+### 3.1 多数据源扩展
+
+> 数据源**输出类型不限于价差**，可能是价差、symbol 列表、资金费率等，需用通用接口 + 类型标识区分。
+
+| 设计要点 | 实现方式 |
+|----------|----------|
+| 数据源接口 | 定义通用 `DataSource` 接口，`DataType()` 标识输出类型，`Fetch()` 返回 `interface{}` |
+| 输出类型枚举 | `spread`（价差）、`symbol_list`（symbol 列表）、`funding_rate` 等，按需扩展 |
+| 适配器模式 | 每个数据源实现独立 adapter，输出类型由 `DataType()` 声明 |
+| 注册机制 | 配置中声明启用的数据源列表，运行时按配置加载 |
+| 消费层按类型处理 | 聚合层/表格层根据 `DataType` 选择对应处理逻辑，不同表格可消费不同数据源 |
+
+```go
+// 数据源输出类型（可扩展）
+const (
+    DataTypeSpread     = "spread"      // 价差数据
+    DataTypeSymbolList = "symbol_list" // symbol 列表
+    DataTypeFunding    = "funding_rate" // 资金费率等，按需扩展
+)
+
+// 数据源接口（输出类型不限于价差）
+type DataSource interface {
+    Name() string
+    DataType() string                              // 输出类型标识
+    Fetch(ctx context.Context) (interface{}, error) // 不同类型返回不同结构
+}
+
+// 示例：SeeingStone 输出价差
+type SeeingStoneSource struct { ... }
+func (s *SeeingStoneSource) DataType() string { return DataTypeSpread }
+func (s *SeeingStoneSource) Fetch(ctx context.Context) (interface{}, error) {
+    return []SpreadItem{...}, nil
+}
+
+// 示例：某配置/API 输出 symbol 列表
+type SymbolListSource struct { ... }
+func (s *SymbolListSource) DataType() string { return DataTypeSymbolList }
+func (s *SymbolListSource) Fetch(ctx context.Context) (interface{}, error) {
+    return []string{"BTCUSDT", "ETHUSDT", ...}, nil
+}
+```
+
+**不同数据类型的下游消费：**
+
+| 数据类型 | 典型用途 |
+|----------|----------|
+| `spread` | 聚合筛选 → 路由探测 → 搬砖概览表 |
+| `symbol_list` | 作为白名单/过滤条件，或独立 symbol 监控表 |
+| 其他 | 按表格 builder 需求消费 |
+
+### 3.2 多监控表格扩展
+
+| 设计要点 | 实现方式 |
+|----------|----------|
+| 表格构建器接口 | 定义 `TableBuilder` 接口，统一 `Build(input) (TableOutput, error)` |
+| 策略模式 | 每种表格类型独立 builder（如 `ArbitrageOverviewBuilder`、`PathDetailBuilder`） |
+| 注册与路由 | API 层按 `table_type` 或路径选择对应 builder，返回不同 JSON 结构 |
+| 前端路由 | 前端按 `/overview`、`/path-detail` 等路由加载不同表格组件 |
+
+```go
+// 表格构建器接口（便于后续新增监控表格）
+type TableBuilder interface {
+    Type() string                    // 如 "arbitrage_overview"、"path_detail"
+    Build(ctx context.Context, input AggregatedData) (interface{}, error)
+}
+
+// 示例：当前搬砖概览；后续可加资金费率表、深度监控表等
+type ArbitrageOverviewBuilder struct { ... }
+```
+
+### 3.3 可扩展目录结构
+
+```
+internal/
+├── source/                    # 数据源层（可扩展，输出类型不限于价差）
+│   ├── interface.go           # DataSource 接口，DataType() + Fetch()
+│   ├── seeingstone/           # 价差数据源
+│   │   └── adapter.go
+│   ├── symbollist/            # symbol 列表数据源（示例）
+│   │   └── adapter.go
+│   └── [future_source]/       # 后续：funding、depth 等
+├── aggregator/
+│   └── aggregator.go          # 按 DataType 分发，spread→PathItem 聚合，symbol_list→过滤/白名单等
+├── detector/
+│   └── detector.go
+├── builder/                   # 表格构建层（可扩展）
+│   ├── interface.go           # TableBuilder 接口定义
+│   ├── arbitrage_overview/    # 搬砖概览表（消费 spread）
+│   │   └── builder.go
+│   ├── path_detail/           # 通路详情表
+│   │   └── builder.go
+│   └── [future_table]/        # 后续表格：可消费 symbol_list、funding 等
+└── api/
+    └── handler.go             # 按 table_type 分发到对应 builder
+```
+
+---
+
 ## 四、分阶段实现计划
 
 ### 阶段 0：项目初始化 (预计 0.5 天)
@@ -71,7 +174,7 @@
 | 0.3 | 前端依赖 | `package.json` | React, TypeScript, 表格组件 |
 | 0.4 | 环境配置 | `.env.example`, `config/settings.yaml` | API_URL, TOKEN, SPREAD_THRESHOLD |
 
-**目录结构建议：**
+**目录结构建议（兼顾可扩展性）：**
 
 ```
 auto-monitor/
@@ -81,14 +184,18 @@ auto-monitor/
 ├── internal/
 │   ├── config/
 │   │   └── config.go        # 配置加载
-│   ├── fetcher/
-│   │   └── fetcher.go       # 阶段1: 数据获取
+│   ├── source/              # 数据源层（接口 + 多实现，输出类型不限于价差）
+│   │   ├── interface.go     # DataSource 接口，DataType() + Fetch()
+│   │   └── seeingstone/
+│   │       └── adapter.go   # 阶段1: SeeingStone 价差数据
 │   ├── aggregator/
 │   │   └── aggregator.go    # 阶段2: 聚合筛选
 │   ├── detector/
 │   │   └── detector.go      # 阶段3: 路由探测
-│   ├── builder/
-│   │   └── builder.go       # 阶段4: 表格组装
+│   ├── builder/             # 表格构建层（接口 + 多实现）
+│   │   ├── interface.go     # TableBuilder 接口
+│   │   └── arbitrage/
+│   │       └── builder.go   # 阶段4: 搬砖概览+详情表
 │   └── api/
 │       └── handler.go       # REST/WebSocket 接口
 ├── frontend/
@@ -111,10 +218,11 @@ auto-monitor/
 
 | 序号 | 任务 | 实现要点 | 验收标准 |
 |------|------|----------|----------|
-| 1.1 | HTTP 客户端 | `net/http` 或 `resty`，Bearer Token 鉴权 | 能成功请求 `/api/spreads` |
-| 1.2 | 10 秒轮询循环 | `time.Ticker(10*time.Second)` + goroutine | 每 10s 拉取一次价差数据 |
-| 1.3 | 容错处理 | 超时 `context.WithTimeout` 10s，失败时 `log` 并继续下一轮 | 单次失败不中断循环 |
-| 1.4 | 数据解析 | `encoding/json` 解析，提取 `data` 数组 | 得到 `[]SpreadItem` |
+| 1.1 | 定义 `DataSource` 接口 | 支持多数据源、多输出类型（价差/symbol 等） | 接口含 `DataType()`, `Fetch(ctx) (interface{}, error)` |
+| 1.2 | SeeingStone 实现（价差） | `net/http` 或 `resty`，Bearer Token 鉴权 | 能成功请求 `/api/spreads`，`DataType() == "spread"` |
+| 1.3 | 10 秒轮询循环 | `time.Ticker(10*time.Second)` + goroutine | 每 10s 拉取一次价差数据 |
+| 1.4 | 容错处理 | 超时 `context.WithTimeout` 10s，失败时 `log` 并继续下一轮 | 单次失败不中断循环 |
+| 1.5 | 数据解析 | `encoding/json` 解析，提取 `data` 数组 | 得到 `[]SpreadItem` |
 
 **接口定义：**
 
@@ -192,10 +300,11 @@ type PhysicalPath struct {
 
 | 序号 | 任务 | 实现要点 | 验收标准 |
 |------|------|----------|----------|
-| 4.1 | 主表汇总 | 每个 symbol 取 `max(spread_percent)` 的 path | 展示最高价差 |
-| 4.2 | 可用通路数 | 统计 `overall_status == "ok"` 的 PhysicalPath 数量 | 数字准确 |
-| 4.3 | 下钻详情 | 该 symbol 下所有 PhysicalPath，按 path_id 排序 | 可展开查看 |
-| 4.4 | 数据出口 | 组装为前端可直接消费的 JSON | 结构稳定 |
+| 4.1 | 定义 `TableBuilder` 接口 | 便于后续多监控表格扩展 | 接口含 `Type()`, `Build(ctx, input)` |
+| 4.2 | 搬砖概览 builder 实现 | 每个 symbol 取 `max(spread_percent)` 的 path | 展示最高价差 |
+| 4.3 | 可用通路数 | 统计 `overall_status == "ok"` 的 PhysicalPath 数量 | 数字准确 |
+| 4.4 | 下钻详情 | 该 symbol 下所有 PhysicalPath，按 path_id 排序 | 可展开查看 |
+| 4.5 | 数据出口 | 组装为前端可直接消费的 JSON | 结构稳定 |
 
 **主表输出结构：**
 
@@ -302,7 +411,8 @@ type PhysicalPath struct {
 1. **确认路由探测模块**：是否已有现成实现？接口形式（HTTP/本地调用）？
 2. **执行阶段 0**：初始化 Go 项目结构（`go mod init`），创建配置文件与依赖声明。
 3. **按阶段顺序推进**：每完成一阶段进行自测，再进入下一阶段。
+4. **扩展时**：新增数据源实现 `DataSource`（可输出价差、symbol 列表等不同类型）；新增表格实现 `TableBuilder`，并在配置/路由中注册。
 
 ---
 
-*文档版本：V2.1 | 更新日期：2026-03-05 | 技术栈：全栈 Go，Web 前端 React + TypeScript*
+*文档版本：V2.2 | 更新日期：2026-03-05 | 技术栈：全栈 Go，Web 前端 React + TypeScript | 架构：多数据源 + 多表格可扩展*
