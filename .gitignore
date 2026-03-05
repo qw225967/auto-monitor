@@ -4,6 +4,10 @@
 # Build
 bin/
 
+# Scripts
+logs/
+.pid.*
+
 # Go
 *.exe
 *.test

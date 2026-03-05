@@ -47,7 +47,12 @@ func Load() (*Config, error) {
 		}
 	}
 
-	// 默认值（环境变量 SEEINGSTONE_API_URL 等可覆盖）
+	// 显式绑定环境变量（.env 通过 godotenv 加载后生效）
+	_ = viper.BindEnv("seeingstone.api_token", "SEEINGSTONE_API_TOKEN")
+	_ = viper.BindEnv("seeingstone.api_url", "SEEINGSTONE_API_URL")
+	_ = viper.BindEnv("server.port", "SERVER_PORT")
+
+	// 默认值
 	viper.SetDefault("seeingstone.api_url", "https://seeingstone.cloud")
 	viper.SetDefault("threshold.spread", 1.0)
 	viper.SetDefault("intervals.fetch", 10)

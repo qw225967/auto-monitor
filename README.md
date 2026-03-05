@@ -9,7 +9,17 @@
 
 ## 快速开始
 
-### 1. 开发模式（使用模拟数据）
+### 一键启动（推荐）
+
+```bash
+./scripts/start.sh          # 启动后端 + 前端
+./scripts/start.sh restart  # 重启
+./scripts/start.sh stop     # 停止
+```
+
+启动后访问 http://localhost:5173
+
+### 手动启动
 
 ```bash
 # 后端
@@ -19,20 +29,23 @@ MOCK_MODE=1 go run ./cmd/server
 cd frontend && npm install && npm run dev
 ```
 
-访问 http://localhost:5173
-
 ### 2. 生产模式（连接 SeeingStone API）
 
 ```bash
-# 复制配置
+# 复制配置并填入 Token
 cp .env.example .env
-# 编辑 .env，填入 SEEINGSTONE_API_TOKEN
+# 编辑 .env，设置 SEEINGSTONE_API_TOKEN=你的JWT
 
-# 后端
+# 后端（不设置 MOCK_MODE 即使用真实 API）
 go run ./cmd/server
 
 # 前端
 cd frontend && npm run build && npm run preview
+```
+
+**真实 API 请求示例**：
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" https://seeingstone.cloud/api/spreads
 ```
 
 ## 项目结构
