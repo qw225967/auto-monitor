@@ -1,0 +1,1941 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Trigger 详情 - {{.Symbol}}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            padding: 0;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px 20px 20px; }
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: #1a1a1a;
+            margin: 0 -20px 20px -20px;
+            padding: 15px 20px;
+            border-bottom: 1px solid #333;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        h1 { color: #4ade80; margin: 0; font-size: 20px; }
+        .back-link { color: #60a5fa; text-decoration: none; }
+        .status-badge-header { padding: 4px 10px; border-radius: 4px; font-size: 14px; font-weight: bold; }
+        .status-badge-header.running { background: #4ade80; color: #000; }
+        .status-badge-header.stopped { background: #f43f5e; color: #fff; }
+        .section { background: #2a2a2a; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .section-title { font-size: 18px; font-weight: bold; color: #4ade80; margin-bottom: 15px; }
+        /* 紧凑配置栏样式 */
+        .config-bar {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+            flex-wrap: wrap;
+        }
+        
+        .config-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .config-label {
+            font-size: 13px;
+            color: #888;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        
+        .config-input {
+            width: 80px;
+            padding: 4px 8px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+        
+        /* 调整 Switch 尺寸以适应紧凑布局 */
+        .switch.compact {
+            width: 40px;
+            height: 22px;
+        }
+        .switch.compact .slider {
+            border-radius: 22px;
+        }
+        .switch.compact .slider:before {
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+        }
+        .switch.compact input:checked + .slider:before {
+            transform: translateX(18px);
+        }
+        
+        /* 紧凑按钮 */
+        .btn-compact {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+        
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: #444;
+            margin: 0 5px;
+        }
+        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #4ade80; }
+        input:checked + .slider:before { transform: translateX(26px); }
+        button { 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 14px; 
+            font-weight: 500;
+            background: #4ade80;
+            color: #000;
+        }
+        button:hover { background: #22c55e; }
+        .data-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .data-item { background: #1a1a1a; padding: 15px; border-radius: 6px; }
+        .data-label { font-size: 12px; color: #888; margin-bottom: 5px; }
+        .data-value { font-size: 20px; font-weight: bold; color: #4ade80; }
+        
+        /* 执行监控表格样式 */
+        .exec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .exec-table th { color: #888; font-weight: 500; text-align: left; padding: 10px; border-bottom: 1px solid #333; }
+        .exec-table td { padding: 10px; border-bottom: 1px solid #2a2a2a; color: #e0e0e0; vertical-align: top; }
+        .exec-row-pending { border-left: 3px solid #f59e0b; background: rgba(245, 158, 11, 0.05); }
+        .exec-row-success { border-left: 3px solid #4ade80; background: rgba(74, 222, 128, 0.05); }
+        .exec-row-failed { border-left: 3px solid #f43f5e; background: rgba(244, 63, 94, 0.05); }
+        .status-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .status-badge.Pending { background: #f59e0b; color: #000; }
+        .status-badge.Success { background: #4ade80; color: #000; }
+        .status-badge.Failed { background: #f43f5e; color: #fff; }
+        .detail-row { font-size: 12px; color: #888; margin-top: 4px; }
+        .error-text { color: #f43f5e; margin-top: 2px; }
+        .tx-link { color: #60a5fa; text-decoration: none; }
+        .tx-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <a href="/" class="back-link">← 返回首页</a>
+                <h1>Trigger 详情 - {{.Symbol}}</h1>
+                <span id="triggerStatusBadge" class="status-badge-header stopped">Unknown</span>
+                
+                <div id="actionButtons" style="display: flex; gap: 10px; margin-left: 15px;">
+                    <!-- JS 动态填充启动/停止按钮 -->
+                </div>
+
+                <!-- 实时价差显示 -->
+                <div class="diff-display" style="margin-left: 15px;">
+                    <div>+A-B: <span id="headerDiffAB" class="diff-value">--</span>%</div>
+                    <div style="width: 1px; height: 12px; background: #444;"></div>
+                    <div>-A+B: <span id="headerDiffBA" class="diff-value">--</span>%</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 紧凑配置栏 (Toolbar) -->
+        <div class="config-bar">
+            <div class="config-item" title="开启 +A-B 方向交易">
+                <label class="switch compact">
+                    <input type="checkbox" id="enableAB">
+                    <span class="slider"></span>
+                </label>
+                <span class="config-label">+A-B</span>
+            </div>
+            
+            <div class="config-item" title="开启 -A+B 方向交易">
+                <label class="switch compact">
+                    <input type="checkbox" id="enableBA">
+                    <span class="slider"></span>
+                </label>
+                <span class="config-label">-A+B</span>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="config-item" title="最小阈值（优化出的阈值必须 >= 此值）">
+                <span class="config-label">Min Interval:</span>
+                <input type="number" class="config-input" id="minInterval" step="0.0001" placeholder="0.1" min="0">
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="config-item" title="最大阈值（优化出的阈值必须 <= 此值，0表示不限制）">
+                <span class="config-label">Max Interval:</span>
+                <input type="number" class="config-input" id="maxInterval" step="0.0001" placeholder="0" min="0">
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="config-item" title="链上交易滑点 (例如 0.2 表示 0.2%)">
+                <span class="config-label">Slippage:</span>
+                <input type="number" class="config-input" id="onChainSlippage" step="0.1" placeholder="0.2" min="0.1">
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="config-item" title="Gas 乘数，用于调整 API 返回的 gas（如 1.5 表示增加 50%）">
+                <span class="config-label">Gas Multiplier:</span>
+                <input type="number" class="config-input" id="gasMultiplier" step="0.1" placeholder="1.0" min="1.0">
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="config-item" title="链上 GasLimit，传给 OKEx API 的请求参数">
+                <span class="config-label">Gas Limit:</span>
+                <input type="text" class="config-input" id="onChainGasLimit" placeholder="500000">
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="config-item" title="Telegram 通知开关">
+                <label class="switch compact">
+                    <input type="checkbox" id="telegramNotification">
+                    <span class="slider"></span>
+                </label>
+                <span class="config-label">TG Notify</span>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="config-item" title="Bundler 交易加速开关">
+                <label class="switch compact">
+                    <input type="checkbox" id="bundlerEnabled">
+                    <span class="slider"></span>
+                </label>
+                <span class="config-label">Bundler</span>
+            </div>
+            
+            <div style="flex-grow: 1;"></div>
+            
+            <button class="btn-compact" onclick="saveConfig()">💾 保存配置</button>
+        </div>
+        
+        <!-- 持仓概览 (Position Overview) -->
+        <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div class="section-title" style="margin-bottom: 0;">持仓概览 (Position Overview)</div>
+                <button onclick="loadPosition()" style="padding: 4px 8px; font-size: 12px; background: #2a2a2a; color: #888; border: 1px solid #444; border-radius: 4px; cursor: pointer;">
+                    Refresh
+                </button>
+            </div>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <!-- A 持仓 -->
+                <div style="flex: 1; min-width: 300px; background: #222; padding: 15px; border-radius: 6px;">
+                    <div id="aPositionTitle" style="color: #888; font-size: 13px; margin-bottom: 10px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 5px;">A 持仓</div>
+                    <div id="aPositionContainer">
+                        <div style="color: #666; font-size: 13px;">Loading...</div>
+                    </div>
+                </div>
+                
+                <!-- B 持仓 -->
+                <div style="flex: 1; min-width: 300px; background: #222; padding: 15px; border-radius: 6px;">
+                    <div id="bPositionTitle" style="color: #888; font-size: 13px; margin-bottom: 10px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 5px;">B 持仓</div>
+                    <div id="bPositionContainer">
+                        <div style="color: #666; font-size: 13px;">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 最优阈值和收益统计 -->
+        <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div class="section-title">最优阈值和收益统计</div>
+                <div>
+                    <button onclick="clearPriceDiffsForDetail()" style="padding: 6px 12px; font-size: 12px; background: #f59e0b; color: #000; margin-right: 10px;">
+                        清空价差数据
+                    </button>
+                    <button onclick="clearAllHistory()" style="padding: 6px 12px; font-size: 12px; background: #f43f5e; color: #fff;">
+                        删除历史数据
+                    </button>
+                </div>
+            </div>
+            <div class="data-grid">
+                <div class="data-item">
+                    <div class="data-label">+A-B 阈值</div>
+                    <div class="data-value" id="thresholdAB">-</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">-A+B 阈值</div>
+                    <div class="data-value" id="thresholdBA">-</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">Long 机会点数量</div>
+                    <div class="data-value" id="longOpportunityCount">0</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">Short 机会点数量</div>
+                    <div class="data-value" id="shortOpportunityCount">0</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">总交易次数</div>
+                    <div class="data-value" id="totalTrades">0</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">总交易量（币）</div>
+                    <div class="data-value" id="statTotalVolume">0</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">总交易量（USDT）</div>
+                    <div class="data-value" id="statTotalVolumeUSDT">0</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">总收益（USDT）</div>
+                    <div class="data-value" id="statTotalProfit" style="color: #4ade80;">0</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">盈利次数</div>
+                    <div class="data-value" id="statWinCount" style="color: #4ade80;">0</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">亏损次数</div>
+                    <div class="data-value" id="statLossCount" style="color: #f43f5e;">0</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 统计监控数据区域 -->
+        <div class="section">
+            <div class="section-title">统计监控数据</div>
+            
+            <!-- 滑点统计 -->
+            <div style="margin-bottom: 20px;">
+                <div onclick="toggleSection('slippageStatsContent', 'slippageStatsIcon')" style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; user-select: none;">
+                    <span id="slippageStatsIcon" style="color: #4ade80; font-size: 14px;">▼</span>
+                    <h3 style="color: #4ade80; font-size: 16px; margin: 0;">滑点统计</h3>
+                </div>
+                <div id="slippageStatsContent" style="display: none;">
+                    <div id="slippageStatsTable"></div>
+                </div>
+            </div>
+
+            <!-- 成本统计 -->
+            <div style="margin-bottom: 20px;">
+                <div onclick="toggleSection('costStatsContent', 'costStatsIcon')" style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; user-select: none;">
+                    <span id="costStatsIcon" style="color: #4ade80; font-size: 14px;">▼</span>
+                    <h3 style="color: #4ade80; font-size: 16px; margin: 0;">成本统计</h3>
+                </div>
+                <div id="costStatsContent" style="display: none;">
+                    <div id="costStatsTable"></div>
+                </div>
+            </div>
+
+            <!-- Size统计 -->
+            <div style="margin-bottom: 20px;">
+                <div onclick="toggleSection('sizeStatsContent', 'sizeStatsIcon')" style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; user-select: none;">
+                    <span id="sizeStatsIcon" style="color: #4ade80; font-size: 14px;">▼</span>
+                    <h3 style="color: #4ade80; font-size: 16px; margin: 0;">Size统计</h3>
+                </div>
+                <div id="sizeStatsContent" style="display: none;">
+                    <div id="sizeStatsTable"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 实时执行监控面板 (新增) -->
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">⚡️ 实时执行监控 (Live Execution)</div>
+                <div style="font-size: 12px; display: flex; align-items: center; gap: 8px;">
+                    <span id="wsStatus" style="color: #f43f5e;">● 未连接</span>
+                </div>
+            </div>
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #333; border-radius: 6px;">
+                <table class="exec-table">
+                    <thead>
+                        <tr style="background: #1f1f1f; position: sticky; top: 0;">
+                            <th style="width: 140px;">时间</th>
+                            <th style="width: 80px;">方向</th>
+                            <th style="width: 100px;">价差 / 阈值</th>
+                            <th id="execStatusAHeader">A 状态</th>
+                            <th id="execStatusBHeader">B 状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="executionTableBody">
+                        <tr><td colspan="5" style="text-align: center; padding: 20px; color: #666;">等待数据...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 时间序列数据区域 -->
+        <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div class="section-title" style="margin-bottom: 0;">时间序列数据</div>
+                <!-- 时间范围选择器 -->
+                <div class="time-range-selector" style="display: flex; gap: 5px;">
+                    <button class="time-btn" onclick="setTimeRange(1 * 60 * 1000, this)">1m</button>
+                    <button class="time-btn active" onclick="setTimeRange(5 * 60 * 1000, this)">5m</button>
+                    <button class="time-btn" onclick="setTimeRange(15 * 60 * 1000, this)">15m</button>
+                    <button class="time-btn" onclick="setTimeRange(60 * 60 * 1000, this)">1h</button>
+                    <button class="time-btn" onclick="setTimeRange(4 * 60 * 60 * 1000, this)">4h</button>
+                    <button class="time-btn" onclick="setTimeRange(24 * 60 * 60 * 1000, this)">24h</button>
+                    <button class="time-btn" onclick="setTimeRange(0, this)">All</button>
+                </div>
+            </div>
+            
+            <style>
+                .time-btn {
+                    background: #2a2a2a;
+                    border: 1px solid #444;
+                    color: #888;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                .time-btn:hover {
+                    border-color: #666;
+                    color: #ccc;
+                }
+                .time-btn.active {
+                    background: #4ade80;
+                    color: #000;
+                    border-color: #4ade80;
+                    font-weight: 500;
+                }
+            </style>
+            
+            <!-- 可折叠的价差图表区域 -->
+            <div style="margin-bottom: 20px;">
+                <div onclick="togglePriceDiff()" style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 15px; user-select: none;">
+                    <span id="priceDiffToggleIcon" style="color: #4ade80; font-size: 14px;">▼</span>
+                    <h3 style="color: #4ade80; font-size: 16px; margin: 0;">价差监控图表</h3>
+                </div>
+                
+                <div id="priceDiffContent" style="display: none;">
+                    <div style="margin-bottom: 20px;">
+                        <h4 id="diffChartABTitle" style="color: #888; font-size: 14px; margin-bottom: 10px;">+A-B</h4>
+                        <canvas id="priceDiffChartAB" style="width: 100%; height: 200px; background: #1a1a1a;"></canvas>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <h4 id="diffChartBATitle" style="color: #888; font-size: 14px; margin-bottom: 10px;">-A+B</h4>
+                        <canvas id="priceDiffChartBA" style="width: 100%; height: 200px; background: #1a1a1a;"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <div onclick="togglePriceChart()" style="cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 15px; user-select: none;">
+                    <span id="priceChartToggleIcon" style="color: #4ade80; font-size: 14px;">▼</span>
+                    <h3 style="color: #4ade80; font-size: 16px; margin: 0;">价格数据监控</h3>
+                </div>
+                
+                <div id="priceChartContent" style="display: none;">
+                    <canvas id="priceChart" style="width: 100%; height: 200px; background: #1a1a1a;"></canvas>
+                </div>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #4ade80; font-size: 16px; margin-bottom: 10px;">成交数据</h3>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table style="width: 100%; font-size: 12px;">
+                        <thead>
+                            <tr style="background: #1a1a1a;">
+                                <th style="padding: 8px; text-align: left;">时间</th>
+                                <th style="padding: 8px; text-align: left;">方向</th>
+                                <th style="padding: 8px; text-align: right;">Size</th>
+                                <th style="padding: 8px; text-align: right;">Size(USDT)</th>
+                                <th style="padding: 8px; text-align: right;">价差</th>
+                                <th style="padding: 8px; text-align: right;">收益</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tradeRecordsTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 加载版本信息
+        fetch('/api/version')
+            .then(res => res.json())
+            .then(data => {
+                const versionEl = document.createElement('div');
+                versionEl.style.position = 'fixed';
+                versionEl.style.top = '10px';
+                versionEl.style.right = '20px';
+                versionEl.style.color = '#666';
+                versionEl.style.fontSize = '12px';
+                versionEl.style.zIndex = '2000'; // 确保在最上层
+                versionEl.style.pointerEvents = 'none'; // 不影响点击
+                versionEl.innerText = data.version || 'dev';
+                document.body.appendChild(versionEl);
+            })
+            .catch(err => console.error('Failed to load version:', err));
+
+        const symbol = '{{.Symbol}}';
+        
+        // 图表时间范围状态 (默认5分钟)
+        let chartTimeRange = 5 * 60 * 1000; 
+
+        function setTimeRange(range, btn) {
+            chartTimeRange = range;
+            
+            // 更新按钮样式
+            document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // 立即重绘
+            loadStatistics();
+        }
+        
+        // ---------------- WebSocket 相关逻辑 ----------------
+        let ws;
+        let wsRetryCount = 0;
+        const maxWsRetries = 5;
+
+        function initWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = protocol + '//' + window.location.host + '/ws';
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                console.log('WebSocket Connected');
+                document.getElementById('wsStatus').innerHTML = '<span style="color: #4ade80;">● 实时监控中</span>';
+                wsRetryCount = 0;
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const msg = JSON.parse(event.data);
+                    
+                    // 处理执行更新
+                    if (msg.type === 'execution_update' && msg.data) {
+                        // 过滤: 只处理当前 Symbol 的数据
+                        if (msg.data.symbol === symbol || msg.data.symbol === symbol + 'USDT') {
+                            updateExecutionRow(msg.data);
+                        }
+                    }
+                    
+                    // 处理价差更新 (新增)
+                    if (msg.type === 'price_diff_update' && msg.data) {
+                         if (msg.data.symbol === symbol || msg.data.symbol === symbol + 'USDT') {
+                            updateHeaderDiff(msg.data);
+                        }
+                    }
+                } catch (e) {
+                    console.error('WS Message Parse Error:', e);
+                }
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket Closed');
+                document.getElementById('wsStatus').innerHTML = '<span style="color: #f59e0b;">● 连接断开</span>';
+                
+                // 简单的指数退避重连
+                if (wsRetryCount < maxWsRetries) {
+                    const timeout = Math.pow(2, wsRetryCount) * 1000;
+                    setTimeout(initWebSocket, timeout);
+                    wsRetryCount++;
+                } else {
+                    document.getElementById('wsStatus').innerHTML = '<span style="color: #f43f5e;">● 连接失败 (请刷新)</span>';
+                }
+            };
+            
+            ws.onerror = function(err) {
+                console.error('WebSocket Error:', err);
+            };
+        }
+
+        function updateHeaderDiff(data) {
+            const elAB = document.getElementById('headerDiffAB');
+            const elBA = document.getElementById('headerDiffBA');
+            const colorUp = '#4ade80'; // 绿色
+            const colorDown = '#f43f5e'; // 红色
+            
+            function formatVal(val) {
+                const s = val.toFixed(4);
+                return (val > 0 ? '+' : '') + s;
+            }
+
+            if (elAB) {
+                const val = data.diffAB;
+                elAB.textContent = formatVal(val);
+                elAB.style.color = val >= 0 ? colorUp : colorDown;
+            }
+            
+            if (elBA) {
+                const val = data.diffBA;
+                elBA.textContent = formatVal(val);
+                elBA.style.color = val >= 0 ? colorUp : colorDown;
+            }
+        }
+
+        // 加载历史执行记录
+        async function loadExecutionHistory() {
+            try {
+                // 获取最近 50 条，然后在前端过滤（或者后端API支持过滤，目前先前端过滤）
+                const res = await fetch('/api/monitor/executions?limit=50');
+                if (res.ok) {
+                    const records = await res.json();
+                    // 倒序排列（旧 -> 新），这样 updateExecutionRow 会把新的插到最上面
+                    // 过滤当前 Symbol
+                    const filtered = records.filter(r => r.symbol === symbol || r.symbol === symbol + 'USDT');
+                    
+                    if (filtered.length > 0) {
+                        document.getElementById('executionTableBody').innerHTML = ''; // 清空"等待数据..."
+                        // 按时间正序遍历，这样最新的会在最上面（因为 updateExecutionRow 是 prepend）
+                        // 实际上 API 返回的是按时间倒序（最新的在最前），所以我们需要反转一下，或者调整 update 逻辑
+                        // 这里我们假设 updateExecutionRow 是把行放到 tbody 的 firstChild
+                        // 所以我们应该先处理旧的，再处理新的
+                        filtered.reverse().forEach(updateExecutionRow);
+                    } else {
+                        document.getElementById('executionTableBody').innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #666;">暂无执行记录</td></tr>';
+                    }
+                }
+            } catch (e) {
+                console.error('Load History Error:', e);
+            }
+        }
+
+        function updateExecutionRow(data) {
+            const tbody = document.getElementById('executionTableBody');
+            
+            // 检查是否已存在该行
+            let row = document.getElementById('exec-row-' + data.id);
+            const isNew = !row;
+            
+            if (isNew) {
+                row = document.createElement('tr');
+                row.id = 'exec-row-' + data.id;
+                // 插入到第一行
+                if (tbody.firstChild) {
+                    tbody.insertBefore(row, tbody.firstChild);
+                } else {
+                    tbody.appendChild(row);
+                }
+                
+                // 如果之前有"暂无记录"或"等待数据"的占位符，移除它
+                const placeholder = tbody.querySelector('td[colspan="5"]');
+                if (placeholder) placeholder.parentElement.remove();
+            }
+            
+            const timeStr = new Date(data.start_time).toLocaleTimeString('zh-CN', { hour12: false }) + 
+                          '.' + new Date(data.start_time).getMilliseconds().toString().padStart(3, '0');
+            
+            // 判断 A 和 B 的类型（用于显示链上还是交易所的信息）
+            const aIsOnchain = traderAType && traderAType.startsWith('onchain:');
+            const bIsOnchain = traderBType && traderBType.startsWith('onchain:');
+            
+            // 现在 ExecutionRecord 直接使用 a 和 b 字段
+            const aStatus = data.a || data.on_chain || { status: 'N/A' }; // 向后兼容
+            const bStatus = data.b || data.exchange || { status: 'N/A' }; // 向后兼容
+            
+            // 决定整体样式类
+            row.className = ''; // 清除旧类
+            // 使用 A 和 B 的状态来判断
+            const aEffectiveStatus = aStatus.status === 'N/A' ? 'Success' : aStatus.status;
+            const bEffectiveStatus = bStatus.status === 'N/A' ? 'Success' : bStatus.status;
+            if (aEffectiveStatus === 'Failed' || bEffectiveStatus === 'Failed') {
+                row.classList.add('exec-row-failed');
+            } else if (aEffectiveStatus === 'Success' && bEffectiveStatus === 'Success') {
+                row.classList.add('exec-row-success');
+            } else {
+                row.classList.add('exec-row-pending');
+            }
+            
+            // 构造 A 状态详情
+            let aHtml = '<span class="status-badge ' + aStatus.status + '">' + aStatus.status + '</span>';
+            if (aStatus.status === 'N/A') {
+                aHtml = '<span class="status-badge" style="background: #666; color: #fff;">N/A</span>';
+            } else if (aStatus.status === 'Success') {
+                if (aStatus.tx_hash || aIsOnchain) {
+                    // 链上交易：显示成交数量和交易哈希
+                    aHtml += '<div class="detail-row">成交: ' + Number(aStatus.size || 0).toFixed(4) + '</div>';
+                    if (aStatus.tx_hash) {
+                        const shortHash = aStatus.tx_hash.substring(0, 6) + '...';
+                        aHtml += '<div class="detail-row"><a href="https://bscscan.com/tx/' + aStatus.tx_hash + '" target="_blank" class="tx-link">Tx: ' + shortHash + '</a></div>';
+                    }
+                } else {
+                    // 交易所交易：显示成交数量和价格
+                    aHtml += '<div class="detail-row">成交: ' + Number(aStatus.size || 0).toFixed(4) + ' @ ' + Number(aStatus.price || 0).toFixed(4) + '</div>';
+                    if (aStatus.order_id) {
+                        const shortOrderId = aStatus.order_id.length > 10 ? aStatus.order_id.substring(0, 10) + '...' : aStatus.order_id;
+                        aHtml += '<div class="detail-row" style="font-size: 11px; color: #888;">Order: ' + shortOrderId + '</div>';
+                    }
+                }
+            } else if (aStatus.error_msg) {
+                aHtml += '<div class="detail-row error-text">' + aStatus.error_msg + '</div>';
+            }
+            
+            // 构造 B 状态详情
+            let bHtml = '<span class="status-badge ' + bStatus.status + '">' + bStatus.status + '</span>';
+            if (bStatus.status === 'N/A') {
+                bHtml = '<span class="status-badge" style="background: #666; color: #fff;">N/A</span>';
+            } else if (bStatus.status === 'Success') {
+                if (bStatus.tx_hash || bIsOnchain) {
+                    // 链上交易：显示成交数量和交易哈希
+                    bHtml += '<div class="detail-row">成交: ' + Number(bStatus.size || 0).toFixed(4) + '</div>';
+                    if (bStatus.tx_hash) {
+                        const shortHash = bStatus.tx_hash.substring(0, 6) + '...';
+                        bHtml += '<div class="detail-row"><a href="https://bscscan.com/tx/' + bStatus.tx_hash + '" target="_blank" class="tx-link">Tx: ' + shortHash + '</a></div>';
+                    }
+                } else {
+                    // 交易所交易：显示成交数量和价格
+                    bHtml += '<div class="detail-row">成交: ' + Number(bStatus.size || 0).toFixed(4) + ' @ ' + Number(bStatus.price || 0).toFixed(4) + '</div>';
+                    if (bStatus.order_id) {
+                        const shortOrderId = bStatus.order_id.length > 10 ? bStatus.order_id.substring(0, 10) + '...' : bStatus.order_id;
+                        bHtml += '<div class="detail-row" style="font-size: 11px; color: #888;">Order: ' + shortOrderId + '</div>';
+                    }
+                }
+            } else if (bStatus.error_msg) {
+                bHtml += '<div class="detail-row error-text">' + bStatus.error_msg + '</div>';
+            }
+
+            row.innerHTML = '<td>' + timeStr + '</td>' +
+                '<td style="font-weight: bold;">' + data.direction + '</td>' +
+                '<td>' +
+                    '<div>Diff: ' + Number(data.diff_value).toFixed(4) + '%</div>' +
+                    '<div style="color: #888; font-size: 11px;">Thres: ' + Number(data.threshold).toFixed(4) + '%</div>' +
+                '</td>' +
+                '<td>' + aHtml + '</td>' +
+                '<td>' + bHtml + '</td>';
+            
+            // 限制行数，防止页面卡顿 (保留最近 50 条)
+            while (tbody.children.length > 50) {
+                tbody.removeChild(tbody.lastChild);
+            }
+        }
+        
+        // 启动 WS 和 历史加载
+        // 先加载配置（获取 traderAType 和 traderBType），然后再加载历史记录
+        loadConfig().then(() => {
+            loadExecutionHistory();
+        });
+        initWebSocket();
+
+        // 全局变量：存储 trader 类型和显示名称
+        let traderAType = '';
+        let traderBType = '';
+        let aDisplayName = 'A';
+        let bDisplayName = 'B';
+        
+        // 获取 trader 的显示名称（JavaScript 版本）
+        function getTraderDisplayName(traderType) {
+            if (!traderType) {
+                return '';
+            }
+            
+            // 解析 traderType：格式为 "type:value"（如 "binance:futures" 或 "onchain:56"）
+            const parts = traderType.split(':');
+            if (parts.length !== 2) {
+                return traderType; // 如果格式不对，直接返回原值
+            }
+            
+            const traderTypeStr = parts[0];
+            const value = parts[1];
+            
+            if (traderTypeStr === 'onchain') {
+                return '链上 ' + value; // 链上 + 链ID
+            }
+            
+            // 交易所类型，首字母大写 + 市场类型
+            const exchangeName = traderTypeStr.charAt(0).toUpperCase() + traderTypeStr.slice(1);
+            const marketType = value === 'futures' ? '合约' : (value === 'spot' ? '现货' : value);
+            return exchangeName + ' ' + marketType;
+        }
+        
+        // 格式化方向标签（用于时间序列数据图表标题）
+        function formatDirectionLabel(direction, aType, bType) {
+            // direction: "AB" 或 "BA"
+            // aType, bType: trader 显示名称
+            
+            const aName = aType || 'A';
+            const bName = bType || 'B';
+            
+            if (direction === 'AB') {
+                // +A-B: A 买入，B 卖出
+                return `+${aName}-${bName} (${aName}买 -> ${bName}卖)`;
+            } else {
+                // -A+B: A 卖出，B 买入
+                return `-${aName}+${bName} (${aName}卖 -> ${bName}买)`;
+            }
+        }
+        
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/trigger?symbol=' + encodeURIComponent(symbol));
+                if (!res.ok) {
+                    console.error('Failed to load config:', res.status);
+                    return;
+                }
+                const data = await res.json();
+                
+                // 保存 trader 类型
+                traderAType = data.traderAType || '';
+                traderBType = data.traderBType || '';
+                
+                // 生成显示名称
+                aDisplayName = getTraderDisplayName(traderAType) || 'A';
+                bDisplayName = getTraderDisplayName(traderBType) || 'B';
+                
+                // 更新持仓概览标题
+                const aPositionTitle = document.getElementById('aPositionTitle');
+                const bPositionTitle = document.getElementById('bPositionTitle');
+                if (aPositionTitle) {
+                    aPositionTitle.textContent = aDisplayName + ' 持仓';
+                }
+                if (bPositionTitle) {
+                    bPositionTitle.textContent = bDisplayName + ' 持仓';
+                }
+                
+                // 更新时间序列数据图表标题
+                const diffChartABTitle = document.getElementById('diffChartABTitle');
+                const diffChartBATitle = document.getElementById('diffChartBATitle');
+                if (diffChartABTitle) {
+                    diffChartABTitle.textContent = formatDirectionLabel('AB', aDisplayName, bDisplayName);
+                }
+                if (diffChartBATitle) {
+                    diffChartBATitle.textContent = formatDirectionLabel('BA', aDisplayName, bDisplayName);
+                }
+                
+                // 更新实时执行监控表头
+                const execStatusAHeader = document.getElementById('execStatusAHeader');
+                const execStatusBHeader = document.getElementById('execStatusBHeader');
+                if (execStatusAHeader) {
+                    execStatusAHeader.textContent = aDisplayName + ' 状态';
+                }
+                if (execStatusBHeader) {
+                    execStatusBHeader.textContent = bDisplayName + ' 状态';
+                }
+                
+                document.getElementById('enableAB').checked = data.enabledAB !== false;
+                document.getElementById('enableBA').checked = data.enabledBA !== false;
+                document.getElementById('minInterval').value = data.minInterval || data.interval || '0.1';
+                document.getElementById('maxInterval').value = data.maxInterval || '0';
+                document.getElementById('onChainSlippage').value = data.onChainSlippage || '0.2';
+                document.getElementById('gasMultiplier').value = data.gasMultiplier || '1.0';
+                document.getElementById('onChainGasLimit').value = data.onChainGasLimit || '500000';
+                document.getElementById('telegramNotification').checked = data.telegramNotificationEnabled !== false;
+                document.getElementById('bundlerEnabled').checked = data.bundlerEnabled === true;
+
+                // 更新状态和按钮
+                updateStatusUI(data.status);
+            } catch (error) {
+                console.error('加载配置失败:', error);
+            }
+        }
+
+        function updateStatusUI(status) {
+            const badge = document.getElementById('triggerStatusBadge');
+            const btnContainer = document.getElementById('actionButtons');
+            
+            if (status === 'running') {
+                badge.textContent = '运行中';
+                badge.className = 'status-badge-header running';
+                
+                btnContainer.innerHTML = `<button class="btn-compact btn-danger" onclick="stopTrigger()">🛑 停止运行</button>`;
+            } else {
+                badge.textContent = '已停止';
+                badge.className = 'status-badge-header stopped';
+                
+                btnContainer.innerHTML = `<button class="btn-compact" onclick="startTrigger()">🚀 启动运行</button>`;
+            }
+        }
+
+        async function startTrigger() {
+            try {
+                const res = await fetch('/api/trigger/start?symbol=' + encodeURIComponent(symbol), { method: 'POST' });
+                if (res.ok) {
+                    loadConfig(); // 刷新状态
+                } else {
+                    const err = await res.text();
+                    alert('启动失败: ' + err);
+                }
+            } catch (error) {
+                alert('启动失败: ' + error.message);
+            }
+        }
+
+        async function stopTrigger() {
+            try {
+                const res = await fetch('/api/trigger/stop?symbol=' + encodeURIComponent(symbol), { method: 'POST' });
+                if (res.ok) {
+                    loadConfig(); // 刷新状态
+                } else {
+                    const err = await res.text();
+                    alert('停止失败: ' + err);
+                }
+            } catch (error) {
+                alert('停止失败: ' + error.message);
+            }
+        }
+        
+        async function saveConfig() {
+            const config = {
+                symbol: symbol,
+                enableAB: document.getElementById('enableAB').checked,
+                enableBA: document.getElementById('enableBA').checked,
+                minInterval: parseFloat(document.getElementById('minInterval').value) || 0,
+                maxInterval: parseFloat(document.getElementById('maxInterval').value) || 0,
+                onChainSlippage: document.getElementById('onChainSlippage').value,
+                gasMultiplier: parseFloat(document.getElementById('gasMultiplier').value) || 1.0,
+                onChainGasLimit: document.getElementById('onChainGasLimit').value || '500000',
+                telegramNotificationEnabled: document.getElementById('telegramNotification').checked,
+                bundlerEnabled: document.getElementById('bundlerEnabled').checked
+            };
+            
+            try {
+                const res = await fetch('/api/trigger/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (res.ok) {
+                    alert('配置已保存');
+                    loadData();
+                } else {
+                    const errText = await res.text();
+                    alert('保存失败: ' + (errText || res.statusText || res.status));
+                }
+            } catch (error) {
+                alert('保存失败: ' + error.message);
+            }
+        }
+        
+        async function loadData() {
+            try {
+                // console.log('开始加载数据，symbol:', symbol); // 减少日志噪音
+                const res = await fetch('/api/trigger/data?symbol=' + encodeURIComponent(symbol));
+                
+                if (!res.ok) {
+                    console.error('API 请求失败:', res.status, res.statusText);
+                    return;
+                }
+                
+                const data = await res.json();
+                
+                // 检查数据结构
+                if (!data.optimalThresholds) {
+                    // console.warn('数据中缺少 optimalThresholds 字段');
+                }
+                
+                // 更新最优阈值数据
+                const thresholds = data.optimalThresholds || {};
+                
+                const thresholdABEl = document.getElementById('thresholdAB');
+                const thresholdBAEl = document.getElementById('thresholdBA');
+                const longOpportunityCountEl = document.getElementById('longOpportunityCount');
+                const shortOpportunityCountEl = document.getElementById('shortOpportunityCount');
+                
+                // 更新 thresholdAB
+                if (thresholdABEl) {
+                    if (thresholds.thresholdAB !== null && thresholds.thresholdAB !== undefined) {
+                        thresholdABEl.textContent = Number(thresholds.thresholdAB).toFixed(6);
+                    } else {
+                        thresholdABEl.textContent = '-';
+                    }
+                }
+                
+                // 更新 thresholdBA
+                if (thresholdBAEl) {
+                    if (thresholds.thresholdBA !== null && thresholds.thresholdBA !== undefined) {
+                        thresholdBAEl.textContent = Number(thresholds.thresholdBA).toFixed(6);
+                    } else {
+                        thresholdBAEl.textContent = '-';
+                    }
+                }
+                
+                // 更新机会点数量
+                if (longOpportunityCountEl) {
+                    longOpportunityCountEl.textContent = thresholds.longOpportunityCount || 0;
+                }
+                if (shortOpportunityCountEl) {
+                    shortOpportunityCountEl.textContent = thresholds.shortOpportunityCount || 0;
+                }
+                
+            } catch (error) {
+                console.error('加载数据失败:', error);
+            }
+        }
+        
+        // 判断是否为链上类型
+        function isOnchainType(traderType) {
+            if (!traderType) return false;
+            const parts = traderType.split(':');
+            return parts.length === 2 && parts[0] === 'onchain';
+        }
+        
+        // 获取交易所类型（从 "binance:futures" 提取 "binance"）
+        function getExchangeType(traderType) {
+            if (!traderType) return '';
+            const parts = traderType.split(':');
+            if (parts.length === 2 && parts[0] !== 'onchain') {
+                return parts[0];
+            }
+            return '';
+        }
+        
+        // 获取链ID（从 "onchain:56" 提取 "56"）
+        function getChainId(traderType) {
+            if (!traderType) return '';
+            const parts = traderType.split(':');
+            if (parts.length === 2 && parts[0] === 'onchain') {
+                return parts[1];
+            }
+            return '';
+        }
+        
+        async function loadPosition() {
+            try {
+                const res = await fetch('/api/trigger/position?symbol=' + encodeURIComponent(symbol));
+                if (!res.ok) return;
+                
+                const data = await res.json();
+                
+                // 判断 A 和 B 的类型
+                const aIsOnchain = isOnchainType(traderAType);
+                const bIsOnchain = isOnchainType(traderBType);
+                const aExchangeType = getExchangeType(traderAType);
+                const bExchangeType = getExchangeType(traderBType);
+                const aChainId = getChainId(traderAType);
+                const bChainId = getChainId(traderBType);
+                
+                // 渲染 A 持仓
+                const aContainer = document.getElementById('aPositionContainer');
+                let aHtml = '';
+                
+                if (aIsOnchain) {
+                    // A 是链上，显示链上余额
+                    const aBalances = (data.onchain_balances || []).filter(bal => bal.chain_index === aChainId);
+                    if (aBalances.length > 0) {
+                        aHtml = '<table style="width: 100%; font-size: 13px;">';
+                        aHtml += '<tr style="color: #666; text-align: left;"><th>Chain</th><th>Address</th><th style="text-align: right;">Balance</th></tr>';
+                        aBalances.forEach(bal => {
+                            const walletAddr = bal.wallet_address || '';
+                            const shortAddr = walletAddr.length > 10 ? walletAddr.substring(0, 6) + '...' + walletAddr.substring(walletAddr.length - 4) : walletAddr;
+                            aHtml += `<tr>
+                                <td style="padding: 4px 0;">${bal.chain_index}</td>
+                                <td title="${walletAddr}">${shortAddr}</td>
+                                <td style="text-align: right; font-weight: bold; color: #e0e0e0;">${Number(bal.balance).toFixed(4)}</td>
+                            </tr>`;
+                        });
+                        aHtml += '</table>';
+                    } else {
+                        aHtml = '<div style="color: #666; font-size: 13px;">暂无余额</div>';
+                    }
+                } else {
+                    // A 是交易所，显示交易所持仓
+                    const aPositions = (data.exchange_positions || []).filter(pos => pos.exchange_type === aExchangeType);
+                    if (aPositions.length > 0) {
+                        aHtml = '<table style="width: 100%; font-size: 13px;">';
+                        aHtml += '<tr style="color: #666; text-align: left;"><th>Type</th><th>Side</th><th style="text-align: right;">Size</th><th style="text-align: right;">PnL</th></tr>';
+                        let totalPnl = 0;
+                        aPositions.forEach(pos => {
+                            const sideColor = pos.side === 'LONG' ? '#4ade80' : '#f43f5e';
+                            const pnlColor = pos.unrealized_pnl >= 0 ? '#4ade80' : '#f43f5e';
+                            totalPnl += pos.unrealized_pnl || 0;
+                            aHtml += `<tr>
+                                <td style="padding: 4px 0;">${pos.exchange_type}</td>
+                                <td style="color: ${sideColor}; font-weight: bold;">${pos.side}</td>
+                                <td style="text-align: right;">${Number(pos.size).toFixed(4)}</td>
+                                <td style="text-align: right; color: ${pnlColor};">${Number(pos.unrealized_pnl).toFixed(2)}</td>
+                            </tr>`;
+                        });
+                        aHtml += '</table>';
+                        if (totalPnl != 0) {
+                            const totalPnlColor = totalPnl >= 0 ? '#4ade80' : '#f43f5e';
+                            aHtml += `<div style="margin-top: 10px; border-top: 1px solid #333; padding-top: 5px; text-align: right; font-size: 12px; color: #888;">
+                                Total PnL: <span style="color: ${totalPnlColor}; font-weight: bold; font-size: 14px;">${Number(totalPnl).toFixed(2)} USDT</span>
+                            </div>`;
+                        }
+                    } else {
+                        aHtml = '<div style="color: #666; font-size: 13px;">暂无持仓</div>';
+                    }
+                }
+                aContainer.innerHTML = aHtml;
+                
+                // 渲染 B 持仓
+                const bContainer = document.getElementById('bPositionContainer');
+                let bHtml = '';
+                
+                if (bIsOnchain) {
+                    // B 是链上，显示链上余额
+                    const bBalances = (data.onchain_balances || []).filter(bal => bal.chain_index === bChainId);
+                    if (bBalances.length > 0) {
+                        bHtml = '<table style="width: 100%; font-size: 13px;">';
+                        bHtml += '<tr style="color: #666; text-align: left;"><th>Chain</th><th>Address</th><th style="text-align: right;">Balance</th></tr>';
+                        bBalances.forEach(bal => {
+                            const walletAddr = bal.wallet_address || '';
+                            const shortAddr = walletAddr.length > 10 ? walletAddr.substring(0, 6) + '...' + walletAddr.substring(walletAddr.length - 4) : walletAddr;
+                            bHtml += `<tr>
+                                <td style="padding: 4px 0;">${bal.chain_index}</td>
+                                <td title="${walletAddr}">${shortAddr}</td>
+                                <td style="text-align: right; font-weight: bold; color: #e0e0e0;">${Number(bal.balance).toFixed(4)}</td>
+                            </tr>`;
+                        });
+                        bHtml += '</table>';
+                    } else {
+                        bHtml = '<div style="color: #666; font-size: 13px;">暂无余额</div>';
+                    }
+                } else {
+                    // B 是交易所，显示交易所持仓
+                    const bPositions = (data.exchange_positions || []).filter(pos => pos.exchange_type === bExchangeType);
+                    if (bPositions.length > 0) {
+                        bHtml = '<table style="width: 100%; font-size: 13px;">';
+                        bHtml += '<tr style="color: #666; text-align: left;"><th>Type</th><th>Side</th><th style="text-align: right;">Size</th><th style="text-align: right;">PnL</th></tr>';
+                        let totalPnl = 0;
+                        bPositions.forEach(pos => {
+                            const sideColor = pos.side === 'LONG' ? '#4ade80' : '#f43f5e';
+                            const pnlColor = pos.unrealized_pnl >= 0 ? '#4ade80' : '#f43f5e';
+                            totalPnl += pos.unrealized_pnl || 0;
+                            bHtml += `<tr>
+                                <td style="padding: 4px 0;">${pos.exchange_type}</td>
+                                <td style="color: ${sideColor}; font-weight: bold;">${pos.side}</td>
+                                <td style="text-align: right;">${Number(pos.size).toFixed(4)}</td>
+                                <td style="text-align: right; color: ${pnlColor};">${Number(pos.unrealized_pnl).toFixed(2)}</td>
+                            </tr>`;
+                        });
+                        bHtml += '</table>';
+                        if (totalPnl != 0) {
+                            const totalPnlColor = totalPnl >= 0 ? '#4ade80' : '#f43f5e';
+                            bHtml += `<div style="margin-top: 10px; border-top: 1px solid #333; padding-top: 5px; text-align: right; font-size: 12px; color: #888;">
+                                Total PnL: <span style="color: ${totalPnlColor}; font-weight: bold; font-size: 14px;">${Number(totalPnl).toFixed(2)} USDT</span>
+                            </div>`;
+                        }
+                    } else {
+                        bHtml = '<div style="color: #666; font-size: 13px;">暂无持仓</div>';
+                    }
+                }
+                bContainer.innerHTML = bHtml;
+                
+            } catch (error) {
+                console.error('加载持仓失败:', error);
+            }
+        }
+
+        
+        async function clearPriceDiffsForDetail() {
+            if (!confirm('确定要清空历史价差数据吗？\n\n这将：\n1. 清空所有历史价差数据\n2. 重置最优阈值计算结果\n3. 系统将基于新的价差数据重新计算最优阈值')) return;
+            
+            try {
+                const res = await fetch('/api/trigger/clear-price-diffs?symbol=' + encodeURIComponent(symbol), { method: 'POST' });
+                if (res.ok) {
+                    alert('历史价差数据已清空，系统将基于新的数据重新计算最优阈值');
+                    loadData(); // 刷新数据
+                } else {
+                    const errorText = await res.text();
+                    alert('清空失败: ' + errorText);
+                }
+            } catch (error) {
+                alert('清空失败: ' + error.message);
+            }
+        }
+
+        async function clearAllHistory() {
+            if (!confirm('⚠️ 确定要删除该交易对的所有历史数据吗？\n\n这将永久删除：\n1. 所有历史交易记录\n2. 所有执行监控日志\n3. 累计收益统计数据\n\n此操作不可恢复！')) return;
+            
+            try {
+                const res = await fetch('/api/statistics/clear?symbol=' + encodeURIComponent(symbol), { method: 'POST' });
+                if (res.ok) {
+                    alert('历史数据已全部删除');
+                    // 刷新页面以重置所有状态
+                    window.location.reload();
+                } else {
+                    const errorText = await res.text();
+                    alert('删除失败: ' + errorText);
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+        
+        // 通用折叠/展开函数
+        function toggleSection(contentId, iconId) {
+            const content = document.getElementById(contentId);
+            const icon = document.getElementById(iconId);
+            if (!content || !icon) return;
+            
+            const isHidden = content.style.display === 'none';
+            
+            if (isHidden) {
+                content.style.display = 'block';
+                icon.innerHTML = '▲';
+            } else {
+                content.style.display = 'none';
+                icon.innerHTML = '▼';
+            }
+        }
+
+        // 折叠/展开价差图表
+        function togglePriceDiff() {
+            const content = document.getElementById('priceDiffContent');
+            const icon = document.getElementById('priceDiffToggleIcon');
+            const isHidden = content.style.display === 'none';
+            
+            if (isHidden) {
+                content.style.display = 'block';
+                icon.innerHTML = '▲';
+                // 展开时立即重绘一次
+                loadStatistics();
+            } else {
+                content.style.display = 'none';
+                icon.innerHTML = '▼';
+            }
+        }
+
+        // 折叠/展开价格图表
+        function togglePriceChart() {
+            const content = document.getElementById('priceChartContent');
+            const icon = document.getElementById('priceChartToggleIcon');
+            const isHidden = content.style.display === 'none';
+            
+            if (isHidden) {
+                content.style.display = 'block';
+                icon.innerHTML = '▲';
+                // 展开时立即重绘一次
+                loadStatistics();
+            } else {
+                content.style.display = 'none';
+                icon.innerHTML = '▼';
+            }
+        }
+
+        // 加载统计数据
+        async function loadStatistics() {
+            const diffContent = document.getElementById('priceDiffContent');
+            const isDiffCollapsed = diffContent && diffContent.style.display === 'none';
+            
+            const priceContent = document.getElementById('priceChartContent');
+            const isPriceCollapsed = priceContent && priceContent.style.display === 'none';
+            
+            try {
+                const res = await fetch('/api/statistics?symbol=' + encodeURIComponent(symbol));
+                if (!res.ok) {
+                    console.error('加载统计数据失败:', res.status);
+                    return;
+                }
+                const data = await res.json();
+                
+                // 1. 更新滑点统计表格
+                if (data.slippageStats) {
+                    updateSlippageStatsTable(data.slippageStats, data.aName, data.bName);
+                }
+                
+                // 2. 更新成本统计表格
+                if (data.costStats) {
+                    updateCostStatsTable(data.costStats);
+                }
+                
+                // 3. 更新Size统计表格
+                if (data.sizeStats) {
+                    updateSizeStatsTable(data.sizeStats);
+                }
+                
+                // 4. 更新Trigger收益/亏损统计
+                if (data.triggerStats) {
+                    // 更新总交易次数（使用统计数据，更准确）
+                    const totalTradesEl = document.getElementById('totalTrades');
+                    if (totalTradesEl) {
+                        totalTradesEl.textContent = data.triggerStats.totalTrades || 0;
+                    }
+                    document.getElementById('statTotalVolume').textContent = (data.triggerStats.totalVolume || 0).toFixed(6);
+                    document.getElementById('statTotalVolumeUSDT').textContent = (data.triggerStats.totalVolumeUSDT || 0).toFixed(2);
+                    const profit = data.triggerStats.totalProfit || 0;
+                    const profitEl = document.getElementById('statTotalProfit');
+                    profitEl.textContent = profit.toFixed(2);
+                    profitEl.style.color = profit >= 0 ? '#4ade80' : '#f43f5e';
+                    document.getElementById('statWinCount').textContent = data.triggerStats.winCount || 0;
+                    document.getElementById('statLossCount').textContent = data.triggerStats.lossCount || 0;
+                }
+                
+                // 5. 更新图表数据
+                
+                // 仅当折叠区域展开时，才绘制价差图
+                if (!isDiffCollapsed && data.priceDiffRecords) {
+                    drawSingleDiffChart('priceDiffChartAB', data.priceDiffRecords, 'AB');
+                    drawSingleDiffChart('priceDiffChartBA', data.priceDiffRecords, 'BA');
+                }
+                
+                // 仅当折叠区域展开时，才绘制价格图
+                if (!isPriceCollapsed && data.priceRecords) {
+                    drawPriceChart(data.priceRecords);
+                }
+                
+                // 始终更新成交记录
+                if (data.tradeRecords) {
+                    updateTradeRecordsTable(data.tradeRecords);
+                }
+                
+            } catch (error) {
+                console.error('加载统计数据失败:', error);
+            }
+        }
+        
+        // 更新滑点统计表格
+        function updateSlippageStatsTable(slippageStats, aName, bName) {
+            // 如果没有传入 aName 和 bName，尝试从 slippageStats 中获取
+            if (!aName && slippageStats.aName) {
+                aName = slippageStats.aName;
+            }
+            if (!bName && slippageStats.bName) {
+                bName = slippageStats.bName;
+            }
+            
+            // 默认名称
+            if (!aName) aName = 'A';
+            if (!bName) bName = 'B';
+            
+            const table = '<table style="width: 100%; font-size: 12px; border-collapse: collapse;">' +
+                '<thead><tr style="background: #1a1a1a;"><th style="padding: 8px; text-align: left;">类型</th>' +
+                '<th style="padding: 8px; text-align: right;">平均值</th>' +
+                '<th style="padding: 8px; text-align: right;">最大值</th>' +
+                '<th style="padding: 8px; text-align: right;">最小值</th>' +
+                '<th style="padding: 8px; text-align: right;">90分位值</th></tr></thead>' +
+                '<tbody>' +
+                createStatRow(aName + '买入', slippageStats.aBuy) +
+                createStatRow(aName + '卖出', slippageStats.aSell) +
+                createStatRow(bName + '买入', slippageStats.bBuy) +
+                createStatRow(bName + '卖出', slippageStats.bSell) +
+                '</tbody></table>';
+            document.getElementById('slippageStatsTable').innerHTML = table;
+        }
+        
+        // 更新成本统计表格
+        function updateCostStatsTable(costStats) {
+            const table = '<table style="width: 100%; font-size: 12px; border-collapse: collapse;">' +
+                '<thead><tr style="background: #1a1a1a;"><th style="padding: 8px; text-align: left;">类型</th>' +
+                '<th style="padding: 8px; text-align: right;">平均值</th>' +
+                '<th style="padding: 8px; text-align: right;">最大值</th>' +
+                '<th style="padding: 8px; text-align: right;">最小值</th>' +
+                '<th style="padding: 8px; text-align: right;">90分位值</th></tr></thead>' +
+                '<tbody>' +
+                createStatRow('成本（币数量）', costStats.costInCoin) +
+                createStatRow('成本百分比', costStats.costPercent) +
+                '</tbody></table>';
+            document.getElementById('costStatsTable').innerHTML = table;
+        }
+        
+        // 更新Size统计表格
+        function updateSizeStatsTable(sizeStats) {
+            const table = '<table style="width: 100%; font-size: 12px; border-collapse: collapse;">' +
+                '<thead><tr style="background: #1a1a1a;"><th style="padding: 8px; text-align: left;">类型</th>' +
+                '<th style="padding: 8px; text-align: right;">平均值</th>' +
+                '<th style="padding: 8px; text-align: right;">最大值</th>' +
+                '<th style="padding: 8px; text-align: right;">最小值</th>' +
+                '<th style="padding: 8px; text-align: right;">90分位值</th></tr></thead>' +
+                '<tbody>' +
+                createStatRow('Size（币数量）', sizeStats.size) +
+                createStatRow('Size（USDT）', sizeStats.sizeUSDT) +
+                '</tbody></table>';
+            document.getElementById('sizeStatsTable').innerHTML = table;
+        }
+        
+        // 创建统计行
+        function createStatRow(label, stats) {
+            if (!stats) return '';
+            return '<tr style="border-bottom: 1px solid #333;">' +
+                '<td style="padding: 8px;">' + label + '</td>' +
+                '<td style="padding: 8px; text-align: right;">' + (stats.average || 0).toFixed(6) + '</td>' +
+                '<td style="padding: 8px; text-align: right;">' + (stats.max || 0).toFixed(6) + '</td>' +
+                '<td style="padding: 8px; text-align: right;">' + (stats.min || 0).toFixed(6) + '</td>' +
+                '<td style="padding: 8px; text-align: right;">' + (stats.percentile90 || 0).toFixed(6) + '</td>' +
+                '</tr>';
+        }
+        
+        // 绘制单个方向价差图表（入口函数）
+        function drawSingleDiffChart(canvasId, records, type) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            // 1. 将数据挂载到 Canvas 元素上，供事件回调使用
+            canvas.chartData = { records, type };
+            
+            // 2. 初始化事件监听（仅执行一次）
+            if (!canvas.hasChartEvents) {
+                canvas.lastMousePos = null; // 存储鼠标位置
+                
+                canvas.addEventListener('mousemove', (e) => {
+                    canvas.lastMousePos = { x: e.offsetX, y: e.offsetY };
+                    // 触发重绘
+                    drawDiffChartCore(canvas, canvas.chartData.records, canvas.chartData.type, canvas.lastMousePos);
+                });
+                
+                canvas.addEventListener('mouseleave', () => {
+                    canvas.lastMousePos = null;
+                    // 触发重绘（清除 Tooltip）
+                    drawDiffChartCore(canvas, canvas.chartData.records, canvas.chartData.type, null);
+                });
+                
+                canvas.hasChartEvents = true;
+            }
+            
+            // 3. 执行绘制（传入当前可能存在的鼠标位置，保持 Tooltip 不消失）
+            drawDiffChartCore(canvas, records, type, canvas.lastMousePos);
+        }
+
+        // 核心绘制逻辑（包含十字线和 Tooltip）
+        function drawDiffChartCore(canvas, records, type, mousePos) {
+            if (!canvas || !records || records.length === 0) return;
+            
+            const isAB = type === 'AB';
+            const valueKey = isAB ? 'diffAB' : 'diffBA';
+            const colorUp = '#4ade80'; // 绿色 > 0
+            const colorDown = '#f43f5e'; // 红色 < 0
+            
+            const ctx = canvas.getContext('2d');
+            const width = canvas.offsetWidth;
+            const height = 200;
+            const padding = { top: 10, right: 50, bottom: 30, left: 50 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            if (records.length < 2) return;
+            
+            // 过滤有效的时间戳
+            const validTimestamps = records.map(r => r.timestamp).filter(t => t != null && t !== undefined && !isNaN(t));
+            if (validTimestamps.length < 2) return;
+            
+            // 计算时间轴范围 (Diff Chart)
+            const dataMaxTime = Math.max(...validTimestamps);
+            const dataMinTime = Math.min(...validTimestamps);
+            
+            let maxTime, minTime;
+            
+            if (chartTimeRange > 0) {
+                maxTime = dataMaxTime;
+                minTime = maxTime - (chartTimeRange / 1000);
+            } else {
+                maxTime = dataMaxTime;
+                minTime = dataMinTime;
+            }
+            
+            const timeRange = maxTime - minTime || 1;
+            
+            // 过滤有效的价差值
+            const validDiffs = [];
+            records.forEach(r => {
+                const val = r[valueKey];
+                if (val != null && val !== undefined && !isNaN(val)) {
+                    validDiffs.push(val);
+                }
+            });
+            
+            if (validDiffs.length === 0) return;
+            
+            let dataMax = Math.max(...validDiffs);
+            let dataMin = Math.min(...validDiffs);
+            
+            // 确保 Y 轴始终包含 0
+            let maxDiff = Math.max(dataMax, 0);
+            let minDiff = Math.min(dataMin, 0);
+            
+            // 添加 10% 的内边距
+            let range = maxDiff - minDiff;
+            if (range === 0) range = 1;
+            
+            maxDiff += range * 0.1;
+            minDiff -= range * 0.1;
+            range = maxDiff - minDiff;
+            
+            // --- 绘制基础图表 (网格、坐标轴、数据线) ---
+            
+            // 绘制网格线
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 0.5;
+            const yTickCount = 5;
+            for (let i = 0; i <= yTickCount; i++) {
+                const y = padding.top + (chartHeight / yTickCount) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(padding.left + chartWidth, y);
+                ctx.stroke();
+            }
+            
+            const xTickCount = 5;
+            for (let i = 0; i <= xTickCount; i++) {
+                const x = padding.left + (chartWidth / xTickCount) * i;
+                ctx.beginPath();
+                ctx.moveTo(x, padding.top);
+                ctx.lineTo(x, padding.top + chartHeight);
+                ctx.stroke();
+            }
+            
+            // 绘制 0 轴线
+            if (maxDiff > 0 && minDiff < 0) {
+                const yZero = padding.top + chartHeight - ((0 - minDiff) / range) * chartHeight;
+                ctx.beginPath();
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 3]);
+                ctx.moveTo(padding.left, yZero);
+                ctx.lineTo(padding.left + chartWidth, yZero);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // 绘制 Y 轴标签
+            ctx.fillStyle = '#888';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= yTickCount; i++) {
+                const value = minDiff + (range / yTickCount) * (yTickCount - i);
+                const y = padding.top + (chartHeight / yTickCount) * i;
+                ctx.fillText(value.toFixed(2) + '%', padding.left - 5, y);
+            }
+            
+            // 绘制 X 轴标签
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            for (let i = 0; i <= xTickCount; i++) {
+                const time = minTime + (timeRange / xTickCount) * i;
+                const date = new Date(time * 1000);
+                const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const x = padding.left + (chartWidth / xTickCount) * i;
+                ctx.fillText(timeStr, x, padding.top + chartHeight + 5);
+            }
+            
+            // 绘制坐标轴线
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top);
+            ctx.lineTo(padding.left, padding.top + chartHeight);
+            ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
+            ctx.stroke();
+            
+            // 构造渐变色
+            const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
+            const stopPos = Math.max(0, Math.min(1, 1 - ((0 - minDiff) / range)));
+            gradient.addColorStop(0, colorUp);
+            gradient.addColorStop(stopPos, colorUp);
+            gradient.addColorStop(stopPos, colorDown);
+            gradient.addColorStop(1, colorDown);
+
+            // --- 开始绘制数据线 (使用 clip 限制区域) ---
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(padding.left, padding.top, chartWidth, chartHeight);
+            ctx.clip();
+
+            // 绘制数据线
+            ctx.beginPath();
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 2;
+            let hasData = false;
+            
+            // 预处理坐标点，供后续 Tooltip 使用
+            const points = [];
+            
+            records.forEach((record) => {
+                const val = record[valueKey];
+                if (record.timestamp != null && val != null && !isNaN(record.timestamp) && !isNaN(val)) {
+                    // 仅收集在时间窗口内(或附近)的点用于 Tooltip，但绘图可以包含所有点以保证连贯性
+                    // 这里我们计算所有点的坐标，Canvas 的 clip 会自动裁剪掉超出部分
+                    
+                    const x = padding.left + ((record.timestamp - minTime) / timeRange) * chartWidth;
+                    const y = padding.top + chartHeight - ((val - minDiff) / range) * chartHeight;
+                    
+                    // 只保存可视范围内的点用于 Tooltip 交互
+                    if (x >= padding.left && x <= padding.left + chartWidth) {
+                        points.push({ x, y, record, val });
+                    }
+                    
+                    if (!hasData) {
+                        ctx.moveTo(x, y);
+                        hasData = true;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+            });
+            if (hasData) ctx.stroke();
+            
+            ctx.restore(); // 恢复 clip 状态，以免影响后续绘制 (如 Tooltip)
+            
+            // --- 交互绘制 (十字线 & Tooltip) ---
+            if (mousePos && points.length > 0) {
+                // 1. 找到离鼠标 X 坐标最近的数据点 (X 轴吸附)
+                // 仅当鼠标在图表区域内时处理
+                if (mousePos.x >= padding.left && mousePos.x <= width - padding.right &&
+                    mousePos.y >= padding.top && mousePos.y <= height - padding.bottom) {
+                    
+                    let closestPoint = points[0];
+                    let minDistX = Math.abs(mousePos.x - points[0].x);
+                    
+                    for (let i = 1; i < points.length; i++) {
+                        const dist = Math.abs(mousePos.x - points[i].x);
+                        if (dist < minDistX) {
+                            minDistX = dist;
+                            closestPoint = points[i];
+                        }
+                    }
+                    
+                    const { x, y, record, val } = closestPoint;
+                    
+                    // 2. 绘制十字准线
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 0.5;
+                    ctx.setLineDash([3, 3]);
+                    
+                    // 垂直线
+                    ctx.moveTo(x, padding.top);
+                    ctx.lineTo(x, padding.top + chartHeight);
+                    
+                    // 水平线
+                    ctx.moveTo(padding.left, y);
+                    ctx.lineTo(padding.left + chartWidth, y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    // 3. 绘制数据点圆点
+                    ctx.beginPath();
+                    ctx.fillStyle = '#fff';
+                    ctx.arc(x, y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 4. 绘制 Tooltip
+                    const date = new Date(record.timestamp * 1000);
+                    const timeStr = date.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
+                    const valStr = val.toFixed(4) + '%';
+                    
+                    const tipText1 = `时间: ${timeStr}`;
+                    const tipText2 = `价差: ${valStr}`;
+                    
+                    ctx.font = '11px sans-serif';
+                    const textWidth = Math.max(ctx.measureText(tipText1).width, ctx.measureText(tipText2).width) + 10;
+                    const textHeight = 34;
+                    const tipPadding = 6;
+                    
+                    // 计算 Tooltip 位置，防止溢出
+                    let tipX = x + 10;
+                    let tipY = y - 10;
+                    
+                    if (tipX + textWidth > width) tipX = x - 10 - textWidth;
+                    if (tipY + textHeight > height) tipY = height - textHeight;
+                    if (tipY < 0) tipY = 0;
+                    
+                    // Tooltip 背景
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                    ctx.strokeStyle = '#666';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.roundRect(tipX, tipY, textWidth, textHeight, 4);
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    // Tooltip 文字
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(tipText1, tipX + 5, tipY + 5);
+                    
+                    // 数值颜色根据正负变化
+                    ctx.fillStyle = val >= 0 ? colorUp : colorDown;
+                    ctx.fillText(tipText2, tipX + 5, tipY + 19);
+                }
+            }
+        }
+        
+        // 绘制价格图表
+        function drawPriceChart(records) {
+            const canvas = document.getElementById('priceChart');
+            if (!canvas || !records || records.length === 0) return;
+            
+            const ctx = canvas.getContext('2d');
+            const width = canvas.offsetWidth;
+            const height = 200;
+            // 增加右侧 padding 以容纳图例 (从 50 -> 120)
+            const padding = { top: 10, right: 120, bottom: 30, left: 60 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            if (records.length < 2) return;
+            
+            // 过滤有效的时间戳
+            const validTimestamps = records.map(r => r.timestamp).filter(t => t != null && t !== undefined && !isNaN(t));
+            if (validTimestamps.length < 2) return;
+            
+            // 计算时间轴范围 (Price Chart)
+            const dataMaxTime = Math.max(...validTimestamps);
+            const dataMinTime = Math.min(...validTimestamps);
+            
+            let maxTime, minTime;
+            
+            if (chartTimeRange > 0) {
+                maxTime = dataMaxTime;
+                minTime = maxTime - (chartTimeRange / 1000);
+            } else {
+                maxTime = dataMaxTime;
+                minTime = dataMinTime;
+            }
+            
+            const timeRange = maxTime - minTime || 1;
+            
+            // 过滤有效的价格值
+            const allPrices = [];
+            records.forEach(r => {
+                if (r.exchangeBid != null && !isNaN(r.exchangeBid)) allPrices.push(r.exchangeBid);
+                if (r.exchangeAsk != null && !isNaN(r.exchangeAsk)) allPrices.push(r.exchangeAsk);
+                if (r.onchainBid != null && !isNaN(r.onchainBid)) allPrices.push(r.onchainBid);
+                if (r.onchainAsk != null && !isNaN(r.onchainAsk)) allPrices.push(r.onchainAsk);
+            });
+            
+            if (allPrices.length === 0) return;
+            
+            let maxPrice = Math.max(...allPrices);
+            let minPrice = Math.min(...allPrices);
+            
+            // 添加 5% 的内边距，防止曲线贴边
+            let priceRange = maxPrice - minPrice;
+            if (priceRange === 0) priceRange = maxPrice * 0.01 || 0.0001;
+            
+            maxPrice += priceRange * 0.05;
+            minPrice -= priceRange * 0.05;
+            priceRange = maxPrice - minPrice;
+            
+            // 绘制网格线
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 0.5;
+            const yTickCount = 5;
+            for (let i = 0; i <= yTickCount; i++) {
+                const y = padding.top + (chartHeight / yTickCount) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(padding.left + chartWidth, y);
+                ctx.stroke();
+            }
+            
+            const xTickCount = 5;
+            for (let i = 0; i <= xTickCount; i++) {
+                const x = padding.left + (chartWidth / xTickCount) * i;
+                ctx.beginPath();
+                ctx.moveTo(x, padding.top);
+                ctx.lineTo(x, padding.top + chartHeight);
+                ctx.stroke();
+            }
+            
+            // 绘制 Y 轴刻度和标签（价格）
+            ctx.fillStyle = '#888';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= yTickCount; i++) {
+                const value = minPrice + (priceRange / yTickCount) * (yTickCount - i);
+                const y = padding.top + (chartHeight / yTickCount) * i;
+                // 价格精度较高，显示6位小数
+                ctx.fillText(value.toFixed(6), padding.left - 5, y);
+            }
+            
+            // 绘制 X 轴刻度和标签（时间）
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            for (let i = 0; i <= xTickCount; i++) {
+                const time = minTime + (timeRange / xTickCount) * i;
+                const date = new Date(time * 1000);
+                const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const x = padding.left + (chartWidth / xTickCount) * i;
+                ctx.fillText(timeStr, x, padding.top + chartHeight + 5);
+            }
+            
+            // 绘制坐标轴
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1;
+            // Y 轴
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top);
+            ctx.lineTo(padding.left, padding.top + chartHeight);
+            ctx.stroke();
+            // X 轴
+            ctx.beginPath();
+            ctx.moveTo(padding.left, padding.top + chartHeight);
+            ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
+            ctx.stroke();
+            
+            // 绘制图例
+            const legendX = width - padding.right + 10;
+            const legendY = padding.top + 10;
+            const legendItemHeight = 18;
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            
+            // 交易所卖出价（绿色）
+            ctx.fillStyle = '#10b981';
+            ctx.fillRect(legendX, legendY, 20, 3);
+            ctx.fillStyle = '#fff';
+            ctx.fillText('交易所卖出价', legendX + 25, legendY);
+            
+            // 交易所买入价（红色）
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(legendX, legendY + legendItemHeight, 20, 3);
+            ctx.fillStyle = '#fff';
+            ctx.fillText('交易所买入价', legendX + 25, legendY + legendItemHeight);
+            
+            // 链上卖出价（蓝色）
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(legendX, legendY + legendItemHeight * 2, 20, 3);
+            ctx.fillStyle = '#fff';
+            ctx.fillText('链上卖出价', legendX + 25, legendY + legendItemHeight * 2);
+            
+            // 链上买入价（黄色）
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(legendX, legendY + legendItemHeight * 3, 20, 3);
+            ctx.fillStyle = '#fff';
+            ctx.fillText('链上买入价', legendX + 25, legendY + legendItemHeight * 3);
+            
+            // --- 使用 clip 限制绘制区域 ---
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(padding.left, padding.top, chartWidth, chartHeight);
+            ctx.clip();
+
+            // 绘制交易所 Bid (卖出价) - 绿色
+            ctx.beginPath();
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 2;
+            let hasExchangeBidData = false;
+            records.forEach((record, i) => {
+                if (record.timestamp != null && record.exchangeBid != null && !isNaN(record.timestamp) && !isNaN(record.exchangeBid)) {
+                    const x = padding.left + ((record.timestamp - minTime) / timeRange) * chartWidth;
+                    const y = padding.top + chartHeight - ((record.exchangeBid - minPrice) / priceRange) * chartHeight;
+                    if (!hasExchangeBidData) {
+                        ctx.moveTo(x, y);
+                        hasExchangeBidData = true;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+            });
+            if (hasExchangeBidData) ctx.stroke();
+            
+            // 绘制交易所 Ask (买入价) - 红色
+            ctx.beginPath();
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            let hasExchangeAskData = false;
+            records.forEach((record, i) => {
+                if (record.timestamp != null && record.exchangeAsk != null && !isNaN(record.timestamp) && !isNaN(record.exchangeAsk)) {
+                    const x = padding.left + ((record.timestamp - minTime) / timeRange) * chartWidth;
+                    const y = padding.top + chartHeight - ((record.exchangeAsk - minPrice) / priceRange) * chartHeight;
+                    if (!hasExchangeAskData) {
+                        ctx.moveTo(x, y);
+                        hasExchangeAskData = true;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+            });
+            if (hasExchangeAskData) ctx.stroke();
+            
+            // 绘制链上 Bid (卖出价) - 蓝色
+            ctx.beginPath();
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 2;
+            let hasOnchainBidData = false;
+            records.forEach((record, i) => {
+                if (record.timestamp != null && record.onchainBid != null && !isNaN(record.timestamp) && !isNaN(record.onchainBid)) {
+                    const x = padding.left + ((record.timestamp - minTime) / timeRange) * chartWidth;
+                    const y = padding.top + chartHeight - ((record.onchainBid - minPrice) / priceRange) * chartHeight;
+                    if (!hasOnchainBidData) {
+                        ctx.moveTo(x, y);
+                        hasOnchainBidData = true;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+            });
+            if (hasOnchainBidData) ctx.stroke();
+            
+            // 绘制链上 Ask (买入价) - 黄色
+            ctx.beginPath();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 2;
+            let hasOnchainAskData = false;
+            records.forEach((record, i) => {
+                if (record.timestamp != null && record.onchainAsk != null && !isNaN(record.timestamp) && !isNaN(record.onchainAsk)) {
+                    const x = padding.left + ((record.timestamp - minTime) / timeRange) * chartWidth;
+                    const y = padding.top + chartHeight - ((record.onchainAsk - minPrice) / priceRange) * chartHeight;
+                    if (!hasOnchainAskData) {
+                        ctx.moveTo(x, y);
+                        hasOnchainAskData = true;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+            });
+            if (hasOnchainAskData) ctx.stroke();
+            
+            ctx.restore(); // 恢复 clip 状态
+        }
+        
+        // 更新成交记录表格
+        function updateTradeRecordsTable(records) {
+            const tbody = document.getElementById('tradeRecordsTable');
+            if (!tbody) return;
+            
+            // 只显示最近20条记录
+            const recentRecords = records.slice(-20).reverse();
+            
+            tbody.innerHTML = recentRecords.map(record => {
+                const date = new Date(record.timestamp * 1000);
+                const timeStr = date.toLocaleTimeString();
+                const profit = record.profit || 0;
+                const profitColor = profit >= 0 ? '#4ade80' : '#f43f5e';
+                return '<tr style="border-bottom: 1px solid #333;">' +
+                    '<td style="padding: 8px;">' + timeStr + '</td>' +
+                    '<td style="padding: 8px;">' + record.direction + '</td>' +
+                    '<td style="padding: 8px; text-align: right;">' + (record.size || 0).toFixed(6) + '</td>' +
+                    '<td style="padding: 8px; text-align: right;">' + (record.sizeUSDT || 0).toFixed(2) + '</td>' +
+                    '<td style="padding: 8px; text-align: right;">' + (record.diffValue || 0).toFixed(4) + '%</td>' +
+                    '<td style="padding: 8px; text-align: right; color: ' + profitColor + ';">' + profit.toFixed(2) + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+        
+        // 每2秒刷新数据
+        loadConfig();
+        loadData();
+        loadPosition();
+        loadStatistics();
+        setInterval(loadData, 2000);
+        setInterval(loadPosition, 3000);
+        setInterval(loadStatistics, 2000);
+    </script>
+</body>
+</html>

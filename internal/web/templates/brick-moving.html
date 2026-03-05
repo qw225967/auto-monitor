@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>搬砖区 - 套利系统管理面板</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: #4ade80; margin-bottom: 20px; }
+        .section { background: #2a2a2a; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .section-title { font-size: 18px; font-weight: bold; color: #4ade80; }
+        button { 
+            padding: 8px 16px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 14px; 
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #4ade80; color: #000; }
+        .btn-primary:hover { background: #22c55e; }
+        .btn-danger { background: #f43f5e; color: #fff; }
+        .btn-danger:hover { background: #e11d48; }
+        .btn-secondary { background: #60a5fa; color: #fff; }
+        .btn-secondary:hover { background: #3b82f6; }
+        /* 列表操作列：按钮紧凑、对齐 */
+        .op-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .op-cell button { padding: 5px 10px; font-size: 12px; white-space: nowrap; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
+        th { color: #888; font-weight: 500; }
+        .search-box { padding: 8px 12px; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #e0e0e0; width: 300px; margin-bottom: 15px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; padding: 30px; border-radius: 8px; min-width: 400px; max-width: 90vw; max-height: 90vh; overflow-y: auto; }
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; margin-bottom: 5px; color: #888; }
+        .form-input { width: 100%; padding: 8px 12px; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #e0e0e0; }
+        .status { padding: 4px 12px; border-radius: 4px; font-size: 12px; }
+        .status.running { background: #4ade80; color: #000; }
+        .status.stopped { background: #f43f5e; color: #fff; }
+        .link { color: #60a5fa; cursor: pointer; text-decoration: underline; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+        .switch-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        .switch input:checked + .switch-slider { background-color: #4ade80; }
+        .switch input:checked + .switch-slider:before { transform: translateX(26px); }
+        
+        /* 配置区域的容器 */
+        .config-sections-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            align-items: stretch;
+            width: 100%;
+        }
+        
+        /* 三个配置区域样式 */
+        .config-section { 
+            background: #1f1f1f; 
+            border-radius: 6px; 
+            padding: 15px; 
+            border-left: 3px solid #4ade80;
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+        .config-section-title { 
+            font-size: 16px; 
+            font-weight: 600; 
+            color: #4ade80; 
+            margin-bottom: 12px; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px;
+        }
+        .config-form { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; 
+            flex: 1;
+        }
+        .config-form-item { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 5px; 
+        }
+        .config-form-item label { 
+            font-size: 12px; 
+            color: #888; 
+        }
+        .config-form-item input, .config-form-item select { 
+            padding: 6px 10px; 
+            border: 1px solid #333; 
+            border-radius: 4px; 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            font-size: 13px;
+            width: 100%;
+        }
+        .config-form-item input[type="checkbox"] { 
+            width: auto; 
+        }
+        .config-status { 
+            margin-top: auto;
+            padding: 10px; 
+            background: #2a2a2a; 
+            border-radius: 4px; 
+            font-size: 12px; 
+            color: #888;
+        }
+        .position-display {
+            padding: 8px 12px;
+            background: #2a2a2a;
+            border: 1px solid #4ade80;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #4ade80;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+        }
+        
+        /* Pipeline 可视化 */
+        .pipeline-visual { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            padding: 10px; 
+            background: #2a2a2a; 
+            border-radius: 4px; 
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .pipeline-node { 
+            padding: 6px 12px; 
+            background: #1a1a1a; 
+            border: 1px solid #4ade80; 
+            border-radius: 4px; 
+            font-size: 12px; 
+            color: #4ade80;
+        }
+        .pipeline-arrow { color: #888; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧱 搬砖区</h1>
+        
+        <!-- 导航栏：搬砖区、订单、充提记录 -->
+        <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <a href="/" style="color: #888; text-decoration: none; padding: 8px 16px; background: #2a2a2a; border-radius: 6px;">主页</a>
+            <a href="/volume-scalper" style="color: #888; text-decoration: none; padding: 8px 16px; background: #2a2a2a; border-radius: 6px;">交易量刷子</a>
+            <a href="/brick-moving" style="color: #4ade80; text-decoration: none; padding: 8px 16px; background: #2a2a2a; border-radius: 6px;">搬砖区</a>
+            <a href="#" style="color: #888; text-decoration: none; padding: 8px 16px; background: #2a2a2a; border-radius: 6px;">订单</a>
+            <a href="#" style="color: #888; text-decoration: none; padding: 8px 16px; background: #2a2a2a; border-radius: 6px;">充提记录</a>
+        </div>
+        
+        <!-- 币列表（搬砖区首页） -->
+        <div id="brickTrigger">
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-title">搬砖区币列表</div>
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <button class="btn-primary" onclick="showCreateBrickTriggerModal()">+ 创建 Trigger</button>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <input type="text" class="search-box" id="brickTriggerSearch" placeholder="搜索 Symbol..." onkeyup="searchBrickTriggers()" style="margin-bottom: 0;">
+                    <label style="display: flex; align-items: center; gap: 6px; color: #888; font-size: 13px; white-space: nowrap; cursor: pointer;">
+                        <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()" style="accent-color: #4ade80;"> 自动刷新 (5s)
+                    </label>
+                </div>
+                <table id="brickTriggerTable">
+                    <thead>
+                        <tr>
+                            <th>序号</th>
+                            <th>Symbol</th>
+                            <th>方向</th>
+                            <th>交易所 A</th>
+                            <th>交易所 B</th>
+                            <th>价差 A→B</th>
+                            <th>价差 B→A</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="brickTriggerTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 创建 Trigger 模态框 -->
+    <div id="createBrickTriggerModal" class="modal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px;">创建搬砖 Trigger</h2>
+            <div class="form-group">
+                <label class="form-label">Symbol（输入代币名称，如 INJ）</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="form-input" id="brickTriggerSymbol" placeholder="例如: INJ" style="flex: 1; text-transform: uppercase;">
+                    <button class="btn-secondary" onclick="scanTokenChains()" id="scanChainsBtn" style="white-space: nowrap;">查找全链</button>
+                </div>
+                <div id="chainScanResults" style="margin-top: 10px; font-size: 13px; color: #aaa;"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">计价币种</label>
+                <input type="text" class="form-input" id="brickTriggerQuote" value="USDT" placeholder="USDT" style="text-transform: uppercase; max-width: 160px;">
+            </div>
+            <div class="form-group">
+                <label class="form-label">A 端类型</label>
+                <select class="form-input" id="brickTriggerTraderAType">
+                    <optgroup label="交易所 : spot">
+                        <option value="binance:spot">Binance:spot</option>
+                        <option value="gate:spot">Gate:spot</option>
+                        <option value="bybit:spot">Bybit:spot</option>
+                        <option value="bitget:spot">Bitget:spot</option>
+                        <option value="okex:spot">OKX:spot</option>
+                    </optgroup>
+                    <optgroup label="交易所 : futures">
+                        <option value="binance:futures">Binance:futures</option>
+                        <option value="gate:futures">Gate:futures</option>
+                        <option value="bybit:futures">Bybit:futures</option>
+                        <option value="bitget:futures">Bitget:futures</option>
+                        <option value="okex:futures">OKX:futures</option>
+                    </optgroup>
+                    <optgroup label="链上 : onchain:链ID">
+                        <option value="onchain:1">onchain:1 (ETH)</option>
+                        <option value="onchain:56">onchain:56 (BSC)</option>
+                        <option value="onchain:10">onchain:10 (Optimism)</option>
+                        <option value="onchain:137">onchain:137 (Polygon)</option>
+                        <option value="onchain:250">onchain:250 (Fantom)</option>
+                        <option value="onchain:42161">onchain:42161 (Arbitrum)</option>
+                        <option value="onchain:43114">onchain:43114 (Avalanche)</option>
+                        <option value="onchain:8453">onchain:8453 (Base)</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">B 端类型</label>
+                <select class="form-input" id="brickTriggerTraderBType">
+                    <optgroup label="交易所 : spot">
+                        <option value="binance:spot">Binance:spot</option>
+                        <option value="gate:spot">Gate:spot</option>
+                        <option value="bybit:spot">Bybit:spot</option>
+                        <option value="bitget:spot">Bitget:spot</option>
+                        <option value="okex:spot">OKX:spot</option>
+                    </optgroup>
+                    <optgroup label="交易所 : futures">
+                        <option value="binance:futures">Binance:futures</option>
+                        <option value="gate:futures">Gate:futures</option>
+                        <option value="bybit:futures">Bybit:futures</option>
+                        <option value="bitget:futures">Bitget:futures</option>
+                        <option value="okex:futures">OKX:futures</option>
+                    </optgroup>
+                    <optgroup label="链上 : onchain:链ID">
+                        <option value="onchain:1">onchain:1 (ETH)</option>
+                        <option value="onchain:56">onchain:56 (BSC)</option>
+                        <option value="onchain:10">onchain:10 (Optimism)</option>
+                        <option value="onchain:137">onchain:137 (Polygon)</option>
+                        <option value="onchain:250">onchain:250 (Fantom)</option>
+                        <option value="onchain:42161">onchain:42161 (Arbitrum)</option>
+                        <option value="onchain:43114">onchain:43114 (Avalanche)</option>
+                        <option value="onchain:8453">onchain:8453 (Base)</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-primary" onclick="createBrickTrigger()">创建</button>
+                <button class="btn-secondary" onclick="closeCreateBrickTriggerModal()">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pipeline 配置模态框 -->
+    <div id="pipelineConfigModal" class="modal" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 1000px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #4ade80;">Pipeline 配置</h2>
+                <button onclick="closePipelineConfigModal()" 
+                        style="background: transparent; color: #888; border: none; font-size: 28px; cursor: pointer; line-height: 1; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"
+                        title="关闭">×</button>
+            </div>
+            <div style="margin-bottom: 15px; padding: 10px; background: #1f1f1f; border-radius: 6px;">
+                <div><strong>Trigger:</strong> <span id="pipelineTriggerSymbol">--</span></div>
+                <div><strong>方向:</strong> <span id="pipelineDirection">--</span></div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Pipeline 节点序列</label>
+                <div id="pipelineNodesList" style="min-height: 200px; padding: 15px; background: #1f1f1f; border-radius: 6px; margin-bottom: 15px;">
+                    <div style="text-align: center; color: #666; padding: 40px;">暂无节点，点击下方"添加节点"按钮开始配置</div>
+                </div>
+                <button class="btn-secondary" onclick="addPipelineNode()" style="margin-bottom: 15px;">+ 添加节点</button>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-primary" onclick="savePipelineConfig()">保存 Pipeline</button>
+                <button class="btn-secondary" onclick="closePipelineConfigModal()">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pipeline 节点编辑模态框 -->
+    <div id="pipelineNodeModal" class="modal" style="z-index: 3000;">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px;">配置 Pipeline 节点</h2>
+            <div class="form-group">
+                <label class="form-label">节点类型</label>
+                <select class="form-input" id="nodeType" onchange="onNodeTypeChange()">
+                    <option value="exchange">交易所</option>
+                    <option value="chain">链</option>
+                </select>
+            </div>
+            <div id="exchangeNodeConfig" class="form-group">
+                <div class="form-group">
+                    <label class="form-label">交易所</label>
+                    <select class="form-input" id="nodeExchangeType">
+                        <option value="binance">Binance</option>
+                        <option value="gate">Gate</option>
+                        <option value="bybit">Bybit</option>
+                        <option value="bitget">Bitget</option>
+                        <option value="okex">OKX</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">市场类型</label>
+                    <select class="form-input" id="nodeMarketType">
+                        <option value="spot">现货</option>
+                        <option value="futures">合约</option>
+                    </select>
+                </div>
+            </div>
+            <div id="chainNodeConfig" class="form-group" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">链ID</label>
+                    <input type="text" class="form-input" id="nodeChainID" placeholder="例如: 56">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">链名称</label>
+                    <input type="text" class="form-input" id="nodeChainName" placeholder="例如: BSC">
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-primary" onclick="savePipelineNode()">保存节点</button>
+                <button class="btn-secondary" onclick="closePipelineNodeModal()">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 搜索充提链模态框 -->
+    <div id="chainSearchModal" class="modal" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 800px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #4ade80;">🔍 搜索充提链</h2>
+                <button onclick="closeChainSearchModal()" 
+                        style="background: transparent; color: #888; border: none; font-size: 28px; cursor: pointer; line-height: 1; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"
+                        title="关闭">×</button>
+            </div>
+            <div style="margin-bottom: 15px; padding: 10px; background: #1f1f1f; border-radius: 6px;">
+                <div><strong>Trigger:</strong> <span id="chainSearchTriggerSymbol">--</span></div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">搜索条件</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" class="form-input" id="chainSearchInput" placeholder="输入交易所、链名称或Symbol搜索..." 
+                           style="flex: 1;" onkeyup="if(event.key==='Enter') searchChains()">
+                    <button class="btn-primary" onclick="searchChains()">搜索</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">搜索结果</label>
+                <div id="chainSearchResults" style="min-height: 300px; max-height: 500px; overflow-y: auto; padding: 15px; background: #1f1f1f; border-radius: 6px;">
+                    <div style="text-align: center; color: #666; padding: 40px;">请输入搜索条件并点击搜索</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-secondary" onclick="closeChainSearchModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 全局变量
+        let currentPipelineTriggerSymbol = '';
+        let currentPipelineTriggerId = ''; // 同 symbol 多 trigger 时，列表弹窗内保存/加载 pipeline 用
+        let currentPipelineDirection = '';
+        let currentPipelineNodes = [];
+        let editingNodeIndex = -1;
+        let currentChainSearchSymbol = '';
+        
+        // 加载版本信息
+        fetch('/api/version')
+            .then(res => res.json())
+            .then(data => {
+                const versionEl = document.createElement('div');
+                versionEl.style.position = 'fixed';
+                versionEl.style.top = '10px';
+                versionEl.style.right = '20px';
+                versionEl.style.color = '#666';
+                versionEl.style.fontSize = '12px';
+                versionEl.style.zIndex = '2000';
+                versionEl.style.pointerEvents = 'none';
+                versionEl.innerText = data.version || 'dev';
+                document.body.appendChild(versionEl);
+            })
+            .catch(err => console.error('Failed to load version:', err));
+        
+        function fmtTradeStatus(raw) {
+            if (!raw || raw === '') return { t: '-', c: '#888' };
+            if (raw === 'Apending' || raw === 'Bpending') return { t: 'pending', c: '#eab308' };
+            if (raw === 'A完成' || raw === 'B完成') return { t: '完成', c: '#22c55e' };
+            if (raw === 'A失败' || raw === 'B失败') return { t: '失败', c: '#ef4444' };
+            return { t: raw, c: '#888' };
+        }
+        function getTraderDisplayName(traderType) {
+            if (!traderType) return '-';
+            const parts = traderType.split(':');
+            if (parts.length !== 2) return traderType;
+            const traderTypeStr = parts[0];
+            const value = parts[1];
+            if (traderTypeStr === 'onchain') return '链上 ' + value;
+            const exchangeName = traderTypeStr.charAt(0).toUpperCase() + traderTypeStr.slice(1);
+            const marketType = value === 'futures' ? '合约' : (value === 'spot' ? '现货' : value);
+            return exchangeName + ' ' + marketType;
+        }
+        
+        let autoRefreshTimer = null;
+        function toggleAutoRefresh() {
+            const checked = document.getElementById('autoRefreshToggle').checked;
+            if (checked) {
+                loadBrickTriggers();
+                autoRefreshTimer = setInterval(loadBrickTriggers, 5000);
+            } else {
+                if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+            }
+        }
+
+        async function loadBrickTriggers() {
+            try {
+                const res = await fetch('/api/brick-moving/arbitrage-list');
+                const list = await res.json();
+                const tbody = document.getElementById('brickTriggerTableBody');
+                const rows = Array.isArray(list) ? list : [];
+                
+                tbody.innerHTML = rows.map((t, idx) => {
+                    const aDisplay = getTraderDisplayName(t.exchangeA || t.traderAType);
+                    const bDisplay = getTraderDisplayName(t.exchangeB || t.traderBType);
+                    // 列表项必须带 triggerId，后续详情/保存/应用/自动充提都依赖此 id
+                    const triggerId = (t.id !== undefined && t.id !== null && t.id !== '') ? String(t.id) : '';
+                    const symbol = t.symbol || '';
+                    const esc = (s) => (s || '').replace(/'/g, "\\'");
+                    const indexNum = idx + 1;
+                    // 详情链接始终带 triggerId，保证进入详情页后所有操作都带 triggerId
+                    const detailHref = triggerId ? ('/brick-moving/' + encodeURIComponent(symbol) + '?triggerId=' + encodeURIComponent(triggerId)) : ('/brick-moving/' + encodeURIComponent(symbol));
+                    
+                    let statusText = '';
+                    let statusClass = '';
+                    if (t.autoWithdrawEnabled) {
+                        statusText = '正在自动充提';
+                        statusClass = 'running';
+                    } else if (t.status === 'running') {
+                        statusText = '正在搬砖';
+                        statusClass = 'running';
+                    } else {
+                        statusText = '已停止';
+                        statusClass = 'stopped';
+                    }
+                    const faAB = fmtTradeStatus(t.tradeStatusABA != null ? t.tradeStatusABA : t.tradeStatusA);
+                    const fbAB = fmtTradeStatus(t.tradeStatusABB != null ? t.tradeStatusABB : t.tradeStatusB);
+                    const fbBA = fmtTradeStatus(t.tradeStatusBAB);
+                    const faBA = fmtTradeStatus(t.tradeStatusBAA);
+                    const tradeStatusLine = '+A-B: <span style="color:' + faAB.c + '">' + faAB.t + '</span>→<span style="color:' + fbAB.c + '">' + fbAB.t + '</span> &nbsp; -A+B: <span style="color:' + fbBA.c + '">' + fbBA.t + '</span>→<span style="color:' + faBA.c + '">' + faBA.t + '</span>';
+                    
+                    const diffAB = (typeof t.diffAB === 'number') ? t.diffAB.toFixed(4) + '%' : '-';
+                    const diffBA = (typeof t.diffBA === 'number') ? t.diffBA.toFixed(4) + '%' : '-';
+                    const diffABColor = (t.diffAB > 0) ? '#4ade80' : (t.diffAB < 0 ? '#f43f5e' : '#888');
+                    const diffBAColor = (t.diffBA > 0) ? '#4ade80' : (t.diffBA < 0 ? '#f43f5e' : '#888');
+
+                    const enabledAB = !!t.enabledAB;
+                    const enabledBA = !!t.enabledBA;
+                    const q = triggerId ? ('&triggerId=' + encodeURIComponent(triggerId)) : '';
+                    const btnABStart = enabledAB ? '' : ('<button class="btn-primary" onclick="setBrickDirectionEnabled(\'' + esc(triggerId) + '\',\'' + esc(symbol) + '\',\'AB\',true)">+A-B 开始</button> ');
+                    const btnABStop = !enabledAB ? '' : ('<button class="btn-danger" onclick="setBrickDirectionEnabled(\'' + esc(triggerId) + '\',\'' + esc(symbol) + '\',\'AB\',false)">+A-B 停止</button> ');
+                    const btnBAStart = enabledBA ? '' : ('<button class="btn-primary" onclick="setBrickDirectionEnabled(\'' + esc(triggerId) + '\',\'' + esc(symbol) + '\',\'BA\',true)">-A+B 开始</button> ');
+                    const btnBAStop = !enabledBA ? '' : ('<button class="btn-danger" onclick="setBrickDirectionEnabled(\'' + esc(triggerId) + '\',\'' + esc(symbol) + '\',\'BA\',false)">-A+B 停止</button> ');
+
+                    return '<tr class="trigger-row" data-symbol="' + esc(symbol) + '" data-trigger-id="' + esc(triggerId) + '">' +
+                        '<td>' + indexNum + '</td>' +
+                        '<td><a href="' + detailHref + '" class="link">' + (symbol || '-') + '</a></td>' +
+                        '<td>' + (t.direction || 'A→B') + '</td>' +
+                        '<td>' + aDisplay + '</td>' +
+                        '<td>' + bDisplay + '</td>' +
+                        '<td style="color:' + diffABColor + '; font-weight: 600;">' + diffAB + '</td>' +
+                        '<td style="color:' + diffBAColor + '; font-weight: 600;">' + diffBA + '</td>' +
+                        '<td><span class="status ' + statusClass + '">' + statusText + '</span><br><small>' + tradeStatusLine + '</small></td>' +
+                        '<td class="op-cell">' +
+                        '<button class="btn-secondary" onclick="startAutoDetectWithdraw(\'' + esc(symbol) + '\', \'forward\', \'' + esc(triggerId) + '\')">充提 A→B</button>' +
+                        '<button class="btn-secondary" onclick="startAutoDetectWithdraw(\'' + esc(symbol) + '\', \'backward\', \'' + esc(triggerId) + '\')">充提 B→A</button>' +
+                        btnABStart + btnABStop + btnBAStart + btnBAStop +
+                        '<button class="btn-danger" onclick="deleteBrickTrigger(\'' + esc(triggerId) + '\',\'' + esc(symbol) + '\')">删除</button>' +
+                        '</td>' +
+                        '</tr>';
+                }).join('');
+                
+                searchBrickTriggers();
+            } catch (error) {
+                console.error('加载搬砖区币列表失败:', error);
+            }
+        }
+        
+        // 开始自动检测并充提（列表调用时传入 triggerId，与详情页一致）
+        async function startAutoDetectWithdraw(symbol, direction, triggerId) {
+            try {
+                const q = 'triggerSymbol=' + encodeURIComponent(symbol) + '&direction=' + encodeURIComponent(direction) + (triggerId ? '&triggerId=' + encodeURIComponent(triggerId) : '');
+                const res = await fetch('/api/brick-moving/pipeline/run?' + q, { method: 'POST' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    alert('启动失败: ' + (data.error || res.statusText));
+                    return;
+                }
+                if (data.status === 'started' && data.pipelineId) {
+                    alert('自动充提已启动');
+                    loadBrickTriggers(); // 重新加载列表
+                }
+            } catch (e) {
+                alert('请求失败: ' + e.message);
+            }
+        }
+        
+        
+        // 搜索 Trigger
+        function searchBrickTriggers() {
+            const search = document.getElementById('brickTriggerSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('#brickTriggerTableBody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(search) ? '' : 'none';
+            });
+        }
+        
+        // 创建 Trigger 相关函数
+        function showCreateBrickTriggerModal() {
+            document.getElementById('brickTriggerSymbol').value = '';
+            document.getElementById('brickTriggerQuote').value = 'USDT';
+            document.getElementById('brickTriggerTraderAType').value = 'binance:spot';
+            document.getElementById('brickTriggerTraderBType').value = 'binance:spot';
+            document.getElementById('chainScanResults').innerHTML = '';
+            document.getElementById('createBrickTriggerModal').style.display = 'block';
+        }
+        
+        function closeCreateBrickTriggerModal() {
+            document.getElementById('createBrickTriggerModal').style.display = 'none';
+        }
+        
+        function ensureQuoteSuffix(symbol) {
+            if (!symbol || typeof symbol !== 'string') return symbol;
+            var u = symbol.toUpperCase();
+            if (u.endsWith('USDT') || u.endsWith('USDC') || u.endsWith('BUSD')) return u;
+            return u + 'USDT';
+        }
+        
+        async function scanTokenChains() {
+            const symbolEl = document.getElementById('brickTriggerSymbol');
+            const symbol = (symbolEl ? symbolEl.value.trim() : '').toUpperCase();
+            if (!symbol) { alert('请先输入 Symbol'); return; }
+            
+            const btn = document.getElementById('scanChainsBtn');
+            const results = document.getElementById('chainScanResults');
+            btn.disabled = true;
+            btn.textContent = '扫描中...';
+            results.innerHTML = '<span style="color: #f0b429;">正在扫描所有链，请稍候...</span>';
+            
+            try {
+                const res = await fetch('/api/brick-moving/token-chains/scan?symbol=' + encodeURIComponent(symbol), { method: 'POST' });
+                const data = await res.json();
+                
+                // 等待扫描完成（异步，轮询结果）
+                setTimeout(async () => {
+                    try {
+                        const r2 = await fetch('/api/brick-moving/token-chains?symbol=' + encodeURIComponent(symbol));
+                        const d2 = await r2.json();
+                        const chains = d2.chains || {};
+                        const chainEntries = Object.entries(chains);
+                        if (chainEntries.length === 0) {
+                            results.innerHTML = '<span style="color: #f87171;">未找到该代币的链上地址</span>';
+                        } else {
+                            const chainNames = {'1':'ETH','56':'BSC','137':'Polygon','42161':'Arbitrum','10':'Optimism','43114':'Avalanche','8453':'Base','250':'Fantom'};
+                            results.innerHTML = '<div style="color: #4ade80; margin-bottom: 6px;">找到 ' + chainEntries.length + ' 条链：</div>' +
+                                chainEntries.map(([cid, info]) => {
+                                    const name = chainNames[cid] || ('Chain ' + cid);
+                                    const vTag = info.verified ? '<span style="color:#4ade80;">✓</span>' : '<span style="color:#f0b429;">?</span>';
+                                    return '<div style="padding: 3px 0; font-family: monospace;">' + vTag + ' ' + name + ' (' + cid + '): ' + info.address.slice(0,10) + '...' + info.address.slice(-6) + ' <span style="color:#666;">[' + info.source + ']</span></div>';
+                                }).join('');
+                        }
+                    } catch (e) {
+                        results.innerHTML = '<span style="color: #f87171;">查询结果失败: ' + e.message + '</span>';
+                    }
+                    btn.disabled = false;
+                    btn.textContent = '查找全链';
+                }, 5000);
+            } catch (error) {
+                results.innerHTML = '<span style="color: #f87171;">扫描失败: ' + error.message + '</span>';
+                btn.disabled = false;
+                btn.textContent = '查找全链';
+            }
+        }
+        
+        async function createBrickTrigger() {
+            const baseEl = document.getElementById('brickTriggerSymbol');
+            const quoteEl = document.getElementById('brickTriggerQuote');
+            let base = baseEl ? baseEl.value.trim().toUpperCase() : '';
+            let quote = quoteEl ? quoteEl.value.trim().toUpperCase() : 'USDT';
+            if (!quote) quote = 'USDT';
+            
+            if (!base) {
+                alert('请输入 Symbol');
+                return;
+            }
+            
+            let symbol = base;
+            if (!symbol.endsWith(quote)) {
+                symbol = base + quote;
+            }
+            
+            const traderAType = document.getElementById('brickTriggerTraderAType').value.trim();
+            const traderBType = document.getElementById('brickTriggerTraderBType').value.trim();
+            
+            const requestBody = { symbol };
+            if (traderAType) requestBody.traderAType = traderAType;
+            if (traderBType) requestBody.traderBType = traderBType;
+            
+            try {
+                const res = await fetch('/api/brick-moving/trigger/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                if (res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    closeCreateBrickTriggerModal();
+                    // 创建后跳转详情必须带 triggerId，后续保存/应用/自动充提都依赖 URL 中的 triggerId
+                    const id = (data.id !== undefined && data.id !== null && data.id !== '') ? String(data.id) : '';
+                    const qs = id ? ('?triggerId=' + encodeURIComponent(id) + '&new=1') : '?new=1';
+                    window.location.href = '/brick-moving/' + encodeURIComponent(symbol) + qs;
+                    return;
+                } else {
+                    const errText = await res.text();
+                    alert('创建失败: ' + errText);
+                }
+            } catch (error) {
+                alert('创建失败: ' + error.message);
+            }
+        }
+        
+        // 设置方向启用状态（+A-B / -A+B 开始、停止），与详情页状态一致
+        async function setBrickDirectionEnabled(triggerId, symbol, direction, enabled) {
+            try {
+                const url = '/api/brick-moving/trigger/config' + (triggerId ? '?triggerId=' + encodeURIComponent(triggerId) : '');
+                const body = { symbol: symbol };
+                if (direction === 'AB') body.enabledAB = enabled;
+                else body.enabledBA = enabled;
+                const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                if (res.ok) loadBrickTriggers();
+                else { const t = await res.text(); alert('操作失败: ' + t); }
+            } catch (error) {
+                alert('请求失败: ' + error.message);
+            }
+        }
+        
+        async function startBrickTrigger(triggerId, symbol) {
+            try {
+                const q = 'symbol=' + encodeURIComponent(symbol) + (triggerId ? '&triggerId=' + encodeURIComponent(triggerId) : '');
+                const res = await fetch('/api/brick-moving/trigger/start?' + q, { method: 'POST' });
+                if (res.ok) loadBrickTriggers();
+            } catch (error) {
+                alert('启动失败: ' + error.message);
+            }
+        }
+        
+        async function stopBrickTrigger(triggerId, symbol) {
+            try {
+                const q = 'symbol=' + encodeURIComponent(symbol) + (triggerId ? '&triggerId=' + encodeURIComponent(triggerId) : '');
+                const res = await fetch('/api/brick-moving/trigger/stop?' + q, { method: 'POST' });
+                if (res.ok) loadBrickTriggers();
+            } catch (error) {
+                alert('停止失败: ' + error.message);
+            }
+        }
+        
+        async function deleteBrickTrigger(triggerId, symbol) {
+            if (!confirm('确定要删除这个 Trigger 吗？')) return;
+            try {
+                const q = (triggerId ? 'triggerId=' + encodeURIComponent(triggerId) : 'symbol=' + encodeURIComponent(symbol));
+                const res = await fetch('/api/brick-moving/trigger/delete?' + q, { method: 'DELETE' });
+                if (res.ok) loadBrickTriggers();
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+        
+        // 更新套保配置
+        async function updateHedgingConfig(symbol) {
+            const enabled = document.getElementById('hedgingEnabled_' + symbol).checked;
+            const exchangeType = document.getElementById('hedgingExchange_' + symbol).value;
+            const hedgingSymbol = document.getElementById('hedgingSymbol_' + symbol).value;
+            const size = parseFloat(document.getElementById('hedgingSize_' + symbol).value);
+            const position = parseFloat(document.getElementById('hedgingPosition_' + symbol).value);
+            
+            try {
+                const res = await fetch('/api/brick-moving/trigger/hedging', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        enabled: enabled,
+                        exchangeType: exchangeType,
+                        hedgingSymbol: hedgingSymbol,
+                        size: size,
+                        position: position
+                    })
+                });
+                
+                if (res.ok) {
+                    const statusEl = document.getElementById('hedgingStatus_' + symbol);
+                    statusEl.textContent = enabled ? '套保已启用' : '套保未启用';
+                } else {
+                    alert('更新套保配置失败');
+                }
+            } catch (error) {
+                alert('更新套保配置失败: ' + error.message);
+            }
+        }
+        
+        // 更新 Trigger 配置
+        // triggerId 可选，同 symbol 多 trigger 时传入以保证更新到正确 trigger
+        async function updateTriggerConfig(symbol, triggerId) {
+            const size = parseFloat(document.getElementById('triggerSize_' + symbol).value);
+            const thresholdAB = parseFloat(document.getElementById('triggerThresholdAB_' + symbol).value);
+            const thresholdBA = parseFloat(document.getElementById('triggerThresholdBA_' + symbol).value);
+            const enabledAB = document.getElementById('triggerEnableAB_' + symbol).checked;
+            const enabledBA = document.getElementById('triggerEnableBA_' + symbol).checked;
+            const tid = (triggerId !== undefined && triggerId !== null && triggerId !== '') ? String(triggerId) : '';
+            try {
+                const configUrl = '/api/brick-moving/trigger/config' + (tid ? '?triggerId=' + encodeURIComponent(tid) : '');
+                const res = await fetch(configUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        size: size,
+                        thresholdAB: thresholdAB,
+                        thresholdBA: thresholdBA,
+                        enabledAB: enabledAB,
+                        enabledBA: enabledBA
+                    })
+                });
+                
+                if (res.ok) {
+                    console.log('Trigger 配置已更新');
+                } else {
+                    alert('更新 Trigger 配置失败');
+                }
+            } catch (error) {
+                alert('更新 Trigger 配置失败: ' + error.message);
+            }
+        }
+        
+        // 更新自动充提配置
+        async function updateAutoTransferConfig(symbol) {
+            const enabled = document.getElementById('autoTransferEnabled_' + symbol).checked;
+            
+            try {
+                const res = await fetch('/api/brick-moving/trigger/auto-transfer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        enabled: enabled
+                    })
+                });
+                
+                if (res.ok) {
+                    console.log('自动充提配置已更新');
+                } else {
+                    alert('更新自动充提配置失败');
+                }
+            } catch (error) {
+                alert('更新自动充提配置失败: ' + error.message);
+            }
+        }
+        
+        // Pipeline 配置相关函数（triggerId 可选，同 symbol 多 trigger 时传入以区分）
+        function openPipelineConfig(symbol, direction, triggerId) {
+            currentPipelineTriggerSymbol = symbol;
+            currentPipelineTriggerId = (triggerId !== undefined && triggerId !== null && triggerId !== '') ? String(triggerId) : '';
+            currentPipelineDirection = direction;
+            currentPipelineNodes = [];
+            editingNodeIndex = -1;
+            
+            document.getElementById('pipelineTriggerSymbol').textContent = symbol;
+            document.getElementById('pipelineDirection').textContent = direction === 'forward' ? 'Forward (A → B)' : 'Backward (B → A)';
+            
+            // 加载现有 Pipeline 配置
+            loadPipelineConfig(symbol, direction);
+            
+            document.getElementById('pipelineConfigModal').style.display = 'block';
+        }
+        
+        async function loadPipelineConfig(symbol, direction) {
+            try {
+                const q = 'triggerSymbol=' + encodeURIComponent(symbol) + (currentPipelineTriggerId ? '&triggerId=' + encodeURIComponent(currentPipelineTriggerId) : '');
+                const res = await fetch('/api/brick-moving/pipelines?' + q);
+                const data = await res.json();
+                
+                const pipeline = direction === 'forward' ? data.forward : data.backward;
+                if (pipeline && pipeline.nodes) {
+                    currentPipelineNodes = pipeline.nodes;
+                } else {
+                    currentPipelineNodes = [];
+                }
+                
+                renderPipelineNodes();
+            } catch (error) {
+                console.error('加载 Pipeline 配置失败:', error);
+                currentPipelineNodes = [];
+                renderPipelineNodes();
+            }
+        }
+        
+        function renderPipelineNodes() {
+            const container = document.getElementById('pipelineNodesList');
+            if (currentPipelineNodes.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">暂无节点，点击下方"添加节点"按钮开始配置</div>';
+                return;
+            }
+            
+            container.innerHTML = currentPipelineNodes.map((node, idx) => {
+                const nodeName = node.name || node.exchangeType || node.chainName || '未知节点';
+                return '<div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: #2a2a2a; border-radius: 4px; margin-bottom: 10px;">' +
+                    '<span style="color: #888; min-width: 30px;">' + (idx + 1) + '.</span>' +
+                    '<span class="pipeline-node">' + nodeName + '</span>' +
+                    '<span style="color: #888; font-size: 12px; margin-left: auto;">' + node.type + '</span>' +
+                    '<button class="btn-secondary" onclick="editPipelineNode(' + idx + ')" style="padding: 4px 8px; font-size: 12px;">编辑</button>' +
+                    '<button class="btn-danger" onclick="removePipelineNode(' + idx + ')" style="padding: 4px 8px; font-size: 12px;">删除</button>' +
+                    (idx > 0 ? '<button class="btn-secondary" onclick="movePipelineNodeUp(' + idx + ')" style="padding: 4px 8px; font-size: 12px;">↑</button>' : '') +
+                    (idx < currentPipelineNodes.length - 1 ? '<button class="btn-secondary" onclick="movePipelineNodeDown(' + idx + ')" style="padding: 4px 8px; font-size: 12px;">↓</button>' : '') +
+                    '</div>';
+            }).join('');
+        }
+        
+        function addPipelineNode() {
+            editingNodeIndex = -1;
+            document.getElementById('nodeType').value = 'exchange';
+            onNodeTypeChange();
+            document.getElementById('pipelineNodeModal').style.display = 'block';
+        }
+        
+        function editPipelineNode(index) {
+            editingNodeIndex = index;
+            const node = currentPipelineNodes[index];
+            document.getElementById('nodeType').value = node.type || 'exchange';
+            onNodeTypeChange();
+            
+            if (node.type === 'exchange') {
+                document.getElementById('nodeExchangeType').value = node.exchangeType || 'binance';
+                document.getElementById('nodeMarketType').value = node.marketType || 'spot';
+            } else {
+                document.getElementById('nodeChainID').value = node.chainID || '';
+                document.getElementById('nodeChainName').value = node.chainName || '';
+            }
+            
+            document.getElementById('pipelineNodeModal').style.display = 'block';
+        }
+        
+        function onNodeTypeChange() {
+            const nodeType = document.getElementById('nodeType').value;
+            if (nodeType === 'exchange') {
+                document.getElementById('exchangeNodeConfig').style.display = 'block';
+                document.getElementById('chainNodeConfig').style.display = 'none';
+            } else {
+                document.getElementById('exchangeNodeConfig').style.display = 'none';
+                document.getElementById('chainNodeConfig').style.display = 'block';
+            }
+        }
+        
+        function savePipelineNode() {
+            const nodeType = document.getElementById('nodeType').value;
+            let node = {
+                id: 'node-' + Date.now(),
+                type: nodeType
+            };
+            
+            if (nodeType === 'exchange') {
+                node.exchangeType = document.getElementById('nodeExchangeType').value;
+                node.marketType = document.getElementById('nodeMarketType').value;
+                node.name = document.getElementById('nodeExchangeType').value.charAt(0).toUpperCase() + 
+                           document.getElementById('nodeExchangeType').value.slice(1) + ' ' + 
+                           (document.getElementById('nodeMarketType').value === 'futures' ? '合约' : '现货');
+            } else {
+                node.chainID = document.getElementById('nodeChainID').value;
+                node.chainName = document.getElementById('nodeChainName').value;
+                node.name = document.getElementById('nodeChainName').value || 'Chain ' + document.getElementById('nodeChainID').value;
+            }
+            
+            if (editingNodeIndex >= 0) {
+                currentPipelineNodes[editingNodeIndex] = node;
+            } else {
+                currentPipelineNodes.push(node);
+            }
+            
+            closePipelineNodeModal();
+            renderPipelineNodes();
+        }
+        
+        function removePipelineNode(index) {
+            if (confirm('确定要删除这个节点吗？')) {
+                currentPipelineNodes.splice(index, 1);
+                renderPipelineNodes();
+            }
+        }
+        
+        function movePipelineNodeUp(index) {
+            if (index > 0) {
+                [currentPipelineNodes[index], currentPipelineNodes[index - 1]] = 
+                [currentPipelineNodes[index - 1], currentPipelineNodes[index]];
+                renderPipelineNodes();
+            }
+        }
+        
+        function movePipelineNodeDown(index) {
+            if (index < currentPipelineNodes.length - 1) {
+                [currentPipelineNodes[index], currentPipelineNodes[index + 1]] = 
+                [currentPipelineNodes[index + 1], currentPipelineNodes[index]];
+                renderPipelineNodes();
+            }
+        }
+        
+        function closePipelineNodeModal() {
+            document.getElementById('pipelineNodeModal').style.display = 'none';
+            editingNodeIndex = -1;
+        }
+        
+        async function savePipelineConfig() {
+            try {
+                const body = {
+                    triggerSymbol: currentPipelineTriggerSymbol,
+                    triggerId: currentPipelineTriggerId || '',
+                    direction: currentPipelineDirection,
+                    nodes: currentPipelineNodes
+                };
+                const res = await fetch('/api/brick-moving/pipeline', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                if (res.ok) {
+                    closePipelineConfigModal();
+                    loadBrickTriggers(); // 刷新列表以更新 Pipeline 可视化
+                    alert('Pipeline 配置已保存');
+                } else {
+                    alert('保存 Pipeline 配置失败');
+                }
+            } catch (error) {
+                alert('保存 Pipeline 配置失败: ' + error.message);
+            }
+        }
+        
+        function closePipelineConfigModal() {
+            document.getElementById('pipelineConfigModal').style.display = 'none';
+        }
+        
+        // 打开搜索充提链模态框
+        function openChainSearch(symbol) {
+            currentChainSearchSymbol = symbol;
+            document.getElementById('chainSearchTriggerSymbol').textContent = symbol;
+            document.getElementById('chainSearchInput').value = '';
+            document.getElementById('chainSearchResults').innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">请输入搜索条件并点击搜索</div>';
+            document.getElementById('chainSearchModal').style.display = 'block';
+        }
+        
+        // 关闭搜索充提链模态框
+        function closeChainSearchModal() {
+            document.getElementById('chainSearchModal').style.display = 'none';
+            currentChainSearchSymbol = '';
+        }
+        
+        // 搜索充提链
+        async function searchChains() {
+            const searchTerm = document.getElementById('chainSearchInput').value.trim();
+            const resultsDiv = document.getElementById('chainSearchResults');
+            
+            if (!searchTerm) {
+                resultsDiv.innerHTML = '<div style="text-align: center; color: #f43f5e; padding: 20px;">请输入搜索条件</div>';
+                return;
+            }
+            
+            resultsDiv.innerHTML = '<div style="text-align: center; color: #888; padding: 40px;">搜索中...</div>';
+            
+            try {
+                // TODO: 调用实际的API搜索充提链
+                // 这里暂时使用mock数据
+                const res = await fetch('/api/brick-moving/chains/search?q=' + encodeURIComponent(searchTerm) + '&symbol=' + encodeURIComponent(currentChainSearchSymbol));
+                
+                if (!res.ok) {
+                    throw new Error('搜索失败');
+                }
+                
+                const data = await res.json();
+                const chains = data.chains || [];
+                
+                if (chains.length === 0) {
+                    resultsDiv.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;">未找到匹配的充提链</div>';
+                    return;
+                }
+                
+                resultsDiv.innerHTML = chains.map((chain, idx) => {
+                    const chainData = encodeURIComponent(JSON.stringify(chain));
+                    return '<div style="padding: 15px; margin-bottom: 10px; background: #2a2a2a; border-radius: 6px; border-left: 3px solid #4ade80;">' +
+                        '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">' +
+                        '<div><strong style="color: #4ade80;">' + (chain.name || chain.id) + '</strong></div>' +
+                        '<button class="btn-secondary" onclick="selectChain(\'' + chain.id + '\', \'' + chainData + '\')" style="padding: 6px 12px; font-size: 12px;">选择</button>' +
+                        '</div>' +
+                        '<div style="font-size: 12px; color: #888; margin-bottom: 5px;">类型: ' + (chain.type || '未知') + '</div>' +
+                        (chain.exchangeType ? '<div style="font-size: 12px; color: #888; margin-bottom: 5px;">交易所: ' + chain.exchangeType + '</div>' : '') +
+                        (chain.chainName ? '<div style="font-size: 12px; color: #888; margin-bottom: 5px;">链: ' + chain.chainName + '</div>' : '') +
+                        (chain.symbol ? '<div style="font-size: 12px; color: #888;">Symbol: ' + chain.symbol + '</div>' : '') +
+                        '</div>';
+                }).join('');
+            } catch (error) {
+                resultsDiv.innerHTML = '<div style="text-align: center; color: #f43f5e; padding: 20px;">搜索失败: ' + error.message + '</div>';
+            }
+        }
+        
+        // 选择充提链
+        function selectChain(chainId, chainData) {
+            try {
+                const chain = JSON.parse(decodeURIComponent(chainData));
+                alert('已选择充提链: ' + (chain.name || chainId) + '\n\n提示: 此功能后续将集成到Pipeline配置中');
+                // TODO: 将选中的链添加到Pipeline配置中
+                closeChainSearchModal();
+            } catch (error) {
+                alert('选择失败: ' + error.message);
+            }
+        }
+        
+        // 点击弹窗外部关闭
+        window.onclick = function(event) {
+            const modals = ['createBrickTriggerModal', 'pipelineConfigModal', 'pipelineNodeModal', 'chainSearchModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (event.target === modal) {
+                    if (modalId === 'createBrickTriggerModal') closeCreateBrickTriggerModal();
+                    else if (modalId === 'pipelineConfigModal') closePipelineConfigModal();
+                    else if (modalId === 'pipelineNodeModal') closePipelineNodeModal();
+                    else if (modalId === 'chainSearchModal') closeChainSearchModal();
+                }
+            });
+        }
+        
+        // 初始化：加载列表并定时轮询刷新
+        loadBrickTriggers();
+        setInterval(loadBrickTriggers, 10000);
+    </script>
+</body>
+</html>

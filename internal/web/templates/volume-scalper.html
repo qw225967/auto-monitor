@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>交易量刷子 - 套利系统管理面板</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: #4ade80; margin-bottom: 20px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #333; }
+        .tab { padding: 10px 20px; cursor: pointer; border: none; background: transparent; color: #888; font-size: 16px; }
+        .tab.active { color: #4ade80; border-bottom: 2px solid #4ade80; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .section { background: #2a2a2a; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .section-title { font-size: 18px; font-weight: bold; color: #4ade80; }
+        button { 
+            padding: 8px 16px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 14px; 
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #4ade80; color: #000; }
+        .btn-primary:hover { background: #22c55e; }
+        .btn-danger { background: #f43f5e; color: #fff; }
+        .btn-danger:hover { background: #e11d48; }
+        .btn-secondary { background: #60a5fa; color: #fff; }
+        .btn-secondary:hover { background: #3b82f6; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
+        th { color: #888; font-weight: 500; }
+        .search-box { padding: 8px 12px; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #e0e0e0; width: 300px; margin-bottom: 15px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; padding: 30px; border-radius: 8px; min-width: 400px; }
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; margin-bottom: 5px; color: #888; }
+        .form-input { width: 100%; padding: 8px 12px; border: 1px solid #333; border-radius: 6px; background: #1a1a1a; color: #e0e0e0; }
+        .status { padding: 4px 12px; border-radius: 4px; font-size: 12px; }
+        .status.running { background: #4ade80; color: #000; }
+        .status.stopped { background: #f43f5e; color: #fff; }
+        .link { color: #60a5fa; cursor: pointer; text-decoration: underline; }
+        .refresh-controls { display: flex; align-items: center; gap: 15px; }
+        .refresh-timer { display: flex; align-items: center; gap: 8px; }
+        .refresh-circle { 
+            width: 32px; 
+            height: 32px; 
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .refresh-circle svg {
+            width: 32px;
+            height: 32px;
+            transform: rotate(-90deg);
+        }
+        .refresh-circle circle {
+            fill: none;
+            stroke-width: 3;
+        }
+        .refresh-circle .bg-circle {
+            stroke: #333;
+        }
+        .refresh-circle .progress-circle {
+            stroke: #4ade80;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.1s linear;
+        }
+        .refresh-circle .time-text {
+            position: absolute;
+            font-size: 10px;
+            color: #4ade80;
+            font-weight: bold;
+        }
+        .refresh-time { font-size: 12px; color: #888; min-width: 30px; text-align: center; }
+        .refresh-interval-selector { display: flex; gap: 5px; align-items: center; }
+        .refresh-interval-selector label { font-size: 12px; color: #888; margin-right: 5px; }
+        .refresh-interval-btn {
+            padding: 4px 8px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            background: #1a1a1a;
+            color: #888;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .refresh-interval-btn:hover {
+            background: #2a2a2a;
+            color: #e0e0e0;
+        }
+        .refresh-interval-btn.active {
+            background: #4ade80;
+            color: #000;
+            border-color: #4ade80;
+        }
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+        .switch-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        .switch input:checked + .switch-slider { background-color: #4ade80; }
+        .switch input:checked + .switch-slider:before { transform: translateX(26px); }
+        
+        /* 钱包卡片样式 */
+        #walletCards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .wallet-card {
+            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        .wallet-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.2);
+            border-color: #4ade80;
+        }
+        .wallet-card-header {
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #333;
+        }
+        .wallet-card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .wallet-card-type {
+            font-size: 11px;
+            padding: 4px 8px;
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .wallet-card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .wallet-card-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+        .wallet-card-label {
+            font-size: 13px;
+            color: #888;
+            font-weight: 500;
+        }
+        .wallet-card-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e0e0e0;
+        }
+        .wallet-card-value.total {
+            font-size: 18px;
+            color: #4ade80;
+            font-weight: 700;
+        }
+        .wallet-card-value.positive {
+            color: #4ade80;
+        }
+        .wallet-card-value.negative {
+            color: #f43f5e;
+        }
+        
+        /* 资金概览区域样式优化 */
+        #wallet-overview {
+            margin-bottom: 20px;
+        }
+        
+        /* 顶部状态栏样式 */
+        .stats-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+        
+        .stat-group {
+            display: flex;
+            gap: 30px;
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            font-weight: 500;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #e0e0e0;
+        }
+        
+        .stat-value.highlight {
+            color: #4ade80;
+            font-size: 20px;
+        }
+        
+        .stat-value.positive { color: #4ade80; }
+        .stat-value.negative { color: #f43f5e; }
+        
+        .stat-sub {
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        /* 详情折叠面板样式 */
+        #wallet-details-panel {
+            display: none;
+            background: #232323;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: -15px; /* 紧贴 Header */
+            margin-bottom: 20px;
+            border: 1px solid #333;
+            border-top: none;
+        }
+        
+        .wallet-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        .wallet-table th {
+            text-align: left;
+            padding: 8px 12px;
+            color: #888;
+            border-bottom: 1px solid #333;
+            font-weight: 500;
+        }
+        
+        .wallet-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #2a2a2a;
+            color: #e0e0e0;
+        }
+        
+        .wallet-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .toggle-btn {
+            background: transparent;
+            border: 1px solid #333;
+            color: #888;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+        
+        .toggle-btn:hover {
+            background: #333;
+            color: #e0e0e0;
+        }
+
+        #walletLastRefresh {
+            font-size: 11px;
+            color: #666;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 交易量刷子</h1>
+        
+        <!-- 导航栏 -->
+        <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <a href="/" style="color: #888; text-decoration: none; padding: 8px 16px; background: #2a2a2a; border-radius: 6px;">主页</a>
+            <a href="/volume-scalper" style="color: #4ade80; text-decoration: none; padding: 8px 16px; background: #2a2a2a; border-radius: 6px;">交易量刷子</a>
+            <a href="/automation" style="color: #888; text-decoration: none; padding: 8px 16px; background: #2a2a2a; border-radius: 6px;">自动化配置</a>
+        </div>
+        
+        <!-- 顶部资金概览栏 (保留，但可以折叠) -->
+        <div id="wallet-overview" style="display: none;">
+            <div class="stats-header">
+                <div class="stat-group">
+                    <div class="stat-item">
+                        <span class="stat-label">💎 总资产估值</span>
+                        <span class="stat-value highlight" id="headerTotalAsset">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">未实现盈亏</span>
+                        <span class="stat-value" id="headerTotalPnl">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">交易所资产</span>
+                        <span class="stat-value" id="headerExchangeAsset">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">链上资产</span>
+                        <span class="stat-value" id="headerOnchainAsset">--</span>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                    <div id="walletLastRefresh">更新: --</div>
+                    <button class="toggle-btn" onclick="toggleWalletDetails()" id="toggleWalletBtn">
+                        <span>展开详情</span>
+                        <span style="font-size: 10px;">▼</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 详情面板 (默认隐藏) -->
+            <div id="wallet-details-panel">
+                <table class="wallet-table">
+                    <thead>
+                        <tr>
+                            <th>账户/来源</th>
+                            <th style="text-align: right;">余额价值</th>
+                            <th style="text-align: right;">持仓价值</th>
+                            <th style="text-align: right;">未实现盈亏</th>
+                            <th style="text-align: right;">持仓数/代币数</th>
+                        </tr>
+                    </thead>
+                    <tbody id="walletDetailsBody">
+                        <!-- JS 填充 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Trigger 管理（主页核心内容） -->
+        <div id="trigger">
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-title">Trigger 列表</div>
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <!-- Token 映射管理入口 -->
+                        <button class="btn-secondary" onclick="showTokenMappingManagementModal()" 
+                                style="font-size: 13px; padding: 6px 12px;" 
+                                title="管理 Token 映射">
+                            ⚙️ Token 映射
+                        </button>
+                        <!-- 合约映射表入口 -->
+                        <button class="btn-secondary" onclick="showContractMappingManagementModal()" 
+                                style="font-size: 13px; padding: 6px 12px;" 
+                                title="管理合约映射表">
+                            📋 合约映射表
+                        </button>
+                        <!-- 自动化配置入口 -->
+                        <button class="btn-secondary" onclick="window.location.href='/automation'" 
+                                style="font-size: 13px; padding: 6px 12px;" 
+                                title="自动化套利配置">
+                            🤖 自动化配置
+                        </button>
+                        <div class="refresh-controls">
+                            <div class="refresh-timer">
+                                <div class="refresh-circle" id="refreshCircle">
+                                    <svg>
+                                        <circle class="bg-circle" cx="16" cy="16" r="14"></circle>
+                                        <circle class="progress-circle" cx="16" cy="16" r="14" id="progressCircle"></circle>
+                                    </svg>
+                                    <span class="time-text" id="refreshTime">3</span>
+                                </div>
+                                <span class="refresh-time" id="refreshTimeText">秒后刷新</span>
+                            </div>
+                            <div class="refresh-interval-selector">
+                                <label>刷新间隔:</label>
+                                <button class="refresh-interval-btn" data-interval="1000" onclick="setRefreshInterval(1000)">1s</button>
+                                <button class="refresh-interval-btn active" data-interval="3000" onclick="setRefreshInterval(3000)">3s</button>
+                                <button class="refresh-interval-btn" data-interval="5000" onclick="setRefreshInterval(5000)">5s</button>
+                                <button class="refresh-interval-btn" data-interval="10000" onclick="setRefreshInterval(10000)">10s</button>
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="showCreateTriggerModal()">+ 创建 Trigger</button>
+                    </div>
+                </div>
+                <input type="text" class="search-box" id="triggerSearch" placeholder="搜索 Symbol..." onkeyup="searchTriggers()">
+                <table id="triggerTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Symbol</th>
+                            <th>A</th>
+                            <th>B</th>
+                            <th>状态</th>
+                            <th>目标价差区间</th>
+                            <th>最优阈值 (+A-B)</th>
+                            <th>最优阈值 (-A+B)</th>
+                            <th>TG 通知</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="triggerTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Token 映射管理弹窗（大型弹窗） -->
+    <div id="tokenMappingManagementModal" class="modal" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto; width: 90%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #4ade80;">Token 映射管理</h2>
+                <button onclick="closeTokenMappingManagementModal()" 
+                        style="background: transparent; color: #888; border: none; font-size: 28px; cursor: pointer; line-height: 1; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"
+                        title="关闭">×</button>
+            </div>
+            <div class="section" style="background: transparent; padding: 0; margin: 0;">
+                <div class="section-header">
+                    <div class="section-title">Token 映射列表</div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button class="btn-secondary" onclick="syncTokenMappings()" id="syncTokenMappingsBtn" title="从 API 同步 Token 映射">
+                            🔄 同步映射
+                        </button>
+                        <span id="syncStatus" style="font-size: 12px; color: #888;"></span>
+                        <button class="btn-primary" onclick="showAddTokenMappingModal()">+ 添加映射</button>
+                    </div>
+                </div>
+                <input type="text" class="search-box" id="tokenMappingSearch" placeholder="搜索合约地址或符号..." onkeyup="searchTokenMappings()">
+                <table id="tokenMappingTable" style="margin-top: 15px;">
+                    <thead>
+                        <tr>
+                            <th>合约地址</th>
+                            <th>代币符号</th>
+                            <th>链 ID</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tokenMappingTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Token 映射编辑模态框（添加/编辑单个映射） -->
+    <div id="tokenMappingModal" class="modal" style="z-index: 3000;">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px;">添加/编辑 Token 映射</h2>
+            <div class="form-group">
+                <label class="form-label">合约地址</label>
+                <input type="text" class="form-input" id="tokenMappingAddress" placeholder="0x...">
+            </div>
+            <div class="form-group">
+                <label class="form-label">代币符号</label>
+                <input type="text" class="form-input" id="tokenMappingSymbol" placeholder="例如: RAVE">
+            </div>
+            <div class="form-group">
+                <label class="form-label">链 ID（可选，如 56=BSC、1=ETH）</label>
+                <input type="text" class="form-input" id="tokenMappingChainId" placeholder="例如: 56">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-primary" onclick="saveTokenMapping()">保存</button>
+                <button class="btn-secondary" onclick="closeTokenMappingModal()">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 创建 Trigger 模态框 -->
+    <div id="createTriggerModal" class="modal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px;">创建 Trigger</h2>
+            <div class="form-group">
+                <label class="form-label">搜索 Symbol</label>
+                <input type="text" class="form-input" id="triggerSymbolSearch" placeholder="输入 Symbol 搜索..." onkeyup="searchSymbolForTrigger()">
+                <div id="symbolSearchResults" style="margin-top: 10px; max-height: 200px; overflow-y: auto;"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Symbol</label>
+                <input type="text" class="form-input" id="triggerSymbol" placeholder="例如: RAVEUSDT" readonly>
+            </div>
+            <div class="form-group">
+                <label class="form-label">A 交易所类型（可选，留空则从映射表获取或使用默认值）</label>
+                <input type="text" class="form-input" id="triggerTraderAType" placeholder="例如: onchain:56">
+                <small style="color: #888; font-size: 12px; display: block; margin-top: 5px;">
+                    格式: onchain:链ID（如 onchain:56 表示 BSC 链）
+                </small>
+            </div>
+            <div class="form-group">
+                <label class="form-label">B 交易所类型（可选，留空则从映射表获取或使用默认值）</label>
+                <input type="text" class="form-input" id="triggerTraderBType" placeholder="例如: binance:futures">
+                <small style="color: #888; font-size: 12px; display: block; margin-top: 5px;">
+                    格式: 交易所类型:市场类型（如 binance:futures, binance:spot）
+                </small>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-primary" onclick="createTrigger()">创建</button>
+                <button class="btn-secondary" onclick="closeCreateTriggerModal()">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 合约映射表管理弹窗（大型弹窗） -->
+    <div id="contractMappingManagementModal" class="modal" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto; width: 90%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #4ade80;">合约映射表</h2>
+                <button onclick="closeContractMappingManagementModal()" 
+                        style="background: transparent; color: #888; border: none; font-size: 28px; cursor: pointer; line-height: 1; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"
+                        title="关闭">×</button>
+            </div>
+            <div class="section" style="background: transparent; padding: 0; margin: 0;">
+                <div class="section-header">
+                    <div class="section-title">合约映射列表</div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button class="btn-primary" onclick="showAddContractMappingModal()">+ 添加映射</button>
+                    </div>
+                </div>
+                <input type="text" class="search-box" id="contractMappingSearch" placeholder="搜索 Symbol 或类型..." onkeyup="searchContractMappings()">
+                <table id="contractMappingTable" style="margin-top: 15px;">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>A 交易所类型</th>
+                            <th>B 交易所类型</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contractMappingTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 合约映射编辑模态框（添加/编辑单个映射） -->
+    <div id="contractMappingModal" class="modal" style="z-index: 3000;">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 20px;">添加/编辑合约映射</h2>
+            <div class="form-group">
+                <label class="form-label">Symbol</label>
+                <input type="text" class="form-input" id="contractMappingSymbol" placeholder="例如: RAVEUSDT">
+            </div>
+            <div class="form-group">
+                <label class="form-label">A 交易所类型</label>
+                <input type="text" class="form-input" id="contractMappingTraderAType" placeholder="例如: onchain:56">
+                <small style="color: #888; font-size: 12px; display: block; margin-top: 5px;">
+                    格式: onchain:链ID（如 onchain:56 表示 BSC 链）
+                </small>
+            </div>
+            <div class="form-group">
+                <label class="form-label">B 交易所类型</label>
+                <input type="text" class="form-input" id="contractMappingTraderBType" placeholder="例如: binance:futures">
+                <small style="color: #888; font-size: 12px; display: block; margin-top: 5px;">
+                    格式: 交易所类型:市场类型（如 binance:futures, binance:spot）
+                </small>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-primary" onclick="saveContractMapping()">保存</button>
+                <button class="btn-secondary" onclick="closeContractMappingModal()">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 系统配置模态框 -->
+    <div id="configModal" class="modal" style="z-index: 2000;">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto; width: 90%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #4ade80;">系统配置</h2>
+                <button onclick="closeConfigModal()" 
+                        style="background: transparent; color: #888; border: none; font-size: 28px; cursor: pointer; line-height: 1; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;"
+                        title="关闭">×</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">配置 JSON</label>
+                <textarea id="configJSON" class="form-input" 
+                          style="min-height: 400px; font-family: 'Courier New', monospace; font-size: 12px; white-space: pre; overflow-wrap: normal; overflow-x: auto;"
+                          placeholder='请输入配置 JSON，例如：&#10;{&#10;  "MyProjectId": "...",&#10;  "BitGet": { ... },&#10;  "OkEx": { ... }&#10;}'></textarea>
+                <small style="color: #888; font-size: 12px; display: block; margin-top: 5px;">
+                    请输入完整的配置 JSON，格式需符合 SelfConfig 结构
+                </small>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn-primary" onclick="saveSystemConfig()">保存配置</button>
+                <button class="btn-secondary" onclick="loadCurrentSystemConfig()">加载当前配置</button>
+                <button class="btn-secondary" onclick="closeConfigModal()">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 加载版本信息
+        fetch('/api/version')
+            .then(res => res.json())
+            .then(data => {
+                const versionEl = document.createElement('div');
+                versionEl.style.position = 'fixed';
+                versionEl.style.top = '10px';
+                versionEl.style.right = '20px';
+                versionEl.style.color = '#666';
+                versionEl.style.fontSize = '12px';
+                versionEl.style.zIndex = '2000'; // 确保在最上层
+                versionEl.style.pointerEvents = 'none'; // 不影响点击
+                versionEl.innerText = data.version || 'dev';
+                document.body.appendChild(versionEl);
+            })
+            .catch(err => console.error('Failed to load version:', err));
+
+        // Token 映射管理弹窗相关函数
+        function showTokenMappingManagementModal() {
+            document.getElementById('tokenMappingManagementModal').style.display = 'block';
+            loadTokenMappings();
+        }
+        
+        function closeTokenMappingManagementModal() {
+            document.getElementById('tokenMappingManagementModal').style.display = 'none';
+            if (window.syncStatusInterval) {
+                clearInterval(window.syncStatusInterval);
+                window.syncStatusInterval = null;
+            }
+        }
+        
+        // 点击弹窗外部关闭
+        window.onclick = function(event) {
+            const managementModal = document.getElementById('tokenMappingManagementModal');
+            const editModal = document.getElementById('tokenMappingModal');
+            const contractMappingManagementModal = document.getElementById('contractMappingManagementModal');
+            const contractMappingEditModal = document.getElementById('contractMappingModal');
+            const configModal = document.getElementById('configModal');
+            if (event.target === managementModal) {
+                closeTokenMappingManagementModal();
+            }
+            if (event.target === editModal) {
+                closeTokenMappingModal();
+            }
+            if (event.target === contractMappingManagementModal) {
+                closeContractMappingManagementModal();
+            }
+            if (event.target === contractMappingEditModal) {
+                closeContractMappingModal();
+            }
+            if (event.target === configModal) {
+                closeConfigModal();
+            }
+        }
+        
+        // 系统配置相关函数
+        function showConfigModal() {
+            document.getElementById('configModal').style.display = 'block';
+            loadCurrentSystemConfig();
+        }
+        
+        function closeConfigModal() {
+            document.getElementById('configModal').style.display = 'none';
+        }
+        
+        async function loadCurrentSystemConfig() {
+            try {
+                const res = await fetch('/api/config');
+                if (res.ok) {
+                    const data = await res.json();
+                    // data.config 已经是 JSON 字符串，尝试格式化显示
+                    try {
+                        const parsed = JSON.parse(data.config);
+                        document.getElementById('configJSON').value = JSON.stringify(parsed, null, 2);
+                    } catch (e) {
+                        // 如果解析失败，直接显示原始字符串
+                        document.getElementById('configJSON').value = data.config;
+                    }
+                } else {
+                    alert('加载当前配置失败');
+                }
+            } catch (error) {
+                console.error('加载配置失败:', error);
+                alert('加载配置失败: ' + error.message);
+            }
+        }
+        
+        async function saveSystemConfig() {
+            const configJSON = document.getElementById('configJSON').value.trim();
+            
+            if (!configJSON) {
+                alert('请输入配置 JSON');
+                return;
+            }
+            
+            // 验证 JSON 格式
+            try {
+                JSON.parse(configJSON);
+            } catch (error) {
+                alert('JSON 格式错误: ' + error.message);
+                return;
+            }
+            
+            if (!confirm('确定要保存配置吗？这将更新系统全局配置。')) {
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ config: configJSON })
+                });
+                
+                if (res.ok) {
+                    alert('配置保存成功！');
+                    closeConfigModal();
+                } else {
+                    const errorText = await res.text();
+                    alert('保存失败: ' + errorText);
+                }
+            } catch (error) {
+                alert('保存失败: ' + error.message);
+            }
+        }
+        
+        // 合约映射表相关函数
+        function showContractMappingManagementModal() {
+            document.getElementById('contractMappingManagementModal').style.display = 'block';
+            loadContractMappings();
+        }
+        
+        function closeContractMappingManagementModal() {
+            document.getElementById('contractMappingManagementModal').style.display = 'none';
+        }
+        
+        async function loadContractMappings() {
+            try {
+                const res = await fetch('/api/contract-mappings');
+                if (!res.ok) {
+                    console.error('加载合约映射失败:', res.statusText);
+                    return;
+                }
+                const data = await res.json();
+                const tbody = document.getElementById('contractMappingTableBody');
+                
+                // 确保 mappings 是数组
+                const mappings = Array.isArray(data.mappings) ? data.mappings : [];
+                
+                tbody.innerHTML = mappings.map(m => {
+                    return '<tr>' +
+                        '<td>' + m.symbol + '</td>' +
+                        '<td>' + m.traderAType + '</td>' +
+                        '<td>' + m.traderBType + '</td>' +
+                        '<td>' +
+                        '<button class="btn-secondary" onclick="editContractMapping(\'' + m.symbol + '\', \'' + m.traderAType + '\', \'' + m.traderBType + '\')">编辑</button> ' +
+                        '<button class="btn-danger" onclick="deleteContractMapping(\'' + m.symbol + '\')">删除</button> ' +
+                        '<button class="btn-primary" onclick="createTriggerFromMapping(\'' + m.symbol + '\', \'' + m.traderAType + '\', \'' + m.traderBType + '\')" title="基于此映射创建 Trigger" style="font-size: 12px; padding: 6px 10px;">🚀 添加 Trigger</button>' +
+                        '</td>' +
+                        '</tr>';
+                }).join('');
+                
+                // 加载后应用当前的搜索条件
+                searchContractMappings();
+            } catch (error) {
+                console.error('加载合约映射失败:', error);
+            }
+        }
+        
+        function searchContractMappings() {
+            const search = document.getElementById('contractMappingSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('#contractMappingTableBody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(search) ? '' : 'none';
+            });
+        }
+        
+        function showAddContractMappingModal() {
+            document.getElementById('contractMappingSymbol').value = '';
+            document.getElementById('contractMappingTraderAType').value = '';
+            document.getElementById('contractMappingTraderBType').value = '';
+            document.getElementById('contractMappingModal').style.display = 'block';
+        }
+        
+        function editContractMapping(symbol, traderAType, traderBType) {
+            document.getElementById('contractMappingSymbol').value = symbol;
+            document.getElementById('contractMappingTraderAType').value = traderAType;
+            document.getElementById('contractMappingTraderBType').value = traderBType;
+            document.getElementById('contractMappingModal').style.display = 'block';
+        }
+        
+        function closeContractMappingModal() {
+            document.getElementById('contractMappingModal').style.display = 'none';
+        }
+        
+        async function saveContractMapping() {
+            console.log('=== saveContractMapping 开始 ===');
+            
+            const symbolEl = document.getElementById('contractMappingSymbol');
+            const traderATypeEl = document.getElementById('contractMappingTraderAType');
+            const traderBTypeEl = document.getElementById('contractMappingTraderBType');
+            
+            console.log('1. Symbol 元素:', symbolEl);
+            console.log('2. TraderAType 元素:', traderATypeEl);
+            console.log('3. TraderBType 元素:', traderBTypeEl);
+            
+            const symbol = symbolEl ? symbolEl.value.trim() : '';
+            const traderAType = traderATypeEl ? traderATypeEl.value.trim() : '';
+            const traderBType = traderBTypeEl ? traderBTypeEl.value.trim() : '';
+            
+            console.log('4. Symbol 值:', symbol);
+            console.log('5. TraderAType 值:', traderAType);
+            console.log('6. TraderBType 值:', traderBType);
+            
+            if (!symbol || !traderAType || !traderBType) {
+                console.log('7. 验证失败: 缺少必填字段');
+                alert('请填写完整信息');
+                return;
+            }
+            
+            const requestBody = { symbol, traderAType, traderBType };
+            const requestBodyStr = JSON.stringify(requestBody);
+            console.log('8. 请求体对象:', requestBody);
+            console.log('9. 请求体 JSON:', requestBodyStr);
+            
+            try {
+                console.log('10. 开始发送请求到 /api/contract-mapping');
+                const res = await fetch('/api/contract-mapping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: requestBodyStr
+                });
+                
+                console.log('11. 响应状态:', res.status, res.statusText);
+                console.log('12. 响应 OK:', res.ok);
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    console.log('13. 响应数据:', data);
+                    closeContractMappingModal();
+                    loadContractMappings(); // 刷新合约映射列表
+                } else {
+                    const errorText = await res.text();
+                    console.log('14. 错误响应文本:', errorText);
+                    alert('保存失败: ' + errorText);
+                }
+            } catch (error) {
+                console.error('15. 请求异常:', error);
+                alert('保存失败: ' + error.message);
+            }
+            
+            console.log('=== saveContractMapping 结束 ===');
+        }
+        
+        async function deleteContractMapping(symbol) {
+            if (!confirm('确定要删除这个映射吗？')) return;
+            
+            try {
+                const res = await fetch('/api/contract-mapping?symbol=' + encodeURIComponent(symbol), {
+                    method: 'DELETE'
+                });
+                
+                if (res.ok) {
+                    loadContractMappings();
+                } else {
+                    const errorText = await res.text();
+                    alert('删除失败: ' + errorText);
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+        
+        // 从合约映射创建 Trigger
+        async function createTriggerFromMapping(symbol, traderAType, traderBType) {
+            console.log('=== createTriggerFromMapping 开始 ===');
+            symbol = ensureQuoteSuffix((symbol || '').trim());
+            console.log('1. 传入的参数( symbol 已补后缀):', { symbol, traderAType, traderBType });
+            
+            if (!symbol) {
+                alert('Symbol 不能为空');
+                return;
+            }
+            
+            // 构建请求体，如果 traderAType 和 traderBType 为空，让后端从映射表获取
+            const requestBody = { symbol };
+            if (traderAType) {
+                requestBody.traderAType = traderAType;
+            }
+            if (traderBType) {
+                requestBody.traderBType = traderBType;
+            }
+            
+            // 确认操作
+            const confirmMsg = '确定要基于 ' + symbol + ' 创建 Trigger 吗？' + 
+                (traderAType && traderBType ? '\nA类型: ' + traderAType + '\nB类型: ' + traderBType : '\n(将从合约映射表获取配置)');
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+            
+            try {
+                const requestBodyStr = JSON.stringify(requestBody);
+                console.log('2. 请求体对象:', requestBody);
+                console.log('3. 请求体 JSON:', requestBodyStr);
+                
+                // 调用统一的创建接口
+                console.log('4. 开始发送请求到 /api/trigger/create');
+                const res = await fetch('/api/trigger/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: requestBodyStr
+                });
+                
+                console.log('5. 响应状态:', res.status, res.statusText);
+                console.log('6. 响应 OK:', res.ok);
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    console.log('7. 响应数据 (JSON):', data);
+                    console.log('8. data.symbol:', data.symbol);
+                    console.log('9. data.traderAType:', data.traderAType);
+                    console.log('10. data.traderBType:', data.traderBType);
+                    console.log('11. data 的所有键:', Object.keys(data));
+                    
+                    alert('Trigger 创建成功！\nSymbol: ' + data.symbol + '\nA类型: ' + data.traderAType + '\nB类型: ' + data.traderBType);
+                    // 刷新 Trigger 列表（如果主页可见）
+                    if (document.getElementById('triggerTableBody')) {
+                        loadTriggers();
+                    }
+                } else {
+                    const errText = await res.text();
+                    console.log('12. 错误响应文本:', errText);
+                    const errorMsg = errText || '创建失败';
+                    alert('创建失败: ' + errorMsg);
+                }
+            } catch (error) {
+                console.error('13. 请求异常:', error);
+                alert('创建失败: ' + error.message);
+            }
+            
+            console.log('=== createTriggerFromMapping 结束 ===');
+        }
+        
+        // Token 映射相关函数
+        async function loadTokenMappings() {
+            try {
+                const res = await fetch('/api/token-mappings');
+                const data = await res.json();
+                const tbody = document.getElementById('tokenMappingTableBody');
+                tbody.innerHTML = data.mappings.map(m => {
+                    const chainId = (m.chainId || '').replace(/'/g, "\\'");
+                    const addr = (m.address || '').replace(/'/g, "\\'");
+                    const sym = (m.symbol || '').replace(/'/g, "\\'");
+                    return '<tr>' +
+                        '<td>' + m.address + '</td>' +
+                        '<td>' + m.symbol + '</td>' +
+                        '<td>' + (m.chainId || '—') + '</td>' +
+                        '<td>' +
+                        '<button class="btn-secondary" onclick="editTokenMapping(\'' + addr + '\', \'' + sym + '\', \'' + chainId + '\')">编辑</button> ' +
+                        '<button class="btn-danger" onclick="deleteTokenMapping(\'' + addr + '\', \'' + chainId + '\')">删除</button> ' +
+                        '<button class="btn-primary" onclick="createTriggerFromMapping(\'' + sym + '\', \'\', \'\')" title="基于此 Symbol 创建 Trigger（将从合约映射表获取配置）" style="font-size: 12px; padding: 6px 10px;">🚀 创建 Trigger</button>' +
+                        '</td>' +
+                        '</tr>';
+                }).join('');
+                
+                // 加载后应用当前的搜索条件
+                searchTokenMappings();
+            } catch (error) {
+                console.error('加载 Token 映射失败:', error);
+            }
+        }
+        
+        function searchTokenMappings() {
+            const search = document.getElementById('tokenMappingSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('#tokenMappingTableBody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(search) ? '' : 'none';
+            });
+        }
+        
+        // 同步 Token 映射
+        async function syncTokenMappings() {
+            const btn = document.getElementById('syncTokenMappingsBtn');
+            const statusEl = document.getElementById('syncStatus');
+            
+            // 禁用按钮
+            btn.disabled = true;
+            btn.textContent = '🔄 同步中...';
+            statusEl.textContent = '正在同步...';
+            statusEl.style.color = '#4ade80';
+            
+            try {
+                const res = await fetch('/api/token-mapping/sync', {
+                    method: 'POST',
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    statusEl.textContent = '同步已启动';
+                    statusEl.style.color = '#4ade80';
+                    
+                    // 等待几秒后刷新列表
+                    setTimeout(() => {
+                        loadTokenMappings();
+                        loadSyncStatus();
+                    }, 3000);
+                } else {
+                    statusEl.textContent = '同步失败: ' + (data.message || '未知错误');
+                    statusEl.style.color = '#ef4444';
+                }
+            } catch (error) {
+                console.error('同步 Token 映射失败:', error);
+                statusEl.textContent = '同步失败: ' + error.message;
+                statusEl.style.color = '#ef4444';
+            } finally {
+                // 恢复按钮
+                btn.disabled = false;
+                btn.textContent = '🔄 同步映射';
+            }
+        }
+        
+        // 加载同步状态
+        async function loadSyncStatus() {
+            try {
+                const res = await fetch('/api/token-mapping/sync-status');
+                const data = await res.json();
+                
+                const statusEl = document.getElementById('syncStatus');
+                if (data.inProgress) {
+                    statusEl.textContent = '⏳ 同步中...';
+                    statusEl.style.color = '#4ade80';
+                } else if (data.lastSyncTime) {
+                    const lastSync = new Date(data.lastSyncTime);
+                    const now = new Date();
+                    const diffMs = now - lastSync;
+                    const diffMins = Math.floor(diffMs / 60000);
+                    
+                    if (diffMins < 1) {
+                        statusEl.textContent = '✓ 刚刚同步';
+                    } else if (diffMins < 60) {
+                        statusEl.textContent = '✓ ' + diffMins + ' 分钟前同步';
+                    } else {
+                        const diffHours = Math.floor(diffMins / 60);
+                        statusEl.textContent = '✓ ' + diffHours + ' 小时前同步';
+                    }
+                    statusEl.style.color = '#888';
+                } else {
+                    statusEl.textContent = '尚未同步';
+                    statusEl.style.color = '#888';
+                }
+            } catch (error) {
+                console.error('加载同步状态失败:', error);
+            }
+        }
+        
+        function showAddTokenMappingModal() {
+            document.getElementById('tokenMappingAddress').value = '';
+            document.getElementById('tokenMappingSymbol').value = '';
+            document.getElementById('tokenMappingChainId').value = '';
+            document.getElementById('tokenMappingModal').style.display = 'block';
+        }
+        
+        function editTokenMapping(address, symbol, chainId) {
+            document.getElementById('tokenMappingAddress').value = address || '';
+            document.getElementById('tokenMappingSymbol').value = symbol || '';
+            document.getElementById('tokenMappingChainId').value = chainId || '';
+            document.getElementById('tokenMappingModal').style.display = 'block';
+        }
+        
+        function closeTokenMappingModal() {
+            document.getElementById('tokenMappingModal').style.display = 'none';
+        }
+        
+        async function saveTokenMapping() {
+            const address = document.getElementById('tokenMappingAddress').value;
+            const symbol = document.getElementById('tokenMappingSymbol').value;
+            const chainId = (document.getElementById('tokenMappingChainId').value || '').trim();
+            
+            if (!address || !symbol) {
+                alert('请填写完整信息');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/token-mapping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ address, symbol, chainId })
+                });
+                
+                if (res.ok) {
+                    closeTokenMappingModal();
+                    loadTokenMappings(); // 刷新 Token 映射列表
+                } else {
+                    alert('保存失败');
+                }
+            } catch (error) {
+                alert('保存失败: ' + error.message);
+            }
+        }
+        
+        async function deleteTokenMapping(address, chainId) {
+            if (!confirm('确定要删除这个映射吗？')) return;
+            
+            try {
+                const q = 'address=' + encodeURIComponent(address);
+                const url = '/api/token-mapping?' + q + (chainId ? '&chainId=' + encodeURIComponent(chainId) : '');
+                const res = await fetch(url, { method: 'DELETE' });
+                
+                if (res.ok) {
+                    loadTokenMappings();
+                } else {
+                    alert('删除失败');
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+        
+        // Trigger 相关函数
+        // 保存正在编辑的输入框状态
+        let editingInterval = null; // {id: number, value: string, selectionStart: number, selectionEnd: number}
+        
+        function saveEditingState() {
+            // 检查是否有输入框正在编辑（有焦点）
+            const activeElement = document.activeElement;
+            if (activeElement && activeElement.id && activeElement.id.startsWith('intervalInput_')) {
+                const symbol = activeElement.id.replace('intervalInput_', '');
+                // 保存光标位置
+                const selectionStart = activeElement.selectionStart || 0;
+                const selectionEnd = activeElement.selectionEnd || 0;
+                editingInterval = {
+                    id: symbol,
+                    value: activeElement.value,
+                    selectionStart: selectionStart,
+                    selectionEnd: selectionEnd
+                };
+            } else {
+                editingInterval = null;
+            }
+        }
+        
+        function restoreEditingState() {
+            if (editingInterval) {
+                // 使用 requestAnimationFrame 确保 DOM 完全渲染后再恢复焦点
+                requestAnimationFrame(() => {
+                    const inputEl = document.getElementById('intervalInput_' + editingInterval.id);
+                    if (inputEl) {
+                        // 设置值
+                        inputEl.value = editingInterval.value;
+                        
+                        // 使用 requestAnimationFrame 确保值已设置
+                        requestAnimationFrame(() => {
+                            // 获得焦点
+                            inputEl.focus();
+                            
+                            // 恢复光标位置 - 使用多次尝试确保成功
+                            const restoreSelection = () => {
+                                if (document.activeElement === inputEl) {
+                                    const start = Math.min(editingInterval.selectionStart, inputEl.value.length);
+                                    const end = Math.min(editingInterval.selectionEnd, inputEl.value.length);
+                                    try {
+                                        inputEl.setSelectionRange(start, end);
+                                    } catch (e) {
+                                        // 忽略错误
+                                    }
+                                }
+                            };
+                            
+                            // 多次尝试，确保光标位置被正确设置
+                            setTimeout(restoreSelection, 0);
+                            setTimeout(restoreSelection, 20);
+                            setTimeout(restoreSelection, 50);
+                        });
+                    }
+                });
+            }
+        }
+        
+        // 加载钱包信息
+        async function loadWalletInfo() {
+            try {
+                const res = await fetch('/api/wallet');
+                if (!res.ok) {
+                    console.error('获取钱包信息失败:', res.statusText);
+                    return;
+                }
+                const data = await res.json();
+                renderWalletCards(data.walletInfo);
+                
+                // 更新最后刷新时间
+                if (data.lastRefreshTime) {
+                    const refreshTime = new Date(data.lastRefreshTime);
+                    const refreshTimeStr = refreshTime.toLocaleString('zh-CN');
+                    document.getElementById('walletLastRefresh').textContent = '最后更新: ' + refreshTimeStr;
+                }
+            } catch (error) {
+                console.error('加载钱包信息失败:', error);
+            }
+        }
+        
+        // 切换详情面板显示
+        function toggleWalletDetails() {
+            const panel = document.getElementById('wallet-details-panel');
+            const btn = document.getElementById('toggleWalletBtn');
+            const icon = btn.querySelector('span:last-child');
+            const text = btn.querySelector('span:first-child');
+            
+            if (panel.style.display === 'block') {
+                panel.style.display = 'none';
+                icon.textContent = '▼';
+                text.textContent = '展开详情';
+                btn.style.background = 'transparent';
+            } else {
+                panel.style.display = 'block';
+                icon.textContent = '▲';
+                text.textContent = '收起详情';
+                btn.style.background = '#333';
+            }
+        }
+
+        // 渲染资金概览（新版）
+        function renderWalletCards(walletInfo) {
+            if (!walletInfo) return;
+
+            // 1. 更新顶部 Header 数据
+            const totalAsset = walletInfo.total_asset || 0;
+            const totalPnl = walletInfo.total_unrealized_pnl || 0;
+            // 交易所资产 = 余额 + 未实现盈亏（不含持仓名义价值，合约有杠杆）
+            const exchangeTotal = (walletInfo.total_balance_value || 0) + (walletInfo.total_unrealized_pnl || 0);
+            const onchainTotal = walletInfo.total_onchain_value || 0;
+
+            document.getElementById('headerTotalAsset').textContent = formatNumber(totalAsset) + ' USDT';
+            
+            const pnlEl = document.getElementById('headerTotalPnl');
+            pnlEl.textContent = (totalPnl >= 0 ? '+' : '') + formatNumber(totalPnl) + ' USDT';
+            pnlEl.className = 'stat-value ' + (totalPnl >= 0 ? 'positive' : 'negative');
+            
+            document.getElementById('headerExchangeAsset').textContent = formatNumber(exchangeTotal) + ' USDT';
+            document.getElementById('headerOnchainAsset').textContent = formatNumber(onchainTotal) + ' USDT';
+
+            // 2. 更新详情列表
+            const tbody = document.getElementById('walletDetailsBody');
+            let html = '';
+
+            // 交易所行
+            if (walletInfo.exchange_wallets) {
+                for (const [name, wallet] of Object.entries(walletInfo.exchange_wallets)) {
+                    if (!wallet) continue;
+                    const bal = wallet.total_balance_value || 0;
+                    const pos = wallet.total_position_value || 0;
+                    const pnl = wallet.total_unrealized_pnl || 0;
+                    const count = wallet.position_count || 0;
+                    
+                    html += `<tr>
+                        <td>
+                            <span style="font-weight: bold; color: #e0e0e0;">🏦 ${name.toUpperCase()}</span>
+                        </td>
+                        <td style="text-align: right;">${formatNumber(bal)}</td>
+                        <td style="text-align: right;">${formatNumber(pos)}</td>
+                        <td style="text-align: right;" class="${pnl >= 0 ? 'positive' : 'negative'}">
+                            ${pnl >= 0 ? '+' : ''}${formatNumber(pnl)}
+                        </td>
+                        <td style="text-align: right;">${count}</td>
+                    </tr>`;
+                }
+            }
+
+            // 链上行 (汇总显示各链，或者分行显示)
+            if (walletInfo.onchain_balances) {
+                 // 这里简单处理：按链分行显示
+                 // 注意：walletInfo.onchain_balances 结构是 map[ChainID]map[Symbol]Info
+                 // 我们需要遍历它
+                 const onchainBalances = walletInfo.onchain_balances;
+                 // 由于 JS 对象键是字符串，后端 map[int]... 会变成 "1":...
+                 for (const [chainId, tokens] of Object.entries(onchainBalances)) {
+                     // 计算该链的总价值
+                     let chainVal = 0;
+                     let tokenCount = 0;
+                     if (tokens) {
+                         tokenCount = Object.keys(tokens).length;
+                         Object.values(tokens).forEach(t => {
+                             chainVal += (t.balance_usdt || 0); // 假设后端提供了 USDT 价值，如果没有可能需要前端算
+                             // 如果后端没提供 balance_usdt，我们可能只能显示数量或暂时用0
+                             // 实际上 WalletInfo.total_onchain_value 是后端算好的，这里每个 token 的 usdt 价值可能在 info 里
+                         });
+                     }
+                     
+                     // 如果后端没给单币价值，我们暂时无法精确显示单链价值，除非后端改接口
+                     // 但通常 TotalOnchainValue 是准确的。
+                     // 这里我们暂时显示 "Details Check API" 或者只显示 Token 数量
+                     // 为了界面好看，假设我们有一个 value 字段，如果没有就显示 -
+                     
+                     html += `<tr>
+                        <td>
+                            <span style="font-weight: bold; color: #e0e0e0;">🔗 Chain ${chainId}</span>
+                        </td>
+                        <td style="text-align: right; color: #888;">-</td>
+                        <td style="text-align: right; color: #888;">-</td>
+                        <td style="text-align: right;">-</td>
+                        <td style="text-align: right;">${tokenCount} Tokens</td>
+                    </tr>`;
+                 }
+                 
+                 // 如果没有详细数据，至少显示一个总的 OnChain 行
+                 if (Object.keys(onchainBalances).length === 0 && onchainTotal > 0) {
+                     html += `<tr>
+                        <td><span style="font-weight: bold; color: #e0e0e0;">🔗 On-Chain Total</span></td>
+                        <td style="text-align: right;">${formatNumber(onchainTotal)}</td>
+                        <td style="text-align: right;">-</td>
+                        <td style="text-align: right;">-</td>
+                        <td style="text-align: right;">-</td>
+                    </tr>`;
+                 }
+            }
+            
+            tbody.innerHTML = html || '<tr><td colspan="5" style="text-align: center; color: #666;">暂无数据</td></tr>';
+        }
+        
+        // 格式化数字
+        function formatNumber(num) {
+            if (num === null || num === undefined || isNaN(num)) return '0.00';
+            return parseFloat(num).toLocaleString('zh-CN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        async function loadTriggers() {
+            // 保存当前编辑状态
+            saveEditingState();
+            
+            // 重置倒计时
+            remainingSeconds = refreshInterval / 1000;
+            updateRefreshTimer();
+            
+            try {
+                const res = await fetch('/api/triggers');
+                const triggers = await res.json();
+                const tbody = document.getElementById('triggerTableBody');
+                // 确保 triggers 是数组，防止 null 或 undefined 导致错误
+                const triggerList = Array.isArray(triggers) ? triggers : [];
+                tbody.innerHTML = triggerList.map(t => {
+                    const thresholds = t.optimalThresholds || {};
+                    const thresholdAB = thresholds.thresholdAB !== null && thresholds.thresholdAB !== undefined 
+                        ? thresholds.thresholdAB.toFixed(6) : '-';
+                    const thresholdBA = thresholds.thresholdBA !== null && thresholds.thresholdBA !== undefined 
+                        ? thresholds.thresholdBA.toFixed(6) : '-';
+                    
+                    // 如果这个输入框正在编辑，使用编辑中的值，否则使用服务器返回的值
+                    // 使用 minInterval，向后兼容 interval
+                    let minInterval = (t.minInterval !== null && t.minInterval !== undefined) 
+                        ? t.minInterval.toFixed(6) 
+                        : ((t.interval !== null && t.interval !== undefined) ? t.interval.toFixed(6) : '-');
+                    if (editingInterval && editingInterval.id === t.symbol) {
+                        minInterval = editingInterval.value;
+                    }
+                    // 显示 maxInterval（0 表示不限制）
+                    let maxInterval = (t.maxInterval !== null && t.maxInterval !== undefined && t.maxInterval > 0) 
+                        ? t.maxInterval.toFixed(6) : '无限制';
+                    
+                    const telegramEnabled = t.telegramNotificationEnabled !== undefined ? t.telegramNotificationEnabled : true;
+                    
+                    // 格式化 trader 显示名称
+                    function getTraderDisplayName(traderType) {
+                        if (!traderType) return '-';
+                        const parts = traderType.split(':');
+                        if (parts.length !== 2) return traderType;
+                        
+                        const traderTypeStr = parts[0];
+                        const value = parts[1];
+                        
+                        if (traderTypeStr === 'onchain') {
+                            return '链上 ' + value; // 链上 + 链ID
+                        }
+                        
+                        // 交易所类型，首字母大写 + 市场类型
+                        const exchangeName = traderTypeStr.charAt(0).toUpperCase() + traderTypeStr.slice(1);
+                        const marketType = value === 'futures' ? '合约' : (value === 'spot' ? '现货' : value);
+                        return exchangeName + ' ' + marketType;
+                    }
+                    
+                    const traderAType = t.traderAType || '';
+                    const traderBType = t.traderBType || '';
+                    const aDisplay = getTraderDisplayName(traderAType);
+                    const bDisplay = getTraderDisplayName(traderBType);
+                    
+                    return '<tr>' +
+                        '<td>' + t.id + '</td>' +
+                        '<td><a href="/trigger/' + encodeURIComponent(t.symbol) + '" class="link">' + t.symbol + '</a></td>' +
+                        '<td>' + aDisplay + '</td>' +
+                        '<td>' + bDisplay + '</td>' +
+                        '<td><span class="status ' + t.status + '">' + (t.status === 'running' ? '运行中' : '已停止') + '</span></td>' +
+                        '<td>' +
+                        '<div style="display: flex; gap: 5px; align-items: center;">' +
+                        '<input type="text" inputmode="decimal" pattern="[0-9]*\\.?[0-9]*" value="' + minInterval + '" ' +
+                        'id="intervalInput_' + t.symbol + '" ' +
+                        'style="width: 80px; padding: 4px; background: #1a1a1a; border: 1px solid #333; border-radius: 4px; color: #e0e0e0;" ' +
+                        'title="修改最小阈值">' +
+                        '<button class="btn-primary" onclick="confirmUpdateInterval(\'' + t.symbol + '\')" ' +
+                        'style="padding: 4px 8px; font-size: 12px;" title="确定修改">✓</button>' +
+                        '</div>' +
+                        '<div style="font-size: 11px; color: #888; margin-top: 2px;">Max: ' + maxInterval + '</div>' +
+                        '</td>' +
+                        '<td>' + thresholdAB + '</td>' +
+                        '<td>' + thresholdBA + '</td>' +
+                        '<td>' +
+                        '<label class="switch" title="Telegram 通知开关">' +
+                        '<input type="checkbox" id="tgNotify_' + t.symbol + '" ' + (telegramEnabled ? 'checked' : '') + 
+                        ' onchange="toggleTelegramNotification(\'' + t.symbol + '\', this.checked)">' +
+                        '<span class="switch-slider"></span>' +
+                        '</label>' +
+                        '</td>' +
+                        '<td>' +
+                        '<button class="btn-primary" onclick="startTrigger(\'' + t.symbol + '\')">启动</button> ' +
+                        '<button class="btn-danger" onclick="stopTrigger(\'' + t.symbol + '\')">停止</button> ' +
+                        '<button class="btn-secondary" onclick="clearPriceDiffs(\'' + t.symbol + '\')" title="清空历史价差数据，重新计算最优阈值">清空数据</button> ' +
+                        '<button class="btn-danger" onclick="deleteTrigger(\'' + t.symbol + '\')">删除</button>' +
+                        '</td>' +
+                        '</tr>';
+                }).join('');
+                
+                // 加载后应用当前的搜索条件
+                searchTriggers();
+                
+                // 在搜索之后恢复编辑状态，避免搜索操作干扰焦点恢复
+                restoreEditingState();
+            } catch (error) {
+                console.error('加载 Trigger 失败:', error);
+                // 即使出错也尝试恢复编辑状态
+                restoreEditingState();
+            }
+        }
+        
+        async function confirmUpdateInterval(symbol) {
+            // 清除编辑状态，因为用户确认了修改
+            editingInterval = null;
+            
+            const inputEl = document.getElementById('intervalInput_' + symbol);
+            if (!inputEl) {
+                console.error('找不到输入框:', 'intervalInput_' + symbol);
+                return;
+            }
+            
+            const intervalValue = inputEl.value.trim();
+            const minInterval = parseFloat(intervalValue);
+            
+            if (isNaN(minInterval) || minInterval < 0) {
+                alert('请输入有效的最小阈值（必须 >= 0）');
+                // 重新加载以恢复原值
+                loadTriggers();
+                return;
+            }
+            
+            try {
+                // 获取当前配置
+                const res = await fetch('/api/trigger?symbol=' + encodeURIComponent(symbol));
+                const data = await res.json();
+                
+                // 检查值是否改变（兼容旧版本的 interval 字段）
+                const currentMin = data.minInterval !== undefined ? data.minInterval : data.interval;
+                if (currentMin === minInterval) {
+                    console.log('最小阈值未改变');
+                    return;
+                }
+                
+                // 更新 minInterval
+                const updateRes = await fetch('/api/trigger/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        enableAB: data.enabledAB,
+                        enableBA: data.enabledBA,
+                        minInterval: minInterval
+                    })
+                });
+                
+                if (updateRes.ok) {
+                    console.log('最小阈值已更新:', minInterval);
+                    // 重新加载以显示最新数据
+                    loadTriggers();
+                } else {
+                    const errorText = await updateRes.text();
+                    alert('更新失败: ' + errorText);
+                    // 重新加载以恢复原值
+                    loadTriggers();
+                }
+            } catch (error) {
+                alert('更新失败: ' + error.message);
+                // 重新加载以恢复原值
+                loadTriggers();
+            }
+        }
+        
+        function searchTriggers() {
+            const search = document.getElementById('triggerSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('#triggerTableBody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(search) ? '' : 'none';
+            });
+        }
+        
+        function showCreateTriggerModal() {
+            document.getElementById('triggerSymbolSearch').value = '';
+            document.getElementById('triggerSymbol').value = '';
+            document.getElementById('triggerTraderAType').value = '';
+            document.getElementById('triggerTraderBType').value = '';
+            document.getElementById('symbolSearchResults').innerHTML = '';
+            document.getElementById('createTriggerModal').style.display = 'block';
+        }
+        
+        function closeCreateTriggerModal() {
+            document.getElementById('createTriggerModal').style.display = 'none';
+        }
+
+        // 若 symbol 无 USDT/USDC/BUSD 后缀则补上 USDT，保证 CEX（如 Binance 合约）拿到 HANAUSDT；链上侧会在 subscribeOnchainForSource / extractBaseSymbol 剥后缀取 base
+        function ensureQuoteSuffix(symbol) {
+            if (!symbol || typeof symbol !== 'string') return symbol;
+            var u = symbol.toUpperCase();
+            if (u.endsWith('USDT') || u.endsWith('USDC') || u.endsWith('BUSD')) return symbol;
+            return symbol + 'USDT';
+        }
+        
+        async function searchSymbolForTrigger() {
+            const search = document.getElementById('triggerSymbolSearch').value;
+            if (search.length < 1) {
+                document.getElementById('symbolSearchResults').innerHTML = '';
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/token-mappings?search=' + encodeURIComponent(search));
+                const data = await res.json();
+                const results = document.getElementById('symbolSearchResults');
+                results.innerHTML = data.mappings.map(m => {
+                    var sym = (m.symbol || '').replace(/'/g, "\\'");
+                    return '<div style="padding: 8px; cursor: pointer; border-bottom: 1px solid #333;" onclick="selectSymbol(ensureQuoteSuffix(\'' + sym + '\'))">' +
+                        m.symbol + ' (' + m.address + ')' +
+                        '</div>';
+                }).join('');
+            } catch (error) {
+                console.error('搜索失败:', error);
+            }
+        }
+        
+        function selectSymbol(symbol) {
+            document.getElementById('triggerSymbol').value = symbol;
+            document.getElementById('symbolSearchResults').innerHTML = '';
+        }
+        
+        async function createTrigger() {
+            console.log('=== createTrigger 开始 ===');
+            
+            const symbolEl = document.getElementById('triggerSymbol');
+            let symbol = symbolEl ? symbolEl.value.trim() : '';
+            symbol = ensureQuoteSuffix(symbol);
+            console.log('1. Symbol 元素:', symbolEl);
+            console.log('2. Symbol 值(含后缀):', symbol);
+            
+            if (!symbol) {
+                alert('请选择 Symbol');
+                return;
+            }
+            
+            // 获取可选的 traderAType 和 traderBType
+            const traderATypeEl = document.getElementById('triggerTraderAType');
+            const traderBTypeEl = document.getElementById('triggerTraderBType');
+            console.log('3. TraderAType 元素:', traderATypeEl);
+            console.log('4. TraderBType 元素:', traderBTypeEl);
+            
+            const traderAType = traderATypeEl ? traderATypeEl.value.trim() : '';
+            const traderBType = traderBTypeEl ? traderBTypeEl.value.trim() : '';
+            console.log('5. TraderAType 值:', traderAType);
+            console.log('6. TraderBType 值:', traderBType);
+            
+            // 构建请求体
+            const requestBody = { symbol };
+            if (traderAType) {
+                requestBody.traderAType = traderAType;
+                console.log('7. 添加 traderAType 到请求体:', traderAType);
+            } else {
+                console.log('7. traderAType 为空，不添加到请求体');
+            }
+            if (traderBType) {
+                requestBody.traderBType = traderBType;
+                console.log('8. 添加 traderBType 到请求体:', traderBType);
+            } else {
+                console.log('8. traderBType 为空，不添加到请求体');
+            }
+            
+            const requestBodyStr = JSON.stringify(requestBody);
+            console.log('9. 最终请求体 JSON:', requestBodyStr);
+            console.log('10. 最终请求体对象:', requestBody);
+            
+            try {
+                console.log('11. 开始发送请求到 /api/trigger/create');
+                const res = await fetch('/api/trigger/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: requestBodyStr
+                });
+                
+                console.log('12. 响应状态:', res.status, res.statusText);
+                console.log('13. 响应 OK:', res.ok);
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    console.log('14. 响应数据 (JSON):', data);
+                    console.log('15. data.symbol:', data.symbol);
+                    console.log('16. data.traderAType:', data.traderAType);
+                    console.log('17. data.traderBType:', data.traderBType);
+                    console.log('18. data 的所有键:', Object.keys(data));
+                    
+                    closeCreateTriggerModal();
+                    loadTriggers();
+                    alert('Trigger 创建成功！\nSymbol: ' + data.symbol + 
+                          (data.traderAType ? '\nA类型: ' + data.traderAType : '') +
+                          (data.traderBType ? '\nB类型: ' + data.traderBType : ''));
+                } else {
+                    const errText = await res.text();
+                    console.log('19. 错误响应文本:', errText);
+                    const errorMsg = errText || '创建失败';
+                    alert('创建失败: ' + errorMsg + '\\n\\n提示：请确保已在 Token 映射管理中添加对应的代币映射');
+                }
+            } catch (error) {
+                console.error('20. 请求异常:', error);
+                alert('创建失败: ' + error.message + '\\n\\n提示：请确保已在 Token 映射管理中添加对应的代币映射');
+            }
+            
+            console.log('=== createTrigger 结束 ===');
+        }
+        
+        async function startTrigger(symbol) {
+            try {
+                const res = await fetch('/api/trigger/start?symbol=' + encodeURIComponent(symbol), { method: 'POST' });
+                if (res.ok) loadTriggers();
+            } catch (error) {
+                alert('启动失败: ' + error.message);
+            }
+        }
+        
+        async function stopTrigger(symbol) {
+            try {
+                const res = await fetch('/api/trigger/stop?symbol=' + encodeURIComponent(symbol), { method: 'POST' });
+                if (res.ok) loadTriggers();
+            } catch (error) {
+                alert('停止失败: ' + error.message);
+            }
+        }
+        
+        async function deleteTrigger(symbol) {
+            if (!confirm('确定要删除这个 Trigger 吗？')) return;
+            
+            try {
+                const res = await fetch('/api/trigger/delete?symbol=' + encodeURIComponent(symbol), { method: 'DELETE' });
+                if (res.ok) loadTriggers();
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+        
+        async function clearPriceDiffs(symbol) {
+            if (!confirm('确定要清空这个 Trigger 的历史价差数据吗？\n\n这将：\n1. 清空所有历史价差数据\n2. 重置最优阈值计算结果\n3. 系统将基于新的价差数据重新计算最优阈值')) return;
+            
+            try {
+                const res = await fetch('/api/trigger/clear-price-diffs?symbol=' + encodeURIComponent(symbol), { method: 'POST' });
+                if (res.ok) {
+                    alert('历史价差数据已清空，系统将基于新的数据重新计算最优阈值');
+                    loadTriggers(); // 刷新列表
+                } else {
+                    const errorText = await res.text();
+                    alert('清空失败: ' + errorText);
+                }
+            } catch (error) {
+                alert('清空失败: ' + error.message);
+            }
+        }
+        
+        async function toggleTelegramNotification(symbol, enabled) {
+            try {
+                const res = await fetch('/api/trigger/telegram-notification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol: symbol, enabled: enabled })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    console.log('Telegram 通知状态已更新:', data);
+                    // 不需要刷新整个列表，因为开关状态已经更新了
+                } else {
+                    const errorText = await res.text();
+                    alert('更新 Telegram 通知状态失败: ' + errorText);
+                    // 如果失败，恢复开关状态
+                    const checkbox = document.getElementById('tgNotify_' + symbol);
+                    if (checkbox) {
+                        checkbox.checked = !enabled;
+                    }
+                }
+            } catch (error) {
+                alert('更新 Telegram 通知状态失败: ' + error.message);
+                // 如果失败，恢复开关状态
+                const checkbox = document.getElementById('tgNotify_' + symbol);
+                if (checkbox) {
+                    checkbox.checked = !enabled;
+                }
+            }
+        }
+        
+        // 刷新控制相关变量
+        let refreshInterval = 3000; // 默认3秒
+        let refreshTimer = null;
+        let countdownTimer = null;
+        let remainingSeconds = 3;
+        
+        // 设置刷新间隔
+        function setRefreshInterval(interval) {
+            refreshInterval = interval;
+            remainingSeconds = Math.floor(interval / 1000);
+            
+            // 更新按钮状态
+            document.querySelectorAll('.refresh-interval-btn').forEach(btn => {
+                if (parseInt(btn.dataset.interval) === interval) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            // 更新倒计时显示
+            updateRefreshTimer();
+            
+            // 重启刷新定时器
+            startAutoRefresh();
+        }
+        
+        // 更新倒计时显示
+        function updateRefreshTimer() {
+            const timeEl = document.getElementById('refreshTime');
+            const timeTextEl = document.getElementById('refreshTimeText');
+            const progressCircle = document.getElementById('progressCircle');
+            
+            if (timeEl && timeTextEl && progressCircle) {
+                const seconds = Math.ceil(remainingSeconds);
+                timeEl.textContent = seconds;
+                timeTextEl.textContent = seconds + '秒后刷新';
+                
+                // 计算进度（用于圆圈动画）
+                const totalSeconds = refreshInterval / 1000;
+                const progress = remainingSeconds / totalSeconds;
+                const circumference = 2 * Math.PI * 14; // 半径约为14px
+                const offset = circumference * (1 - progress);
+                
+                // 设置 SVG 圆圈的 stroke-dasharray 和 stroke-dashoffset
+                progressCircle.style.strokeDasharray = circumference;
+                progressCircle.style.strokeDashoffset = offset;
+            }
+        }
+        
+        // 开始倒计时
+        function startCountdown() {
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+            }
+            
+            const totalSeconds = refreshInterval / 1000;
+            remainingSeconds = totalSeconds;
+            updateRefreshTimer();
+            
+            countdownTimer = setInterval(() => {
+                remainingSeconds -= 0.1;
+                if (remainingSeconds < 0) {
+                    remainingSeconds = 0;
+                }
+                updateRefreshTimer();
+            }, 100);
+        }
+        
+        // 开始自动刷新
+        function startAutoRefresh() {
+            // 清除旧的定时器
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+            }
+            
+            // 启动刷新（Trigger 管理始终是主页核心内容）
+            const totalSeconds = refreshInterval / 1000;
+            remainingSeconds = totalSeconds;
+            updateRefreshTimer();
+            startCountdown();
+            
+            refreshTimer = setInterval(() => {
+                loadTriggers();
+                loadWalletInfo(); // 同时刷新钱包信息
+                // 重置倒计时
+                remainingSeconds = refreshInterval / 1000;
+                updateRefreshTimer();
+            }, refreshInterval);
+        }
+        
+        // 停止自动刷新
+        function stopAutoRefresh() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+        }
+        
+        // 初始化
+        loadTriggers(); // 加载 Trigger 列表
+        loadWalletInfo(); // 加载钱包信息
+        startAutoRefresh(); // 启动自动刷新
+    </script>
+</body>
+</html>

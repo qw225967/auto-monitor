@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>搬砖详细信息</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            padding: 0;
+            min-width: 1200px;
+        }
+        .container { max-width: 1600px; margin: 0 auto; padding: 0 20px 20px 20px; }
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: #1a1a1a;
+            margin: 0 -20px 20px -20px;
+            padding: 15px 20px;
+            border-bottom: 1px solid #333;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        h1 { color: #4ade80; margin: 0; font-size: 20px; }
+        .back-link { color: #60a5fa; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+        .status-badge-header { padding: 4px 10px; border-radius: 4px; font-size: 14px; font-weight: bold; }
+        .status-badge-header.running { background: #4ade80; color: #000; }
+        .status-badge-header.stopped { background: #f43f5e; color: #fff; }
+        .section { background: #2a2a2a; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .section-title { font-size: 18px; font-weight: bold; color: #4ade80; margin-bottom: 15px; }
+        button { 
+            padding: 8px 16px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 14px; 
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #4ade80; color: #000; }
+        .btn-primary:hover { filter: brightness(1.06); }
+        .btn-danger { background: #f43f5e; color: #fff; }
+        .btn-danger:hover { filter: brightness(1.06); }
+        .btn-secondary { background: #60a5fa; color: #fff; }
+        .btn-secondary:hover { filter: brightness(1.06); }
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; margin-bottom: 5px; color: #888; }
+        .form-input { width: 100%; padding: 8px 12px; border: 1px solid #444; border-radius: 6px; background: #111; color: #e0e0e0; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+        .switch-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        .switch input:checked + .switch-slider { background-color: #4ade80; }
+        .switch input:checked + .switch-slider:before { transform: translateX(26px); }
+        @keyframes flip-pipeline-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .flip-pipeline-running { animation: flip-pipeline-blink 1s ease-in-out infinite; }
+        
+        /* 配置区域容器 - 纵向布局 */
+        .config-sections-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+        }
+        
+        /* 配置区域样式 */
+        .config-section { 
+            background: #1f1f1f; 
+            border-radius: 6px; 
+            padding: 20px; 
+            border-left: 4px solid #4ade80;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        .config-section-title { 
+            font-size: 16px; 
+            font-weight: 600; 
+            color: #4ade80; 
+            margin-bottom: 12px; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px;
+        }
+        .config-form { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; 
+            flex: 1;
+        }
+        .config-form-item { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 5px; 
+        }
+        .config-form-item label { 
+            font-size: 12px; 
+            color: #888; 
+        }
+        .config-form-item input, .config-form-item select { 
+            padding: 6px 10px; 
+            border: 1px solid #333; 
+            border-radius: 4px; 
+            background: #1a1a1a; 
+            color: #e0e0e0; 
+            font-size: 13px;
+            width: 100%;
+        }
+        .config-form-item input[type="checkbox"] { 
+            width: auto; 
+        }
+        .config-status { 
+            margin-top: auto;
+            padding: 10px; 
+            background: #2a2a2a; 
+            border-radius: 4px; 
+            font-size: 12px; 
+            color: #888;
+        }
+        .position-item { margin-bottom: 10px; }
+        .position-item:last-of-type { margin-bottom: 0; }
+        .position-label { display: block; color: #888; font-size: 12px; margin-bottom: 4px; }
+        .position-display {
+            padding: 8px 12px;
+            background: #2a2a2a;
+            border: 1px solid #4ade80;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #4ade80;
+            line-height: 1.4;
+            font-family: 'Courier New', monospace;
+        }
+        
+        /* Pipeline 可视化 */
+        .pipeline-visual { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            padding: 10px; 
+            background: #2a2a2a; 
+            border-radius: 4px; 
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .pipeline-node { 
+            padding: 6px 12px; 
+            background: #1a1a1a; 
+            border: 1px solid #555; 
+            border-radius: 4px; 
+            font-size: 12px;
+        }
+        .pipeline-node.node-success { border-color: #4ade80; color: #4ade80; }
+        .pipeline-node.node-failed { border-color: #f43f5e; color: #f43f5e; }
+        .pipeline-node.node-pending { border-color: #555; color: #888; }
+        .pipeline-node.node-running { border-color: #60a5fa; color: #60a5fa; }
+        .pipeline-arrow { color: #555; font-size: 16px; }
+        .pipeline-arrow.active-step { color: #60a5fa; animation: blink 0.8s ease-in-out infinite; }
+        @keyframes blink { 50% { opacity: 0.4; } }
+        @keyframes pipeline-arrow-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .pipeline-arrow-running { animation: pipeline-arrow-blink 1s infinite; }
+        
+        /* 顶部三栏布局 */
+        .top-summary-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .top-summary-card {
+            background: #1f1f1f;
+            border-radius: 8px;
+            padding: 16px;
+            border-left: 4px solid #4ade80;
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+        }
+        .top-summary-card .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #4ade80;
+            margin-bottom: 12px;
+        }
+        .top-summary-card .card-body {
+            flex: 1;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; }
+        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2a2a2a; padding: 30px; border-radius: 8px; min-width: 400px; max-width: 90vw; max-height: 90vh; overflow-y: auto; }
+
+        /* ===================== 新 UI (React) 基础样式 ===================== */
+        :root{
+            --aa-bg: #1a1a1a;
+            --aa-card: #2a2a2a;
+            --aa-border: #333;
+            --aa-input: #1a1a1a;
+            --aa-input-border: #333;
+            --aa-text: #e0e0e0;
+            --aa-muted: #888;
+            --aa-green: #4ade80;
+            --aa-red: #f43f5e;
+            --aa-blue: #60a5fa;
+            --aa-gap: 16px;
+        }
+        #app { width: 100%; }
+        .aa-stack { display: flex; flex-direction: column; gap: var(--aa-gap); }
+        .aa-card { background: var(--aa-card); border: 1px solid var(--aa-border); border-radius: 10px; padding: 16px; }
+        .aa-cardTitle { display:flex; align-items:center; justify-content: space-between; gap: 12px; font-size: 14px; font-weight: 700; color: var(--aa-text); }
+        .aa-subtle { color: var(--aa-muted); font-size: 12px; }
+        .aa-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--aa-gap); }
+        .aa-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--aa-gap); }
+        @media (max-width: 1280px){
+            .aa-grid2{ grid-template-columns: 1fr; }
+        }
+        .aa-row { display:flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .aa-input { background: var(--aa-input); border: 1px solid var(--aa-input-border); color: var(--aa-text); border-radius: 8px; padding: 8px 10px; min-width: 140px; }
+        .aa-input:disabled { opacity: 0.5; cursor: not-allowed; }
+        .aa-btn { border: 1px solid transparent; border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .aa-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .aa-btnGreen{ background: var(--aa-green); color:#08110a; }
+        .aa-btnRed{ background: var(--aa-red); color:#fff; }
+        .aa-btnBlue{ background: var(--aa-blue); color:#fff; }
+        .aa-sepLabel{ text-align:center; color: var(--aa-muted); font-size: 12px; margin: 6px 0; }
+        .aa-divider{ border-top: 1px solid var(--aa-border); margin: 10px 0; }
+        .aa-hiddenLegacy { display:none !important; }
+        .aa-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; }
+        .aa-list { display:flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .aa-listItem { display:flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--aa-border); border-radius: 10px; background: rgba(255,255,255,0.02); }
+        .aa-listMain { min-width: 0; }
+        .aa-listTitle { font-size: 12px; font-weight: 800; color: var(--aa-text); }
+        .aa-listSub { font-size: 12px; color: var(--aa-muted); margin-top: 4px; }
+        .aa-pill { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--aa-border); color: var(--aa-text); white-space: nowrap; }
+        .aa-pillGreen{ border-color: rgba(74,222,128,0.6); color: var(--aa-green); }
+        .aa-pillRed{ border-color: rgba(244,63,94,0.6); color: var(--aa-red); }
+        .aa-pillBlue{ border-color: rgba(96,165,250,0.6); color: var(--aa-blue); }
+        .aa-pillGray{ opacity: 0.85; }
+        .aa-kv { display:grid; grid-template-columns: 96px 1fr; gap: 8px 10px; margin-top: 10px; }
+        .aa-k { color: var(--aa-muted); font-size: 12px; }
+        .aa-v { color: var(--aa-text); font-size: 12px; }
+        .aa-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; border: 1px solid var(--aa-border); }
+        .aa-dotRunning { background: var(--aa-green); border-color: rgba(74,222,128,0.8); box-shadow: 0 0 0 rgba(74,222,128,0.35); animation: aaPulse 1.2s ease-in-out infinite; }
+        .aa-dotStopped { background: #6b7280; border-color: #6b7280; opacity: 0.9; }
+        @keyframes aaPulse {
+            0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.35); }
+            70% { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+            100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+        }
+
+        /* CollapsibleSection */
+        .aa-collapsibleHead { display:flex; align-items:center; justify-content: space-between; gap: 12px; }
+        .aa-collapsibleTitle { font-size: 14px; font-weight: 800; color: var(--aa-text); display:flex; align-items:center; gap: 10px; }
+        .aa-toggleBtn { background: transparent; border: 1px solid var(--aa-border); color: var(--aa-text); border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+        .aa-toggleBtn:hover { filter: brightness(1.05); }
+        .aa-toggleBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .aa-collapsibleSummary { margin-top: 10px; color: var(--aa-muted); font-size: 12px; white-space: pre-wrap; }
+        .aa-collapseWrap { overflow: hidden; transition: max-height 260ms ease; }
+        .aa-collapseInner { padding-top: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <a href="/brick-moving" class="back-link">← 返回搬砖区</a>
+                <h1>🧱 搬砖详细信息</h1>
+                <span id="headerSymbol" style="color: #4ade80; font-weight: 600;">--</span>
+            </div>
+        </div>
+
+        <!-- React App 挂载点（唯一渲染入口，旧配置区已移除） -->
+        <div id="app"></div>
+    </div>
+    
+    <script>
+        let currentSymbol = '';
+        let currentTriggerId = '';
+        let currentTrigger = null;  // getEffectiveTriggerId 回退用，可为 null
+        
+        function getSymbolFromURL() {
+            const path = window.location.pathname;
+            const parts = path.split('/');
+            if (parts.length >= 3 && parts[1] === 'brick-moving') {
+                return decodeURIComponent(parts[2]);
+            }
+            return null;
+        }
+        function getTriggerIdFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('triggerId') || '';
+        }
+        // 每次请求前用：优先 URL，再已加载的 trigger 对象，再内存变量，保证 apply/save/展示 都按当前 trigger 区分
+        function getEffectiveTriggerId() {
+            const fromUrl = getTriggerIdFromURL();
+            if (fromUrl) return fromUrl;
+            const fromTrigger = (currentTrigger && currentTrigger.id !== undefined && currentTrigger.id !== null && currentTrigger.id !== '') ? String(currentTrigger.id) : '';
+            if (fromTrigger) return fromTrigger;
+            if (typeof currentTriggerId !== 'undefined' && currentTriggerId) return currentTriggerId;
+            if (typeof window.currentBrickTriggerId !== 'undefined' && window.currentBrickTriggerId) return window.currentBrickTriggerId;
+            return '';
+        }
+        function triggerIdQuery() { const t = getEffectiveTriggerId(); return t ? '&triggerId=' + encodeURIComponent(t) : ''; }
+        function triggerIdQueryParam() { const t = getEffectiveTriggerId(); return t ? '?triggerId=' + encodeURIComponent(t) : ''; }
+        
+        // ===================== 旧版入口已禁用 =====================
+        // 说明：新 UI 由 React 在 #app 挂载后自行发起数据拉取与定时刷新。
+        // 旧函数保留仅用于对照/回滚，但不再自动执行，避免出现双重请求与 DOM 互相覆盖。
+    </script>
+
+    <!-- React (无构建链：CDN UMD) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+    <script>
+        (function(){
+            if (!window.React || !window.ReactDOM) {
+                const el = document.getElementById('app');
+                if (el) el.innerHTML = '<div class="aa-card"><div class="aa-cardTitle">加载失败</div><div class="aa-subtle" style="margin-top:8px;">React 资源未能加载（请检查网络）。</div></div>';
+                return;
+            }
+            if (!window.htm) {
+                const el = document.getElementById('app');
+                if (el) el.innerHTML = '<div class="aa-card"><div class="aa-cardTitle">加载失败</div><div class="aa-subtle" style="margin-top:8px;">htm 资源未能加载（请检查网络）。</div></div>';
+                return;
+            }
+            const {useEffect, useRef, useState} = React;
+            const html = window.htm.bind(React.createElement);
+
+            function getSymbolFromURL(){
+                const path = window.location.pathname || '';
+                const parts = path.split('/');
+                if (parts.length >= 3 && parts[1] === 'brick-moving') {
+                    try { return decodeURIComponent(parts[2]); } catch (e) { return parts[2]; }
+                }
+                return '';
+            }
+
+            async function fetchJSON(url, options){
+                const res = await fetch(url, options);
+                const text = await res.text();
+                let data = null;
+                try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+                return { ok: res.ok, status: res.status, statusText: res.statusText, text, data };
+            }
+
+            function fmtNum(n, digits){
+                const v = Number(n);
+                if (!Number.isFinite(v)) return '--';
+                if (typeof digits === 'number') return v.toFixed(digits);
+                return String(v);
+            }
+
+            function fmtTradeStatus(raw){
+                if (!raw || raw === '') return { t: '-', c: '#888' };
+                if (raw === 'Apending' || raw === 'Bpending') return { t: 'pending', c: '#eab308' };
+                if (raw === 'A完成' || raw === 'B完成') return { t: '完成', c: '#22c55e' };
+                if (raw === 'A失败' || raw === 'B失败') return { t: '失败', c: '#ef4444' };
+                return { t: raw, c: '#888' };
+            }
+
+            function pillForStatus(status){
+                const s = (status || '').toLowerCase();
+                if (s === 'running') return { cls: 'aa-pill aa-pillBlue', label: '运行中' };
+                if (s === 'completed') return { cls: 'aa-pill aa-pillGreen', label: '已完成' };
+                if (s === 'failed') return { cls: 'aa-pill aa-pillRed', label: '失败' };
+                if (s === 'idle') return { cls: 'aa-pill aa-pillGray', label: '空闲' };
+                if (s === 'stopped') return { cls: 'aa-pill aa-pillGray', label: '已停止' };
+                if (s === 'not_found') return { cls: 'aa-pill aa-pillGray', label: '未找到' };
+                return { cls: 'aa-pill aa-pillGray', label: status || '--' };
+            }
+
+            function nodeLabel(n){
+                if (!n) return '';
+                return n.name || n.id || '';
+            }
+
+            function pipelinePath(nodes){
+                if (!Array.isArray(nodes) || nodes.length === 0) return '未配置';
+                return nodes.map(nodeLabel).filter(Boolean).join(' → ');
+            }
+
+            // 提币 pipeline 可视化：节点 + 箭头（执行中闪烁、成功绿、失败红）；在链旁展示可达/不可达
+            // 未配置时只显示「未配置」，不显示绿色「可达」（后端对未配置返回 reachable=true 以避免误报不可达，但前端不展示为可达）
+            function renderWithdrawPipelineViz(pipeline, directionLabel, reachable, reachableReason) {
+                const isUnconfigured = !pipeline || !Array.isArray(pipeline.nodes) || pipeline.nodes.length === 0;
+                const unreachable = reachable === false;
+                const reachableBadge = unreachable
+                    ? html`<span style=${ {padding:'2px 6px', background:'rgba(239,68,68,0.3)', borderRadius:4, fontSize:11, color:'#fca5a5'} }>⚠ 不可达${reachableReason ? '：' + reachableReason : ''}</span>`
+                    : (!isUnconfigured && reachable === true ? html`<span style=${ {padding:'2px 6px', background:'rgba(74,222,128,0.25)', borderRadius:4, fontSize:11, color:'#86efac'} }>可达</span>` : null);
+                if (isUnconfigured) {
+                    return html`
+                        <div style=${ {marginTop:8,marginBottom:8} }>
+                            <div className="aa-subtle" style=${ {fontSize:11,marginBottom:4, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'} }>
+                                <span>${directionLabel} 未配置</span>
+                                ${unreachable ? reachableBadge : null}
+                            </div>
+                        </div>
+                    `;
+                }
+                const nodes = pipeline.nodes;
+                const edges = Array.isArray(pipeline.edges) ? pipeline.edges : [];
+                const status = (pipeline.status || 'idle').toLowerCase();
+                const currentStep = typeof pipeline.currentStep === 'number' ? pipeline.currentStep : 0;
+                const parts = [];
+                for (let i = 0; i < nodes.length; i++) {
+                    const node = nodes[i];
+                    const name = node.name || node.id || 'Node';
+                    let bg = '#666';
+                    if (status === 'running' && i < currentStep) bg = '#4ade80';
+                    else if (status === 'running' && i === currentStep) bg = '#3b82f6';
+                    else if (status === 'completed') bg = '#4ade80';
+                    else if (status === 'failed' && i <= currentStep) bg = i === currentStep ? '#f43f5e' : '#4ade80';
+                    parts.push(html`<span key=${'n'+i} style=${ {padding:'4px 8px',background:bg,borderRadius:4,color:'#fff',fontWeight:500,minWidth:60,textAlign:'center',fontSize:11} }>${name}</span>`);
+                    if (i < nodes.length - 1) {
+                        const edge = edges.find(e => e.step === i + 1) || {};
+                        const edgeStatus = (edge.status || 'pending').toLowerCase();
+                        let arrowColor = '#666';
+                        let arrowClass = '';
+                        if (edgeStatus === 'running') { arrowColor = '#3b82f6'; arrowClass = 'pipeline-arrow-running'; }
+                        else if (edgeStatus === 'success') arrowColor = '#4ade80';
+                        else if (edgeStatus === 'failed') arrowColor = '#f43f5e';
+                        const stepLabel = edgeStatus === 'success' ? (edge.stepLabelDone || edge.stepLabel || '') : (edgeStatus === 'running' ? (edge.stepLabel || '执行中') : '');
+                        parts.push(html`<span key=${'a'+i} style=${ {display:'flex',flexDirection:'column',alignItems:'center',gap:2} }>
+                            <span className=${'pipeline-arrow ' + (arrowClass || '')} style=${ {color:arrowColor,fontSize:16,fontWeight:'bold'} }>→</span>
+                            ${stepLabel ? html`<span className="aa-subtle" style=${ {fontSize:9,color:arrowColor,maxWidth:90,textAlign:'center',lineHeight:1.1} }>${stepLabel}</span>` : null}
+                        </span>`);
+                    }
+                }
+                const statusText = { idle:'未执行', running:'执行中', completed:'已完成', failed:'执行失败', paused:'已暂停' }[status] || status;
+                const stepInfo = currentStep > 0 ? ` (步骤 ${currentStep}/${nodes.length - 1})` : '';
+                const bt = pipeline.balanceTransfer || {};
+                const btStatus = (bt.status || 'idle').toLowerCase();
+                const showBalanceTransfer = bt.fromName && bt.toName && (btStatus === 'running' || btStatus === 'completed' || btStatus === 'failed');
+                const btArrowClass = btStatus === 'running' ? 'pipeline-arrow-running' : '';
+                const btArrowColor = btStatus === 'running' ? '#3b82f6' : (btStatus === 'completed' ? '#4ade80' : (btStatus === 'failed' ? '#f43f5e' : '#666'));
+                const btStatusText = btStatus === 'running' ? '执行中' : (btStatus === 'completed' ? '已完成' : (btStatus === 'failed' ? '执行失败' : ''));
+                return html`
+                    <div style=${ {marginTop:8,marginBottom:8} }>
+                        <div className="aa-subtle" style=${ {fontSize:11,marginBottom:4, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'} }>
+                            <span>${directionLabel}</span>
+                            ${reachableBadge}
+                        </div>
+                        <div style=${ {display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',fontSize:11} }>${parts}</div>
+                        <div style=${ {marginTop:6,fontSize:10,color:'#888'} }>状态: ${statusText}${stepInfo}</div>
+                        ${pipeline.lastError && status === 'failed' ? html`
+                            <div style=${ {marginTop:4,fontSize:10,color: pipeline.lastError.startsWith('[WARN]') ? '#eab308' : '#f43f5e',padding:4,background:'#1a1a1a',borderRadius:2,wordBreak:'break-word'} }>
+                                ${pipeline.lastError.startsWith('[WARN]') ? '警告: ' + pipeline.lastError.replace(/^\[WARN\]\s*/, '') : '错误: ' + pipeline.lastError}
+                            </div>
+                        ` : null}
+                        ${showBalanceTransfer ? html`
+                            <div className="aa-subtle" style=${ {marginTop:10,fontSize:11,color:'#888'} }>（ 余额转账：<span style=${ {color:btArrowColor,fontWeight:'bold'} }>${bt.fromName}</span><span className=${'pipeline-arrow ' + btArrowClass} style=${ {color:btArrowColor,fontSize:14,fontWeight:'bold',marginLeft:4,marginRight:4} }>→</span><span style=${ {color:btArrowColor,fontWeight:'bold'} }>${bt.toName}</span> ）${btStatus === 'running' ? (bt.stepLabel || btStatusText) : (btStatus === 'completed' ? (bt.stepLabelDone || btStatusText) : (btStatus === 'failed' ? btStatusText : ''))}</div>
+                            ${bt.lastError && btStatus === 'failed' ? html`<div style=${ {marginTop:2,fontSize:10,color:'#f43f5e',wordBreak:'break-word'} }>${bt.lastError}</div>` : null}
+                        ` : null}
+                    </div>
+                `;
+            }
+
+            function CollapsibleSection(props){
+                const { title, summary, collapsedExtra, defaultCollapsed, children } = props;
+                const [collapsed, setCollapsed] = useState(!!defaultCollapsed);
+                const wrapRef = useRef(null);   // max-height transition element
+                const innerRef = useRef(null);  // content height measure element
+                const [maxHeight, setMaxHeight] = useState(collapsed ? 0 : null); // null => auto（展开后）
+                const animatingRef = useRef(false);
+
+                // 仅当 collapsed 变化时运行动画；不依赖 children，避免轮询导致父组件每 500ms 重渲染时 children 引用变化反复触发动画造成闪动
+                useEffect(() => {
+                    const inner = innerRef.current;
+                    if (!inner) return;
+                    const full = inner.scrollHeight;
+
+                    animatingRef.current = true;
+                    if (collapsed) {
+                        setMaxHeight(full);
+                        requestAnimationFrame(() => setMaxHeight(0));
+                    } else {
+                        setMaxHeight(full);
+                    }
+                }, [collapsed]);
+
+                useEffect(() => {
+                    const wrap = wrapRef.current;
+                    if (!wrap) return;
+                    const onEnd = (e) => {
+                        if (e.propertyName !== 'max-height') return;
+                        if (!animatingRef.current) return;
+                        animatingRef.current = false;
+                        if (!collapsed) setMaxHeight(null); // 展开结束 => auto
+                    };
+                    wrap.addEventListener('transitionend', onEnd);
+                    return () => wrap.removeEventListener('transitionend', onEnd);
+                }, [collapsed]);
+
+                const btnText = collapsed ? '+ 展开' : '— 收起';
+
+                return html`
+                    <div className="aa-card">
+                        <div className="aa-collapsibleHead">
+                            <div className="aa-collapsibleTitle">${title}</div>
+                            <button className="aa-toggleBtn" type="button" onClick=${() => setCollapsed(v => !v)}>${btnText}</button>
+                        </div>
+                        ${collapsed && summary ? html`<div className="aa-collapsibleSummary">${summary}</div>` : null}
+                        ${collapsed && collapsedExtra ? html`<div style=${({marginTop: 10})}>${collapsedExtra}</div>` : null}
+                        <div
+                            className="aa-collapseWrap"
+                            ref=${wrapRef}
+                            style=${({ maxHeight: maxHeight === null ? 'none' : (maxHeight + 'px') })}
+                        >
+                            <div ref=${innerRef} className="aa-collapseInner">
+                                ${children}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function App(){
+                const [symbol] = useState(() => getSymbolFromURL());
+                const [fillsState, setFillsState] = useState({ loading: true, error: '', fills: [] });
+                const fillsAutoRefreshTimerRef = useRef(null);
+                const [fillsAutoRefresh, setFillsAutoRefresh] = useState(false);
+                const [withdrawState, setWithdrawState] = useState({ loading: true, error: '', forward: null, backward: null, mirrorForward: { nodes: [], edges: [] }, mirrorBackward: { nodes: [], edges: [] }, records: [], inFlipMode: false, flipPipelines: {}, forwardReachable: true, backwardReachable: true, forwardReachableReason: '', backwardReachableReason: '', mirrorForwardReachable: true, mirrorBackwardReachable: true, mirrorForwardReachableReason: '', mirrorBackwardReachableReason: '' });
+                const [posState, setPosState] = useState({ loading: true, error: '', data: null, lastAt: 0 });
+                const posAutoRefreshTimerRef = useRef(null);
+                const [posAutoRefresh, setPosAutoRefresh] = useState(false);
+                const [hedgingCfg, setHedgingCfg] = useState({
+                    loading: true, error: '',
+                    enabled: true,
+                    exchangeType: 'binance',
+                    hedgingSymbol: '',
+                    size: 1000,
+                    positionOpenSize: 0,
+                    position: 0,
+                    openPositionSide: 'A',
+                    autoWithdrawEnabled: false,
+                    autoWithdrawUseFixed: true,
+                    autoWithdrawFixedSize: 0,
+                    autoWithdrawPercentage: 0,
+                    quoteAsset: 'USDT',
+                    smartFlipEnabled: false,
+                    smartFlipThreshold: 1.5,
+                });
+                const [hedgeUi, setHedgeUi] = useState({ saving: false, error: '', opening: false, openMsg: '', closing: false, closeMsg: '' });
+                const [closePositionSize, setClosePositionSize] = useState('');
+
+                // route probe states
+                const [probeFwd, setProbeFwd] = useState({ source: '', dest: '', amount: '5', loading: false, error: '', rows: [] });
+                const [probeBwd, setProbeBwd] = useState({ source: '', dest: '', amount: '5', loading: false, error: '', rows: [] });
+
+                // auto-withdraw + swap states（触发由后端轮询负责，前端只做启用/停用）
+                const [autoRunning, setAutoRunning] = useState({ forward: false, backward: false });
+                const [autoUi, setAutoUi] = useState({ saving: false, error: '', last: { forward: null, backward: null } });
+                const autoWithdrawFixedSizeRef = useRef(null);
+                const [smartFlipExpanded, setSmartFlipExpanded] = useState(false);
+                const [priceDiff, setPriceDiff] = useState({ loading: true, error: '', exists: false, diffAB: null, diffBA: null });
+                // 用于「无 triggerId 时解析出唯一 trigger 后」强制 re-render，使 getTriggerIdFromURL() 生效
+                const [triggerIdResolved, setTriggerIdResolved] = useState('');
+                const [triggerState, setTriggerState] = useState({
+                    loading: true, error: '',
+                    status: '',
+                    traderAType: '',
+                    traderBType: '',
+                    enabledAB: false,
+                    enabledBA: false,
+                    thresholdAB: 0.2,
+                    thresholdBA: 0.0,
+                    triggerABSize: 1000,
+                    triggerBASize: 1000,
+                    onChainSlippage: '0.5',
+                    gasLimit: '',
+                    gasMultiplier: 1,
+                    tradeStatusABA: '',
+                    tradeStatusABB: '',
+                    tradeStatusBAB: '',
+                    tradeStatusBAA: '',
+                    orderLoopMs: 500,
+                    cooldownSec: 2,
+                });
+
+                useEffect(() => {
+                    const headerSymbolEl = document.getElementById('headerSymbol');
+                    if (headerSymbolEl) headerSymbolEl.textContent = symbol || '--';
+                    if (symbol) document.title = '搬砖详细信息 - ' + symbol;
+                    try { window.currentSymbol = symbol || ''; } catch(e) {}
+                    const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '';
+                    try { window.currentBrickTriggerId = tid || ''; } catch(e) {}
+                }, [symbol]);
+
+                // 价差：2 秒刷新（带 triggerId 避免同 symbol 多 trigger 串数据）；与页面其他请求一致用 getEffectiveTriggerId
+                const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '';
+                useEffect(() => {
+                    let cancelled = false;
+                    let timer = null;
+                    async function load(){
+                        if (!symbol) return;
+                        try{
+                            const q = 'triggerSymbol=' + encodeURIComponent(symbol) + (tid ? '&triggerId=' + encodeURIComponent(tid) : '');
+                            const r = await fetchJSON('/api/brick-moving/trigger/price-diff?' + q);
+                            if (cancelled) return;
+                            if (!r.ok) {
+                                setPriceDiff({ loading:false, error: (r.data && r.data.error) || r.text || r.statusText, exists:false, diffAB:null, diffBA:null });
+                                return;
+                            }
+                            setPriceDiff({
+                                loading:false, error:'',
+                                exists: !!(r.data && r.data.exists),
+                                diffAB: (r.data && r.data.diffAB != null) ? Number(r.data.diffAB) : null,
+                                diffBA: (r.data && r.data.diffBA != null) ? Number(r.data.diffBA) : null,
+                            });
+                        }catch(e){
+                            if (cancelled) return;
+                            setPriceDiff({ loading:false, error: e.message || String(e), exists:false, diffAB:null, diffBA:null });
+                        }
+                    }
+                    load();
+                    timer = setInterval(load, 2000);
+                    return () => { cancelled = true; if (timer) clearInterval(timer); };
+                }, [symbol, tid]);
+
+                // Trigger 状态/方向开关：用 /api/trigger?symbol 获取 enabledAB/enabledBA + status；阈值用 /api/brick-moving/triggers 列表补齐
+                // silent: 轮询时传 true，避免 loading 闪烁
+                async function loadTriggerState(silent){
+                    if (!symbol) return;
+                    if (!silent) setTriggerState(s => ({...s, loading:true, error:''}));
+                    try{
+                        const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '';
+                        const triggerUrl = '/api/trigger?symbol=' + encodeURIComponent(symbol) + (tid ? '&triggerId=' + encodeURIComponent(tid) : '');
+                        const [a, b] = await Promise.all([
+                            fetchJSON(triggerUrl),
+                            fetchJSON('/api/brick-moving/triggers')
+                        ]);
+                        // 缺少 triggerId 时：若该 symbol 仅有一个 trigger，补全 URL 并立即刷新提币记录，保证首屏就带 triggerId
+                        if (!tid && b.ok && Array.isArray(b.data)) {
+                            const forSymbol = b.data.filter(x => x && x.symbol === symbol);
+                            if (forSymbol.length === 1) {
+                                const id = String(forSymbol[0].id);
+                                if (id && !window.location.search.includes('triggerId=')) {
+                                    history.replaceState(null, '', window.location.pathname + '?triggerId=' + encodeURIComponent(id));
+                                    setTriggerIdResolved(id);
+                                    if (typeof reloadWithdraw === 'function') reloadWithdraw(false);
+                                }
+                            }
+                        }
+                        const enabledAB = a.ok && a.data ? !!a.data.enabledAB : false;
+                        const enabledBA = a.ok && a.data ? !!a.data.enabledBA : false;
+                        const status = a.ok && a.data ? (a.data.status || '') : '';
+
+                        let thresholdAB = 0.2;
+                        let thresholdBA = 0.0;
+                        let onChainSlippage = '0.5';
+                        let gasMultiplier = 1;
+                        let gasLimit = '';
+                        let traderAType = '';
+                        let traderBType = '';
+                        // 优先从单 trigger 接口取阈值（一个接口拿全）
+                        if (a.ok && a.data) {
+                            if (a.data.thresholdAB != null) thresholdAB = Number(a.data.thresholdAB);
+                            if (a.data.thresholdBA != null) thresholdBA = Number(a.data.thresholdBA);
+                        }
+                        if (b.ok && Array.isArray(b.data)) {
+                            const row = tid ? b.data.find(x => x && String(x.id) === String(tid)) : b.data.find(x => x && x.symbol === symbol);
+                            if (row) {
+                                traderAType = String(row.traderAType || row.exchangeA || '').trim();
+                                traderBType = String(row.traderBType || row.exchangeB || '').trim();
+                                if (a.data == null || a.data.thresholdAB == null) { if (row.thresholdAB != null) thresholdAB = Number(row.thresholdAB); }
+                                if (a.data == null || a.data.thresholdBA == null) { if (row.thresholdBA != null) thresholdBA = Number(row.thresholdBA); }
+                                // 链上参数（优先 A 侧）
+                                if (row.onChainSlippageA) onChainSlippage = String(row.onChainSlippageA);
+                                else if (row.onChainSlippageB) onChainSlippage = String(row.onChainSlippageB);
+                                if (row.gasMultiplierA != null) gasMultiplier = Number(row.gasMultiplierA) || 1;
+                                else if (row.gasMultiplierB != null) gasMultiplier = Number(row.gasMultiplierB) || 1;
+                                if (row.onChainGasLimitA) gasLimit = String(row.onChainGasLimitA);
+                                else if (row.onChainGasLimitB) gasLimit = String(row.onChainGasLimitB);
+                            }
+                        }
+                        // 按方向区分的 size：优先 triggerABSize/triggerBASize，兼容旧接口 size
+                        const def = Number(hedgingCfg.size) || 1000;
+                        const triggerABSize = (a.ok && a.data && a.data.triggerABSize != null) ? Number(a.data.triggerABSize) : ((a.ok && a.data && a.data.size != null) ? Number(a.data.size) : def);
+                        const triggerBASize = (a.ok && a.data && a.data.triggerBASize != null) ? Number(a.data.triggerBASize) : ((a.ok && a.data && a.data.size != null) ? Number(a.data.size) : def);
+                        let tradeStatusABA = (a.ok && a.data && (a.data.tradeStatusABA != null || a.data.tradeStatusA != null)) ? String(a.data.tradeStatusABA != null ? a.data.tradeStatusABA : a.data.tradeStatusA) : '';
+                        let tradeStatusABB = (a.ok && a.data && (a.data.tradeStatusABB != null || a.data.tradeStatusB != null)) ? String(a.data.tradeStatusABB != null ? a.data.tradeStatusABB : a.data.tradeStatusB) : '';
+                        let tradeStatusBAB = (a.ok && a.data && a.data.tradeStatusBAB != null) ? String(a.data.tradeStatusBAB) : '';
+                        let tradeStatusBAA = (a.ok && a.data && a.data.tradeStatusBAA != null) ? String(a.data.tradeStatusBAA) : '';
+                        let orderLoopMs = (a.ok && a.data && a.data.orderLoopMs != null) ? Number(a.data.orderLoopMs) : 500;
+                        let cooldownSec = (a.ok && a.data && a.data.cooldownSec != null) ? Number(a.data.cooldownSec) : 2;
+                        if (b.ok && Array.isArray(b.data)) {
+                            const row2 = tid ? b.data.find(x => x && String(x.id) === String(tid)) : b.data.find(x => x && x.symbol === symbol);
+                            if (row2) {
+                                if (row2.tradeStatusABA != null) tradeStatusABA = String(row2.tradeStatusABA); else if (row2.tradeStatusA != null) tradeStatusABA = String(row2.tradeStatusA);
+                                if (row2.tradeStatusABB != null) tradeStatusABB = String(row2.tradeStatusABB); else if (row2.tradeStatusB != null) tradeStatusABB = String(row2.tradeStatusB);
+                                if (row2.tradeStatusBAB != null) tradeStatusBAB = String(row2.tradeStatusBAB);
+                                if (row2.tradeStatusBAA != null) tradeStatusBAA = String(row2.tradeStatusBAA);
+                                if (row2.orderLoopMs != null) orderLoopMs = Number(row2.orderLoopMs) || 500;
+                                if (row2.cooldownSec != null) cooldownSec = Number(row2.cooldownSec) || 2;
+                            }
+                        }
+
+                        if (silent) {
+                            // 轮询时只更新只读字段（交易状态、运行开关），不覆盖用户正在输入的阈值/Size 等
+                            setTriggerState(s => ({
+                                ...s,
+                                loading: false,
+                                error: (!a.ok && ((a.data && a.data.error) || a.text || a.statusText)) || (!b.ok && ((b.data && b.data.error) || b.text || b.statusText)) || '',
+                                status,
+                                enabledAB,
+                                enabledBA,
+                                tradeStatusABA,
+                                tradeStatusABB,
+                                tradeStatusBAB,
+                                tradeStatusBAA,
+                            }));
+                        } else {
+                            setTriggerState(s => ({
+                                ...s,
+                                loading:false,
+                                error: (!a.ok && ((a.data && a.data.error) || a.text || a.statusText)) || (!b.ok && ((b.data && b.data.error) || b.text || b.statusText)) || '',
+                                status,
+                                traderAType,
+                                traderBType,
+                                enabledAB,
+                                enabledBA,
+                                thresholdAB,
+                                thresholdBA,
+                                triggerABSize,
+                                triggerBASize,
+                                onChainSlippage,
+                                gasLimit,
+                                gasMultiplier,
+                                tradeStatusABA,
+                                tradeStatusABB,
+                                tradeStatusBAB,
+                                tradeStatusBAA,
+                                orderLoopMs,
+                                cooldownSec,
+                            }));
+                        }
+                    }catch(e){
+                        setTriggerState(s => ({...s, loading:false, error: e.message || String(e)}));
+                    }
+                }
+
+                useEffect(() => {
+                    if (!symbol) return;
+                    loadTriggerState(false);
+                    const timer = setInterval(function(){ loadTriggerState(true); }, 500);
+                    return function(){ if (timer) clearInterval(timer); };
+                }, [symbol, hedgingCfg.size]); // eslint-disable-line react-hooks/exhaustive-deps
+
+                async function updateTriggerConfig(patch){
+                    if (!symbol) return;
+                    const body = { symbol, ...(patch || {}) };
+                    const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '');
+                    const url = '/api/brick-moving/trigger/config' + (tid ? '?triggerId=' + encodeURIComponent(tid) : '');
+                    const r = await fetchJSON(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                    if (!r.ok) {
+                        alert('更新失败：' + ((r.data && r.data.error) || r.text || r.statusText));
+                        return false;
+                    }
+                    await loadTriggerState();
+                    return true;
+                }
+
+                // 套保配置（主要用于 backward 的 QuoteAsset）；带 triggerId 与页面一致用 getEffectiveTriggerId
+                useEffect(() => {
+                    let cancelled = false;
+                    const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '';
+                    async function load(){
+                        if (!symbol) return;
+                        setHedgingCfg(s => ({...s, loading: true, error: ''}));
+                        try{
+                            const q = 'triggerSymbol=' + encodeURIComponent(symbol) + (tid ? '&triggerId=' + encodeURIComponent(tid) : '');
+                            const r = await fetchJSON('/api/brick-moving/trigger/hedging?' + q);
+                            if (cancelled) return;
+                            const d = (r.data && typeof r.data === 'object') ? r.data : {};
+                            const enabled = !!d.autoWithdrawEnabled;
+                            setHedgingCfg({
+                                loading: false,
+                                error: r.ok ? '' : (d.error) || r.text || r.statusText,
+                                enabled: d.enabled !== undefined ? !!d.enabled : true,
+                                exchangeType: d.exchangeType || 'binance',
+                                hedgingSymbol: d.hedgingSymbol || symbol,
+                                size: (d.size != null ? Number(d.size) : 1000) || 0,
+                                positionOpenSize: (d.positionOpenSize != null ? Number(d.positionOpenSize) : 0) || 0,
+                                position: (d.position != null ? Number(d.position) : 0) || 0,
+                                autoWithdrawEnabled: enabled,
+                                autoWithdrawUseFixed: d.autoWithdrawUseFixed !== undefined ? !!d.autoWithdrawUseFixed : true,
+                                autoWithdrawFixedSize: (d.autoWithdrawFixedSize != null ? Number(d.autoWithdrawFixedSize) : 0) || 0,
+                                autoWithdrawPercentage: (d.autoWithdrawPercentage != null ? Number(d.autoWithdrawPercentage) : 0) || 0,
+                                quoteAsset: (d.quoteAsset || 'USDT') || 'USDT',
+                                openPositionSide: (d.openPositionSide === 'B' ? 'B' : 'A'),
+                                smartFlipEnabled: !!d.smartFlipEnabled,
+                                smartFlipThreshold: (d.smartFlipThreshold != null && d.smartFlipThreshold > 0) ? Number(d.smartFlipThreshold) : 1.5,
+                            });
+                            setAutoRunning({ forward: enabled, backward: enabled });
+                        }catch(e){
+                            if (cancelled) return;
+                            setHedgingCfg(s => ({...s, loading: false, error: e.message || String(e)}));
+                        }
+                    }
+                    load();
+                    return () => { cancelled = true; };
+                }, [symbol]);
+
+                // 交易记录（按钮刷新 + 初次加载 + 2s 定时刷新）
+                const reloadFills = async () => {
+                    if (!symbol) return;
+                    setFillsState(s => ({...s, loading: true, error: ''}));
+                    try {
+                        const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '';
+                        const q = 'triggerSymbol=' + encodeURIComponent(symbol) + '&limit=20' + (tid ? '&triggerId=' + encodeURIComponent(tid) : '');
+                        const r = await fetchJSON('/api/brick-moving/trigger/fills?' + q);
+                        const fills = r.data && Array.isArray(r.data.fills) ? r.data.fills : [];
+                        setFillsState({ loading: false, error: r.ok ? '' : (r.data && r.data.error) || r.text || r.statusText, fills });
+                    } catch (e) {
+                        setFillsState({ loading: false, error: e.message || String(e), fills: [] });
+                    }
+                };
+                const startFillsAutoRefresh = () => {
+                    if (fillsAutoRefreshTimerRef.current) return;
+                    reloadFills();
+                    fillsAutoRefreshTimerRef.current = setInterval(reloadFills, 2000);
+                    setFillsAutoRefresh(true);
+                };
+                const stopFillsAutoRefresh = () => {
+                    if (fillsAutoRefreshTimerRef.current) {
+                        clearInterval(fillsAutoRefreshTimerRef.current);
+                        fillsAutoRefreshTimerRef.current = null;
+                    }
+                    setFillsAutoRefresh(false);
+                };
+                useEffect(() => {
+                    startFillsAutoRefresh();
+                    return () => { stopFillsAutoRefresh(); };
+                }, [symbol]); // eslint-disable-line react-hooks/exhaustive-deps
+
+                // 提币记录 + pipeline 路径（轮询，后续可按 running 状态加速）
+                const reloadWithdraw = async (isBackground = false) => {
+                    if (!symbol) return;
+                    if (!isBackground) setWithdrawState(s => ({...s, loading: true, error: ''}));
+                    try {
+                        const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '';
+                        const q = 'triggerSymbol=' + encodeURIComponent(symbol) + '&limit=10' + (tid ? '&triggerId=' + encodeURIComponent(tid) : '');
+                        const r = await fetchJSON('/api/brick-moving/withdraw-history?' + q);
+                        // 兼容：后端在某些情况下可能返回 []
+                        if (Array.isArray(r.data)) {
+                            setWithdrawState({ loading: false, error: '', forward: null, backward: null, mirrorForward: { nodes: [], edges: [] }, mirrorBackward: { nodes: [], edges: [] }, records: [], inFlipMode: false, flipPipelines: {}, forwardReachable: true, backwardReachable: true, forwardReachableReason: '', backwardReachableReason: '', mirrorForwardReachable: true, mirrorBackwardReachable: true, mirrorForwardReachableReason: '', mirrorBackwardReachableReason: '' });
+                            return;
+                        }
+                        const pipelines = r.data && r.data.pipelines ? r.data.pipelines : {};
+                        const forward = pipelines && pipelines.forward ? pipelines.forward : null;
+                        const backward = pipelines && pipelines.backward ? pipelines.backward : null;
+                        const mirrorForward = r.data && r.data.mirrorForward ? r.data.mirrorForward : { nodes: [], edges: [] };
+                        const mirrorBackward = r.data && r.data.mirrorBackward ? r.data.mirrorBackward : { nodes: [], edges: [] };
+                        const records = r.data && Array.isArray(r.data.records) ? r.data.records : [];
+                        const inFlipMode = !!(r.data && r.data.inFlipMode);
+                        const flipPipelines = (r.data && r.data.flipPipelines) || {};
+                        const raw = r.data || r;
+                        const forwardReachable = raw && raw.forwardReachable !== undefined ? !!raw.forwardReachable : true;
+                        const backwardReachable = raw && raw.backwardReachable !== undefined ? !!raw.backwardReachable : true;
+                        const forwardReachableReason = (raw && raw.forwardReachableReason) || '';
+                        const backwardReachableReason = (raw && raw.backwardReachableReason) || '';
+                        const mirrorForwardReachable = raw && raw.mirrorForwardReachable !== undefined ? !!raw.mirrorForwardReachable : true;
+                        const mirrorBackwardReachable = raw && raw.mirrorBackwardReachable !== undefined ? !!raw.mirrorBackwardReachable : true;
+                        const mirrorForwardReachableReason = (raw && raw.mirrorForwardReachableReason) || '';
+                        const mirrorBackwardReachableReason = (raw && raw.mirrorBackwardReachableReason) || '';
+                        setWithdrawState({ loading: false, error: r.ok ? '' : (r.data && r.data.error) || r.text || r.statusText, forward, backward, mirrorForward, mirrorBackward, records, inFlipMode, flipPipelines, forwardReachable, backwardReachable, forwardReachableReason, backwardReachableReason, mirrorForwardReachable, mirrorBackwardReachable, mirrorForwardReachableReason, mirrorBackwardReachableReason });
+                    } catch (e) {
+                        setWithdrawState({ loading: false, error: e.message || String(e), forward: null, backward: null, mirrorForward: { nodes: [], edges: [] }, mirrorBackward: { nodes: [], edges: [] }, records: [], inFlipMode: false, flipPipelines: {}, forwardReachable: true, backwardReachable: true, forwardReachableReason: '', backwardReachableReason: '', mirrorForwardReachable: true, mirrorBackwardReachable: true, mirrorForwardReachableReason: '', mirrorBackwardReachableReason: '' });
+                    }
+                };
+                const triggerIdFromUrl = (typeof getTriggerIdFromURL === 'function' ? getTriggerIdFromURL() : '') || '';
+                useEffect(() => {
+                    let timer = null;
+                    reloadWithdraw(false);
+                    timer = setInterval(() => reloadWithdraw(true), 5000);
+                    return () => { if (timer) clearInterval(timer); };
+                }, [symbol, triggerIdFromUrl, triggerIdResolved]); // eslint-disable-line react-hooks/exhaustive-deps
+
+                // 智能翻转两条镜像路径存在不可达时自动展开，便于用户看到
+                useEffect(() => {
+                    if (!withdrawState.loading && (!withdrawState.mirrorForwardReachable || !withdrawState.mirrorBackwardReachable)) {
+                        setSmartFlipExpanded(true);
+                    }
+                }, [withdrawState.loading, withdrawState.mirrorForwardReachable, withdrawState.mirrorBackwardReachable]);
+
+                // 供 Pipeline/Chain 模态框保存后刷新 React 状态
+                useEffect(() => {
+                    window.__reloadBrickMovingState = () => { reloadWithdraw(); };
+                    return () => { try { delete window.__reloadBrickMovingState; } catch(e) {} };
+                }, [symbol]); // eslint-disable-line react-hooks/exhaustive-deps
+
+                // 持仓（按钮刷新 + 初次加载 + 2s 定时刷新）；带 triggerId 与页面一致用 getEffectiveTriggerId
+                const refreshPos = async () => {
+                    if (!symbol) return;
+                    const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '';
+                    setPosState(s => ({...s, loading: true, error: ''}));
+                    try {
+                        const q = 'triggerSymbol=' + encodeURIComponent(symbol) + (tid ? '&triggerId=' + encodeURIComponent(tid) : '');
+                        const r = await fetchJSON('/api/brick-moving/trigger/hedging-position?' + q);
+                        const data = r.data && typeof r.data === 'object' ? r.data : null;
+                        setPosState({ loading: false, error: r.ok ? '' : (r.data && r.data.error) || r.text || r.statusText, data, lastAt: Date.now() });
+                    } catch (e) {
+                        setPosState({ loading: false, error: e.message || String(e), data: null, lastAt: Date.now() });
+                    }
+                };
+                const startPosAutoRefresh = () => {
+                    if (posAutoRefreshTimerRef.current) return;
+                    refreshPos();
+                    posAutoRefreshTimerRef.current = setInterval(refreshPos, 2000);
+                    setPosAutoRefresh(true);
+                };
+                const stopPosAutoRefresh = () => {
+                    if (posAutoRefreshTimerRef.current) {
+                        clearInterval(posAutoRefreshTimerRef.current);
+                        posAutoRefreshTimerRef.current = null;
+                    }
+                    setPosAutoRefresh(false);
+                };
+                useEffect(() => {
+                    startPosAutoRefresh();
+                    return () => { stopPosAutoRefresh(); };
+                }, [symbol]); // eslint-disable-line react-hooks/exhaustive-deps
+
+                const forwardPath = pipelinePath(withdrawState.forward && withdrawState.forward.nodes);
+                const backwardPath = pipelinePath(withdrawState.backward && withdrawState.backward.nodes);
+
+                // 初始化 route probe 默认输入（基于当前 active pipeline）
+                useEffect(() => {
+                    if (!symbol) return;
+                    const fwdNodes = withdrawState.forward && Array.isArray(withdrawState.forward.nodes) ? withdrawState.forward.nodes : [];
+                    const bwdNodes = withdrawState.backward && Array.isArray(withdrawState.backward.nodes) ? withdrawState.backward.nodes : [];
+                    const fallbackFwdSrc = (fwdNodes[0] && (fwdNodes[0].id || fwdNodes[0].name)) || 'binance';
+                    const fallbackFwdDst = (fwdNodes[fwdNodes.length - 1] && (fwdNodes[fwdNodes.length - 1].id || fwdNodes[fwdNodes.length - 1].name)) || 'okex';
+                    const fallbackBwdSrc = (bwdNodes[0] && (bwdNodes[0].id || bwdNodes[0].name)) || 'okex';
+                    const fallbackBwdDst = (bwdNodes[bwdNodes.length - 1] && (bwdNodes[bwdNodes.length - 1].id || bwdNodes[bwdNodes.length - 1].name)) || 'binance';
+                    // 期望语义：source=源(A类型，如 onchain:56)，dest=目标(B类型，如 okex:spot)，amount=探测金额
+                    // 优先使用 trigger 的 traderAType/traderBType（更贴近业务），再 fallback 到当前 pipeline 首尾节点
+                    const preferFwdSrc = (triggerState.traderAType || '').trim();
+                    const preferFwdDst = (triggerState.traderBType || '').trim();
+                    const preferBwdSrc = (triggerState.traderBType || '').trim();
+                    const preferBwdDst = (triggerState.traderAType || '').trim();
+                    setProbeFwd(s => {
+                        const curSrc = (s.source || '').trim();
+                        const curDst = (s.dest || '').trim();
+                        return {
+                            ...s,
+                            source: (!curSrc || curSrc === fallbackFwdSrc) ? (preferFwdSrc || fallbackFwdSrc) : s.source,
+                            dest: (!curDst || curDst === fallbackFwdDst) ? (preferFwdDst || fallbackFwdDst) : s.dest,
+                            amount: (s.amount && String(s.amount).trim()) ? s.amount : '5',
+                        };
+                    });
+                    setProbeBwd(s => {
+                        const curSrc = (s.source || '').trim();
+                        const curDst = (s.dest || '').trim();
+                        return {
+                            ...s,
+                            source: (!curSrc || curSrc === fallbackBwdSrc) ? (preferBwdSrc || fallbackBwdSrc) : s.source,
+                            dest: (!curDst || curDst === fallbackBwdDst) ? (preferBwdDst || fallbackBwdDst) : s.dest,
+                            amount: (s.amount && String(s.amount).trim()) ? s.amount : '5',
+                        };
+                    });
+                }, [symbol, withdrawState.forward, withdrawState.backward, triggerState.traderAType, triggerState.traderBType]);
+
+                function baseAssetFromPair(pair){
+                    const p = String(pair || '').trim();
+                    if (!p) return '';
+                    return p.replace(/USDT$/i,'').replace(/USDC$/i,'').replace(/BUSD$/i,'');
+                }
+
+                function buildRowsFromProbeResult(data){
+                    if (!data) return [];
+                    const main = { path: data.path || [], segments: data.segments || [], totalTimeSec: data.totalEstimatedTimeSec, totalFee: data.totalFee, isRecommended: true, altIndex: null };
+                    const out = [main];
+                    const alternatives = Array.isArray(data.alternativePaths) ? data.alternativePaths : [];
+                    alternatives.forEach((alt, idx) => {
+                        const ap = alt.path || [];
+                        const asegs = alt.segments || [];
+                        const aTime = Array.isArray(asegs) ? asegs.reduce((s, seg) => s + (seg.estimatedTimeSec || 0), 0) : 0;
+                        const aFee = (alt.totalFee != null) ? alt.totalFee : (Array.isArray(asegs) ? asegs.reduce((s, seg) => s + parseFloat(seg.fee || '0'), 0).toFixed(6) : '0');
+                        out.push({ path: ap, segments: asegs, totalTimeSec: aTime, totalFee: aFee, isRecommended: false, altIndex: idx });
+                    });
+                    return out;
+                }
+
+                function chainIDToNetwork(chainId) {
+                    const m = { '1': 'ERC20', '56': 'BEP20', '137': 'POLYGON', '42161': 'ARBITRUM', '10': 'OPTIMISM', '43114': 'AVAXC', '8453': 'BASE', '250': 'FTM', '25': 'CRO' };
+                    return m[String(chainId)] || '';
+                }
+
+                function probeSegLabel(seg){
+                    if (!seg) return '';
+                    if (seg.edgeLabel) return String(seg.edgeLabel);
+                    if (seg.bridgeProtocol) return String(seg.bridgeProtocol);
+                    if (seg.type === 'exchange_to_exchange' && seg.withdrawNetworkChainID) {
+                        const net = chainIDToNetwork(seg.withdrawNetworkChainID) || ('chain:' + String(seg.withdrawNetworkChainID));
+                        return '提现链:' + net;
+                    }
+                    if (seg.type) return String(seg.type);
+                    return '';
+                }
+
+                function renderProbeEdgeInfo(row){
+                    const path = row && Array.isArray(row.path) ? row.path : [];
+                    const segs = row && Array.isArray(row.segments) ? row.segments : [];
+                    if (!path || path.length < 2) return null;
+                    const chips = [];
+                    const reasons = [];
+                    for (let i = 0; i < path.length - 1; i++) {
+                        const seg = segs[i];
+                        const lbl = probeSegLabel(seg) || '—';
+                        const ok = !(seg && seg.available === false);
+                        const titleParts = [];
+                        if (seg && seg.fee != null) titleParts.push('fee=' + seg.fee);
+                        if (seg && seg.estimatedTimeSec != null) titleParts.push('eta=' + seg.estimatedTimeSec + 's');
+                        const title = titleParts.join(' ');
+                        chips.push(html`<span key=${i} className=${'aa-pill ' + (ok ? 'aa-pillBlue' : 'aa-pillRed')} title=${title}>${lbl}</span>`);
+                        if (!ok) {
+                            const r = seg && seg.rawInfo && seg.rawInfo.reason ? String(seg.rawInfo.reason) : '';
+                            reasons.push('段' + (i + 1) + (r ? (': ' + r) : ''));
+                        }
+                    }
+                    return html`
+                        <div className="aa-row" style=${({marginTop:6, gap:6})}>
+                            <span className="aa-subtle">边:</span>
+                            ${chips}
+                        </div>
+                        ${reasons.length ? html`<div className="aa-subtle" style=${({marginTop:6, color:'var(--aa-red)'})}>不可用: ${reasons.join('；')}</div>` : null}
+                    `;
+                }
+
+                async function runProbe(direction){
+                    const isFwd = direction === 'forward';
+                    const st = isFwd ? probeFwd : probeBwd;
+                    const setSt = isFwd ? setProbeFwd : setProbeBwd;
+                    const source = (st.source || '').trim();
+                    const dest = (st.dest || '').trim();
+                    const amount = (st.amount || '5').trim() || '5';
+                    if (!source || !dest) {
+                        setSt(s => ({...s, error: '请输入 source/dest' }));
+                        return;
+                    }
+                    setSt(s => ({...s, loading: true, error: '' }));
+                    try{
+                        const probeSymbol = isFwd ? baseAssetFromPair(symbol) : (hedgingCfg.quoteAsset || 'USDT');
+                        // 重要：这里不传 triggerSymbol/direction，避免后端按 trigger/pipeline 覆盖用户输入的 source/dest
+                        const body = { source, destination: dest, symbol: probeSymbol || 'USDT', probeAmount: amount };
+                        const r = await fetchJSON('/api/brick-moving/route-probe', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                        if (!r.ok) {
+                            setSt(s => ({...s, loading:false, error: (r.data && r.data.error) || r.text || r.statusText, rows: [] }));
+                            return;
+                        }
+                        const rows = buildRowsFromProbeResult(r.data);
+                        setSt(s => ({...s, loading:false, error:'', rows }));
+                    }catch(e){
+                        setSt(s => ({...s, loading:false, error: e.message || String(e), rows: [] }));
+                    }
+                }
+
+                async function applyProbe(direction, row){
+                    const isFwd = direction === 'forward';
+                    const probeSymbol = isFwd ? baseAssetFromPair(symbol) : (hedgingCfg.quoteAsset || 'USDT');
+                    const baseAsset = baseAssetFromPair(symbol) || 'USDT';
+                    const quoteA = hedgingCfg.quoteAsset || 'USDT';
+                    const path = row && Array.isArray(row.path) ? row.path : [];
+                    const segments = row && Array.isArray(row.segments) ? row.segments : [];
+                    if (path.length < 2) {
+                        alert('路径无效');
+                        return;
+                    }
+
+                    const nodesForApi = path.map((nodeId, idx) => {
+                        const name = nodeId + '-' + (idx + 1);
+                        if (String(nodeId).startsWith('onchain:')) {
+                            return { type: nodeId, asset: baseAsset, name };
+                        }
+                        return { type: nodeId, asset: baseAsset, name, network: 'ERC20' };
+                    });
+
+                    function chainIDToNetwork(chainId) {
+                        const m = { '1': 'ERC20', '56': 'BEP20', '137': 'POLYGON', '42161': 'ARBITRUM', '10': 'OPTIMISM', '43114': 'AVAXC', '8453': 'BASE', '250': 'FTM', '25': 'CRO' };
+                        return m[String(chainId)] || '';
+                    }
+
+                    const edges = [];
+                    for (let i = 0; i < nodesForApi.length - 1; i++) {
+                        const edge = { from: i, to: i + 1, amountType: 'all' };
+                        const fromNodeId = path[i];
+                        const toNodeId = path[i + 1];
+                        if (segments[i] && segments[i].type === 'bridge' && segments[i].bridgeProtocol) {
+                            edge.bridgeProtocol = segments[i].bridgeProtocol;
+                        }
+                        if (toNodeId && String(toNodeId).indexOf('onchain:') === 0) {
+                            edge.chainId = String(toNodeId).replace('onchain:', '');
+                        }
+                        // 链→交易所：充币网络必须与来源链一致
+                        if (fromNodeId && String(fromNodeId).indexOf('onchain:') === 0 && toNodeId && String(toNodeId).indexOf('onchain:') !== 0) {
+                            const fromChainId = String(fromNodeId).replace('onchain:', '');
+                            const net = chainIDToNetwork(fromChainId);
+                            if (net) edge.network = net;
+                        }
+                        // 交易所→交易所：网络由 withdrawNetworkChainID 决定
+                        if (segments[i] && segments[i].type === 'exchange_to_exchange' && segments[i].withdrawNetworkChainID) {
+                            const net = chainIDToNetwork(segments[i].withdrawNetworkChainID);
+                            if (net) edge.network = net;
+                            edge.chainId = segments[i].withdrawNetworkChainID;
+                        }
+                        if (!isFwd) {
+                            edge.asset = quoteA;
+                        }
+                        edges.push(edge);
+                    }
+
+                    // 根据 segment.available 推导本方向可达性，供智能翻转决策
+                    const reachable = segments.length > 0 && segments.every(s => s && s.available !== false);
+                    let reachableReason = '';
+                    if (!reachable && segments.length > 0) {
+                        const bad = segments.find(s => s && s.available === false);
+                        if (bad) {
+                            const typeLabel = bad.type === 'deposit' ? '充币' : bad.type === 'withdraw' ? '提币' : bad.type === 'bridge' ? '跨链' : bad.type || '段';
+                            reachableReason = (bad.rawInfo && bad.rawInfo.reason) ? String(bad.rawInfo.reason) : (typeLabel + '不可达');
+                        }
+                    }
+
+                    try{
+                        const saveRes = await fetchJSON('/api/brick-moving/pipeline', {
+                            method:'POST',
+                            headers:{'Content-Type':'application/json'},
+                            body: JSON.stringify({ triggerSymbol: symbol, triggerId: getEffectiveTriggerId(), direction, nodes: nodesForApi, edges, reachable, reachableReason })
+                        });
+                        if (!saveRes.ok) {
+                            alert('保存 Pipeline 配置失败：' + ((saveRes.data && saveRes.data.error) || saveRes.text || saveRes.statusText));
+                            return;
+                        }
+                        const applyRes = await fetchJSON('/api/brick-moving/pipeline/apply', {
+                            method:'POST',
+                            headers:{'Content-Type':'application/json'},
+                            body: JSON.stringify({ triggerSymbol: symbol, triggerId: getEffectiveTriggerId(), direction })
+                        });
+                        if (!applyRes.ok || !(applyRes.data && applyRes.data.status === 'success')) {
+                            alert('应用失败：' + ((applyRes.data && applyRes.data.error) || applyRes.text || applyRes.statusText));
+                            return;
+                        }
+                        // localStorage 摘要（用于折叠态 ETA 展示）
+                        try{
+                            const key = 'aa.routeProbeSummary.' + symbol + '.' + direction;
+                            const etaSec = row && row.totalTimeSec != null ? row.totalTimeSec : 0;
+                            const pathText = Array.isArray(path) ? path.join('→') : '';
+                            localStorage.setItem(key, JSON.stringify({ etaSec, pathText, at: Date.now(), probeSymbol }));
+                        }catch(e){}
+
+                        alert('已应用为 ' + (direction === 'forward' ? 'A→B' : 'B→A') + ' Pipeline');
+                        reloadWithdraw(); // 刷新区块1的路径/状态
+                    }catch(e){
+                        alert('操作失败：' + (e.message || String(e)));
+                    }
+                }
+
+                async function saveHedgingConfigSilent(override){
+                    const merged = {...hedgingCfg, ...(override || {})};
+                    try{
+                        const body = {
+                            symbol: symbol,
+                            triggerId: (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '',
+                            enabled: true,
+                            exchangeType: merged.exchangeType,
+                            hedgingSymbol: merged.hedgingSymbol || symbol,
+                            size: Number(merged.size) || 0,
+                            positionOpenSize: Number(merged.positionOpenSize) || 0,
+                            position: Number(merged.position) || 0,
+                            openPositionSide: (merged.openPositionSide === 'B' ? 'B' : 'A'),
+                            autoWithdrawEnabled: !!merged.autoWithdrawEnabled,
+                            autoWithdrawUseFixed: !!merged.autoWithdrawUseFixed,
+                            autoWithdrawFixedSize: Number(merged.autoWithdrawFixedSize) || 0,
+                            autoWithdrawPercentage: Number(merged.autoWithdrawPercentage) || 0,
+                            quoteAsset: merged.quoteAsset || 'USDT',
+                        };
+                        const r = await fetchJSON('/api/brick-moving/trigger/hedging', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                        if (r.ok) setHedgingCfg(s => ({...s, ...merged}));
+                    }catch(e){ /* 静默失败 */ }
+                }
+
+                async function saveSmartFlipConfig(enabled, threshold){
+                    if (!symbol) return;
+                    if (saveSmartFlipConfigSaving) return;
+                    saveSmartFlipConfigSaving = true;
+                    const th = (threshold != null && threshold > 0) ? Number(threshold) : 1.5;
+                    if (th < 0.1 || th > 20) { saveSmartFlipConfigSaving = false; return; }
+                    try{
+                        const body = { symbol: symbol, triggerId: (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '', smartFlipEnabled: !!enabled, smartFlipThreshold: th };
+                        const r = await fetchJSON('/api/brick-moving/trigger/smart-flip', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                        if (r.ok) setHedgingCfg(s => ({...s, smartFlipEnabled: !!enabled, smartFlipThreshold: th}));
+                    }catch(e){ /* 静默失败 */ }
+                    finally { saveSmartFlipConfigSaving = false; }
+                }
+
+                async function saveHedgingAll(next){
+                    // next: partial override of hedgingCfg (in-memory) before saving；优先从输入框 ref 取阈值，避免 state 未 flush 导致保存旧值
+                    const merged = {...hedgingCfg, ...(next || {})};
+                    const fixedSizeFromInput = (autoWithdrawFixedSizeRef.current && autoWithdrawFixedSizeRef.current.value !== '' && autoWithdrawFixedSizeRef.current.value != null) ? Number(autoWithdrawFixedSizeRef.current.value) : null;
+                    if (merged.autoWithdrawUseFixed && fixedSizeFromInput != null && !Number.isNaN(fixedSizeFromInput)) merged.autoWithdrawFixedSize = fixedSizeFromInput;
+                    setAutoUi(s => ({...s, saving: true, error: ''}));
+                    try{
+                        const body = {
+                            symbol: symbol,
+                            triggerId: (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '',
+                            enabled: true,
+                            exchangeType: merged.exchangeType,
+                            hedgingSymbol: merged.hedgingSymbol || symbol,
+                            size: Number(merged.size) || 0,
+                            positionOpenSize: Number(merged.positionOpenSize) || 0,
+                            position: Number(merged.position) || 0,
+                            openPositionSide: (merged.openPositionSide === 'B' ? 'B' : 'A'),
+                            autoWithdrawEnabled: !!merged.autoWithdrawEnabled,
+                            autoWithdrawUseFixed: !!merged.autoWithdrawUseFixed,
+                            autoWithdrawFixedSize: Number(merged.autoWithdrawFixedSize) || 0,
+                            autoWithdrawPercentage: Number(merged.autoWithdrawPercentage) || 0,
+                            quoteAsset: merged.quoteAsset || 'USDT',
+                        };
+                        const r = await fetchJSON('/api/brick-moving/trigger/hedging', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                        if (!r.ok) {
+                            setAutoUi(s => ({...s, saving: false, error: (r.data && r.data.error) || r.text || r.statusText}));
+                            return false;
+                        }
+                        setHedgingCfg(s => ({...s, ...merged}));
+                        setAutoUi(s => ({...s, saving: false, error: ''}));
+                        return true;
+                    }catch(e){
+                        setAutoUi(s => ({...s, saving: false, error: e.message || String(e)}));
+                        return false;
+                    }
+                }
+
+                function getFixedSize(){
+                    const fixed = Number(hedgingCfg.autoWithdrawFixedSize) || 0;
+                    const fallback = Number(hedgingCfg.size) || 0;
+                    return fixed > 0 ? fixed : fallback;
+                }
+
+                // 开启后端自动充提：保存启用配置并可选立即执行一次 run（触发由后端轮询负责，关页后仍执行）
+                async function startAuto(direction){
+                    if (!symbol) return;
+                    const ok = await saveHedgingAll({ autoWithdrawEnabled: true });
+                    if (ok) setHedgingCfg(s => ({...s, autoWithdrawEnabled: true}));
+                    setAutoRunning({ forward: true, backward: true });
+                    try {
+                        const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '';
+                        const runQ = 'triggerSymbol=' + encodeURIComponent(symbol) + '&direction=' + encodeURIComponent(direction) + (tid ? '&triggerId=' + encodeURIComponent(tid) : '');
+                        const rr = await fetchJSON('/api/brick-moving/pipeline/run?' + runQ, { method:'POST' });
+                        if (rr.ok) reloadWithdraw();
+                    } catch (e) { /* 立即 run 失败不影响后端轮询 */ }
+                }
+
+                async function stopAuto(direction){
+                    const ok = await saveHedgingAll({ autoWithdrawEnabled: false });
+                    if (ok) setHedgingCfg(s => ({...s, autoWithdrawEnabled: false}));
+                    setAutoRunning({ forward: false, backward: false });
+                }
+
+                return html`
+                    <div className="aa-stack">
+                        <div className="aa-grid3">
+                            <div className="aa-card" style=${({display:'flex', flexDirection:'column', minHeight:0})}>
+                                <div className="aa-cardTitle"><span>📋 交易记录</span><span className="aa-subtle">${symbol || '--'}</span></div>
+                                <div style=${({maxHeight:'280px', overflowY:'auto', flex:1, minHeight:0})}>
+                                    ${fillsState.error ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-red)'})}>加载失败：${fillsState.error}</div>` : null}
+                                    ${(!fillsState.loading && fillsState.fills.length === 0) ? html`<div className="aa-subtle" style=${({marginTop:10})}>暂无成交记录（该接口目前返回空列表，后续可接入交易所成交查询）。</div>` : null}
+                                    ${fillsState.fills.length > 0 ? html`
+                                        <div className="aa-list">
+                                            ${fillsState.fills.map((f, idx) => {
+                                                const dir = f.direction || f.side || '-';
+                                                const dirLabel = dir === 'AB' || dir === '+A-B' ? '+A-B' : (dir === 'BA' || dir === '-A+B' ? '-A+B' : dir);
+                                                const timeStr = f.timestamp ? new Date(f.timestamp * 1000).toLocaleString() : (f.time || f.createTime || '--');
+                                                const qty = f.size != null ? f.size : (f.qty != null ? f.qty : f.quantity || '--');
+                                                const fee = ((f.feeA || 0) + (f.feeB || 0)).toFixed(4);
+                                                const gasSum = (f.gasA || 0) + (f.gasB || 0);
+                                                const gas = gasSum > 0 ? gasSum.toFixed(6) : '--';
+                                                const hasCostA = f.costA != null && f.costA !== 0;
+                                                const hasRevenueA = f.revenueA != null && f.revenueA !== 0;
+                                                const hasCostB = f.costB != null && f.costB !== 0;
+                                                const hasRevenueB = f.revenueB != null && f.revenueB !== 0;
+                                                const lineALabel = hasCostA ? ('成本 ' + f.costA.toFixed(2)) : (hasRevenueA ? ('收入 ' + f.revenueA.toFixed(2)) : '成本 --');
+                                                const lineBLabel = hasCostB ? ('成本 ' + f.costB.toFixed(2)) : (hasRevenueB ? ('收入 ' + f.revenueB.toFixed(2)) : '成本 --');
+                                                const filledALabel = f.filledQtyA != null ? Number(f.filledQtyA).toFixed(4) : '--';
+                                                const filledBLabel = f.filledQtyB != null ? Number(f.filledQtyB).toFixed(4) : '--';
+                                                const profitVal = f.profit != null ? f.profit : 0;
+                                                const profitColor = profitVal >= 0 ? '#4ade80' : '#f43f5e';
+                                                const profitStr = f.profit != null ? f.profit.toFixed(2) + ' USDT' : '--';
+                                                return html`
+                                                <div key=${idx} className="aa-listItem">
+                                                    <div className="aa-listMain">
+                                                        <div className="aa-listTitle">${symbol || '--'} ${dirLabel} · 计划=${qty}</div>
+                                                        <div className="aa-listSub aa-mono" style=${({fontSize:11})}>A: 成交 ${filledALabel}  ${lineALabel}</div>
+                                                        <div className="aa-listSub aa-mono" style=${({fontSize:11})}>B: 成交 ${filledBLabel}  ${lineBLabel}</div>
+                                                        <div className="aa-listSub aa-mono" style=${({fontSize:10, color:'var(--aa-muted)'})}>手续费 ${fee}  Gas费 ${gas}${f.costPercent != null ? '  磨损 ' + f.costPercent.toFixed(2) + '%' : ''}</div>
+                                                        <div className="aa-listSub aa-mono" style=${({fontSize:11, fontWeight:600, color: profitColor})}>收益 ${profitStr}</div>
+                                                        <div className="aa-listSub aa-mono" style=${({fontSize:10, color:'var(--aa-muted)'})}>${timeStr}</div>
+                                                    </div>
+                                                </div>
+                                                `;
+                                            })}
+                                        </div>
+                                    ` : null}
+                                </div>
+                            </div>
+                            <div className="aa-card" style=${({display:'flex', flexDirection:'column', minHeight:0})}>
+                                <div className="aa-cardTitle"><span>🚚 提币记录</span><span className="aa-subtle">A→B / B→A</span></div>
+                                <div style=${({maxHeight:'280px', overflowY:'auto', flex:1, minHeight:0})}>
+                                    ${withdrawState.error ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-red)'})}>加载失败：${withdrawState.error}</div>` : null}
+                                    ${renderWithdrawPipelineViz(withdrawState.forward, 'A→B (Forward)', withdrawState.forwardReachable, withdrawState.forwardReachableReason)}
+                                    ${renderWithdrawPipelineViz(withdrawState.backward, 'B→A (Backward)', withdrawState.backwardReachable, withdrawState.backwardReachableReason)}
+                                    <div style=${({marginTop:12, marginBottom:12, border:'1px solid var(--aa-border)', borderRadius:6, overflow:'hidden', background:'rgba(0,0,0,0.2)'})}>
+                                        <div onClick=${() => setSmartFlipExpanded(s => !s)} style=${({padding:'10px 12px', cursor:'pointer', display:'flex', alignItems:'center', gap:8, fontSize:13})}>
+                                            <span style=${({transform: smartFlipExpanded ? 'rotate(90deg)' : 'none', transition:'transform 0.2s'})}>▶</span>
+                                            <span>🔄 智能翻转充提</span>
+                                            ${(!withdrawState.mirrorForwardReachable || !withdrawState.mirrorBackwardReachable) ? html`<span style=${({marginLeft:4, padding:'2px 6px', background:'rgba(239,68,68,0.3)', borderRadius:4, fontSize:11, color:'#fca5a5'})}>⚠ 存在不可达</span>` : null}
+                                        </div>
+                                        ${smartFlipExpanded ? html`
+                                            <div style=${({padding:12, background:'#1a1a1a', fontSize:12})}>
+                                                <div style=${({color:'#888', marginBottom:6})}>镜像 Pipeline（B-A 币 / A-B USDT）</div>
+                                                <div style=${({marginBottom:4, fontSize:11, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'})}>
+                                                    <span className="aa-subtle">B-A 币:</span>
+                                                    <span>${pipelinePath((withdrawState.mirrorForward && withdrawState.mirrorForward.nodes) || []) || '未配置'}</span>
+                                                    ${withdrawState.mirrorForwardReachable === false ? html`<span style=${({padding:'2px 6px', background:'rgba(239,68,68,0.3)', borderRadius:4, fontSize:11, color:'#fca5a5'})}>⚠ 不可达${withdrawState.mirrorForwardReachableReason ? '：' + withdrawState.mirrorForwardReachableReason : ''}</span>` : (withdrawState.mirrorForwardReachable === true ? html`<span style=${({padding:'2px 6px', background:'rgba(74,222,128,0.25)', borderRadius:4, fontSize:11, color:'#86efac'})}>可达</span>` : null)}
+                                                </div>
+                                                <div style=${({marginBottom:4, fontSize:11, display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'})}>
+                                                    <span className="aa-subtle">A-B USDT:</span>
+                                                    <span>${pipelinePath((withdrawState.mirrorBackward && withdrawState.mirrorBackward.nodes) || []) || '未配置'}</span>
+                                                    ${withdrawState.mirrorBackwardReachable === false ? html`<span style=${({padding:'2px 6px', background:'rgba(239,68,68,0.3)', borderRadius:4, fontSize:11, color:'#fca5a5'})}>⚠ 不可达${withdrawState.mirrorBackwardReachableReason ? '：' + withdrawState.mirrorBackwardReachableReason : ''}</span>` : (withdrawState.mirrorBackwardReachable === true ? html`<span style=${({padding:'2px 6px', background:'rgba(74,222,128,0.25)', borderRadius:4, fontSize:11, color:'#86efac'})}>可达</span>` : null)}
+                                                </div>
+                                                ${(!withdrawState.mirrorForwardReachable || !withdrawState.mirrorBackwardReachable) ? html`
+                                                    <div style=${({marginBottom:8, padding:6, background:'rgba(239,68,68,0.15)', borderRadius:4, fontSize:11, color:'#fca5a5'})}>
+                                                        ${!withdrawState.mirrorForwardReachable ? html`<div>⚠ B-A 币 不可达${withdrawState.mirrorForwardReachableReason ? '：' + withdrawState.mirrorForwardReachableReason : ''}</div>` : null}
+                                                        ${!withdrawState.mirrorBackwardReachable ? html`<div>⚠ A-B USDT 不可达${withdrawState.mirrorBackwardReachableReason ? '：' + withdrawState.mirrorBackwardReachableReason : ''}</div>` : null}
+                                                        <div style=${({marginTop:4, fontSize:10, color:'#94a3b8'})}>智能翻转将跳过（需两条镜像路径均可达）</div>
+                                                    </div>
+                                                ` : null}
+                                                <div style=${({display:'flex', flexWrap:'wrap', alignItems:'center', gap:16})}>
+                                                    <label style=${({display:'flex', alignItems:'center', gap:8, cursor:'pointer'})}>
+                                                        <span>启用智能翻转</span>
+                                                        <input type="checkbox" checked=${!!hedgingCfg.smartFlipEnabled} onChange=${e => { const v = !!e.target.checked; setHedgingCfg(s => ({...s, smartFlipEnabled: v})); saveSmartFlipConfig(v, hedgingCfg.smartFlipThreshold); }} />
+                                                    </label>
+                                                    <label style=${({display:'flex', alignItems:'center', gap:8})}>
+                                                        <span>翻转阈值 (%)</span>
+                                                        <input type="number" className="aa-input" step="0.1" min="0.1" max="20" value=${hedgingCfg.smartFlipThreshold || 1.5} style=${({width:80})} onBlur=${e => { const v = parseFloat(e.target.value) || 1.5; if (v >= 0.1 && v <= 20) { setHedgingCfg(s => ({...s, smartFlipThreshold: v})); saveSmartFlipConfig(hedgingCfg.smartFlipEnabled, v); } }} onChange=${e => setHedgingCfg(s => ({...s, smartFlipThreshold: parseFloat(e.target.value) || 1.5}))} />
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        ` : null}
+                                    </div>
+                                    <div className="aa-list" style=${({marginTop:4})}>
+                                        <div className="aa-listItem">
+                                            <div className="aa-listMain">
+                                                <div className="aa-listTitle">A→B</div>
+                                                <div className="aa-listSub aa-mono">${forwardPath}</div>
+                                            </div>
+                                            <div className=${pillForStatus(withdrawState.forward && withdrawState.forward.status).cls}>${pillForStatus(withdrawState.forward && withdrawState.forward.status).label}</div>
+                                        </div>
+                                        <div className="aa-listItem">
+                                            <div className="aa-listMain">
+                                                <div className="aa-listTitle">B→A</div>
+                                                <div className="aa-listSub aa-mono">${backwardPath}</div>
+                                            </div>
+                                            <div className=${pillForStatus(withdrawState.backward && withdrawState.backward.status).cls}>${pillForStatus(withdrawState.backward && withdrawState.backward.status).label}</div>
+                                        </div>
+                                    </div>
+                                    ${(withdrawState.flipPipelines && (withdrawState.flipPipelines.token || withdrawState.flipPipelines.usdt)) ? html`
+                                        <div className="aa-subtle" style=${({fontSize:11, marginTop:8, marginBottom:4})}>翻转充提</div>
+                                        <div className="aa-list">
+                                            ${withdrawState.flipPipelines.token ? html`
+                                                <div className="aa-listItem">
+                                                    <div className="aa-listMain"><div className="aa-listTitle">B-A 币</div></div>
+                                                    <div className=${withdrawState.flipPipelines.token.status === 'completed' ? 'aa-pill aa-pillGreen' : (withdrawState.flipPipelines.token.status === 'failed' ? 'aa-pill aa-pillRed' : 'aa-pill aa-pillBlue flip-pipeline-running')}>${withdrawState.flipPipelines.token.status === 'completed' ? '成功' : (withdrawState.flipPipelines.token.status === 'failed' ? '失败' : '运行中')}</div>
+                                                </div>
+                                            ` : null}
+                                            ${withdrawState.flipPipelines.usdt ? html`
+                                                <div className="aa-listItem">
+                                                    <div className="aa-listMain"><div className="aa-listTitle">A-B USDT</div></div>
+                                                    <div className=${withdrawState.flipPipelines.usdt.status === 'completed' ? 'aa-pill aa-pillGreen' : (withdrawState.flipPipelines.usdt.status === 'failed' ? 'aa-pill aa-pillRed' : 'aa-pill aa-pillBlue flip-pipeline-running')}>${withdrawState.flipPipelines.usdt.status === 'completed' ? '成功' : (withdrawState.flipPipelines.usdt.status === 'failed' ? '失败' : '运行中')}</div>
+                                                </div>
+                                            ` : null}
+                                        </div>
+                                    ` : null}
+                                    <div className="aa-divider"></div>
+                                    <div className="aa-cardTitle" style=${({fontSize:12, fontWeight:800, color: withdrawState.loading ? '#60a5fa' : undefined})}><span>提币历史</span><span className="aa-subtle">最近 ${withdrawState.records.length} 条</span></div>
+                                    ${(!withdrawState.loading && withdrawState.records.length === 0) ? html`<div className="aa-subtle" style=${({marginTop:10})}>暂无提币记录。</div>` : null}
+                                    ${withdrawState.inFlipMode ? html`<div className="aa-subtle" style=${({marginTop:6, marginBottom:6, fontSize:11})}>正在智能翻转充提</div>` : null}
+                                    ${withdrawState.records.length > 0 ? html`
+                                        <div className="aa-list" style=${withdrawState.inFlipMode ? { opacity: 0.8, color: '#888' } : undefined}>
+                                            ${withdrawState.records.map((r, idx) => html`
+                                                <div key=${idx} className="aa-listItem">
+                                                    <div className="aa-listMain">
+                                                        <div className="aa-listTitle">${r.asset || '--'} ${r.amount || '--'} <span className="aa-subtle">(${r.network || '--'})</span></div>
+                                                        <div className="aa-listSub aa-mono">${r.status || '--'} · ${r.createTime || '--'} · ${r.txHash ? ('tx=' + r.txHash) : ''}</div>
+                                                    </div>
+                                                    <div className="aa-pill aa-pillGray">${r.withdrawId || '--'}</div>
+                                                </div>
+                                            `)}
+                                        </div>
+                                    ` : null}
+                                </div>
+                            </div>
+                            <div className="aa-card">
+                                <div className="aa-cardTitle"><span>📊 当前持仓</span><span className="aa-subtle">含中间链与 Gas</span></div>
+                                ${posState.error ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-red)'})}>加载失败：${posState.error}</div>` : null}
+                                ${posState.data ? html`
+                                    <div className="aa-kv aa-mono">
+                                        <div className="aa-k">套保持仓</div><div className="aa-v">${fmtNum(posState.data.hedgingPosition, 4)}</div>
+                                        <div className="aa-k">A钱包</div><div className="aa-v">币 ${fmtNum(posState.data.aPositionCoin, 6)} / USDT ${fmtNum(posState.data.aPositionUsdt, 2)}${(posState.data.aPositionGasToken || posState.data.aPositionGasBalance > 0) ? (' · Gas ' + (posState.data.aPositionGasToken || '') + ' ' + fmtNum(posState.data.aPositionGasBalance, 6)) : ''}</div>
+                                        <div className="aa-k">B钱包</div><div className="aa-v">币 ${fmtNum(posState.data.bPositionCoin, 6)} / USDT ${fmtNum(posState.data.bPositionUsdt, 2)}${(posState.data.bPositionGasToken || posState.data.bPositionGasBalance > 0) ? (' · Gas ' + (posState.data.bPositionGasToken || '') + ' ' + fmtNum(posState.data.bPositionGasBalance, 6)) : ''}</div>
+                                        ${posState.data.onchainGasChain ? html`<div className="aa-k">链 Gas</div><div className="aa-v">${posState.data.onchainGasChain} ${posState.data.onchainGasToken || ''} ${fmtNum(posState.data.onchainGasBalance, 6)}</div>` : null}
+                                    </div>
+                                    ${Array.isArray(posState.data.intermediatePositions) && posState.data.intermediatePositions.length > 0 ? html`
+                                        <div className="aa-divider"></div>
+                                        <div className="aa-cardTitle" style=${({fontSize:12, fontWeight:800})}><span>中间链</span><span className="aa-subtle">${posState.data.intermediatePositions.length} 条</span></div>
+                                        <div className="aa-list">
+                                            ${posState.data.intermediatePositions.map((m, idx) => html`
+                                                <div key=${idx} className="aa-listItem">
+                                                    <div className="aa-listMain">
+                                                        <div className="aa-listTitle">${m.chainName || m.chainId || '--'}</div>
+                                                        <div className="aa-listSub aa-mono">币 ${fmtNum(m.coin, 6)} · ${m.gasToken || 'Gas'} ${fmtNum(m.gasBalance, 6)}</div>
+                                                    </div>
+                                                </div>
+                                            `)}
+                                        </div>
+                                    ` : null}
+                                ` : html`<div className="aa-subtle" style=${({marginTop:10})}>${posState.loading ? '加载中...' : '暂无数据'}</div>`}
+                            </div>
+                        </div>
+
+                        <${CollapsibleSection}
+                            title=${'🔍 路由探测'}
+                            defaultCollapsed=${false}
+                        >
+                            <div className="aa-grid2">
+                                <div>
+                                    <div className="aa-cardTitle" style=${({marginBottom: 10})}><span>A→B (Forward)</span></div>
+                                    <div className="aa-row">
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">源(A类型)</span>
+                                            <input className="aa-input aa-mono" value=${probeFwd.source} onChange=${e => setProbeFwd(s => ({...s, source: e.target.value}))} placeholder="例如 onchain:56 或 binance:spot" />
+                                        </div>
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">目标(B类型)</span>
+                                            <input className="aa-input aa-mono" value=${probeFwd.dest} onChange=${e => setProbeFwd(s => ({...s, dest: e.target.value}))} placeholder="例如 okex:spot 或 onchain:1" />
+                                        </div>
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">探测金额</span>
+                                            <input className="aa-input aa-mono" style=${({minWidth:90})} value=${probeFwd.amount} onChange=${e => setProbeFwd(s => ({...s, amount: e.target.value}))} placeholder="例如 5" />
+                                        </div>
+                                        <button className="aa-btn aa-btnBlue" disabled=${probeFwd.loading} onClick=${() => runProbe('forward')}>🔍 搜索跨链</button>
+                                    </div>
+                                    <div className="aa-subtle aa-mono" style=${({marginTop: 8})}>
+                                        source=${(probeFwd.source || '--')} dest=${(probeFwd.dest || '--')} amount=${(probeFwd.amount || '--')}
+                                    </div>
+                                    ${probeFwd.error ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-red)'})}>${probeFwd.error}</div>` : null}
+                                    ${probeFwd.loading ? html`<div className="aa-subtle" style=${({marginTop:10})}>探测中...</div>` : null}
+                                    ${(!probeFwd.loading && probeFwd.rows.length === 0) ? html`<div className="aa-subtle" style=${({marginTop:10})}>暂无探测结果。</div>` : null}
+                                    ${probeFwd.rows.length > 0 ? html`
+                                        <div className="aa-list">
+                                            ${probeFwd.rows.map((row, idx) => html`
+                                                <div key=${idx} className="aa-listItem">
+                                                    <div className="aa-listMain">
+                                                        <div className="aa-listTitle">${row.isRecommended ? '✅ 推荐' : '备选'} · ${fmtNum(row.totalTimeSec,0)}s · 损耗 ${row.totalFee != null ? row.totalFee : '--'}</div>
+                                                        <div className="aa-listSub aa-mono">${Array.isArray(row.path) ? row.path.join(' → ') : '--'}</div>
+                                                        ${renderProbeEdgeInfo(row)}
+                                                    </div>
+                                                    <button className="aa-btn aa-btnBlue" onClick=${() => applyProbe('forward', row)}>应用</button>
+                                                </div>
+                                            `)}
+                                        </div>
+                                    ` : null}
+                                </div>
+                                <div>
+                                    <div className="aa-cardTitle" style=${({marginBottom: 10})}><span>B→A (Backward)</span></div>
+                                    <div className="aa-row">
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">源(B类型)</span>
+                                            <input className="aa-input aa-mono" value=${probeBwd.source} onChange=${e => setProbeBwd(s => ({...s, source: e.target.value}))} placeholder="例如 okex:spot 或 onchain:1" />
+                                        </div>
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">目标(A类型)</span>
+                                            <input className="aa-input aa-mono" value=${probeBwd.dest} onChange=${e => setProbeBwd(s => ({...s, dest: e.target.value}))} placeholder="例如 onchain:56 或 binance:spot" />
+                                        </div>
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">探测金额</span>
+                                            <input className="aa-input aa-mono" style=${({minWidth:90})} value=${probeBwd.amount} onChange=${e => setProbeBwd(s => ({...s, amount: e.target.value}))} placeholder="例如 5" />
+                                        </div>
+                                        <button className="aa-btn aa-btnBlue" disabled=${probeBwd.loading} onClick=${() => runProbe('backward')}>🔍 搜索跨链</button>
+                                    </div>
+                                    <div className="aa-subtle aa-mono" style=${({marginTop: 8})}>
+                                        source=${(probeBwd.source || '--')} dest=${(probeBwd.dest || '--')} amount=${(probeBwd.amount || '--')}
+                                    </div>
+                                    ${hedgingCfg.error ? html`<div className="aa-subtle" style=${({marginTop:8, color:'var(--aa-red)'})}>QuoteAsset 获取失败：${hedgingCfg.error}</div>` : null}
+                                    <div className="aa-subtle" style=${({marginTop:8})}>计价/提现资产：<span className="aa-mono">${hedgingCfg.quoteAsset || 'USDT'}</span></div>
+                                    ${probeBwd.error ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-red)'})}>${probeBwd.error}</div>` : null}
+                                    ${probeBwd.loading ? html`<div className="aa-subtle" style=${({marginTop:10})}>探测中...</div>` : null}
+                                    ${(!probeBwd.loading && probeBwd.rows.length === 0) ? html`<div className="aa-subtle" style=${({marginTop:10})}>暂无探测结果。</div>` : null}
+                                    ${probeBwd.rows.length > 0 ? html`
+                                        <div className="aa-list">
+                                            ${probeBwd.rows.map((row, idx) => html`
+                                                <div key=${idx} className="aa-listItem">
+                                                    <div className="aa-listMain">
+                                                        <div className="aa-listTitle">${row.isRecommended ? '✅ 推荐' : '备选'} · ${fmtNum(row.totalTimeSec,0)}s · 损耗 ${row.totalFee != null ? row.totalFee : '--'}</div>
+                                                        <div className="aa-listSub aa-mono">${Array.isArray(row.path) ? row.path.join(' → ') : '--'}</div>
+                                                        ${renderProbeEdgeInfo(row)}
+                                                    </div>
+                                                    <button className="aa-btn aa-btnBlue" onClick=${() => applyProbe('backward', row)}>应用</button>
+                                                </div>
+                                            `)}
+                                        </div>
+                                    ` : null}
+                                </div>
+                            </div>
+                        </${CollapsibleSection}>
+
+                        <${CollapsibleSection}
+                            title=${'🛡 套保配置'}
+                            defaultCollapsed=${false}
+                        >
+                            <div className="aa-row" style=${({marginTop: 2, flexWrap: 'wrap', gap: 8})}>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">套保交易所</span>
+                                    <select
+                                        className="aa-input"
+                                        value=${hedgingCfg.exchangeType}
+                                        disabled=${hedgingCfg.loading || hedgeUi.saving}
+                                        onChange=${e => { setHedgingCfg(s => ({...s, exchangeType: e.target.value})); saveHedgingConfigSilent({...hedgingCfg, exchangeType: e.target.value}); }}
+                                    >
+                                        <option value="binance">Binance</option>
+                                        <option value="okex">OKX</option>
+                                        <option value="bybit">Bybit</option>
+                                        <option value="bitget">Bitget</option>
+                                        <option value="gate">Gate</option>
+                                    </select>
+                                </div>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">套保 Symbol</span>
+                                    <input
+                                        className="aa-input aa-mono"
+                                        style=${({minWidth: 220})}
+                                        value=${hedgingCfg.hedgingSymbol}
+                                        disabled=${hedgingCfg.loading || hedgeUi.saving}
+                                        onChange=${e => setHedgingCfg(s => ({...s, hedgingSymbol: e.target.value}))}
+                                        onBlur=${e => saveHedgingConfigSilent({...hedgingCfg, hedgingSymbol: e.target.value})}
+                                        placeholder="例如 CLOUSDT"
+                                    />
+                                </div>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">单次 Size</span>
+                                    <input
+                                        className="aa-input aa-mono"
+                                        style=${({minWidth: 140})}
+                                        value=${String(hedgingCfg.size != null ? hedgingCfg.size : '')}
+                                        disabled=${hedgingCfg.loading || hedgeUi.saving}
+                                        onChange=${e => setHedgingCfg(s => ({...s, size: Number(e.target.value)}))}
+                                        onBlur=${e => saveHedgingConfigSilent({...hedgingCfg, size: Number(e.target.value)})}
+                                        placeholder="1000"
+                                    />
+                                </div>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">开仓数量 (positionOpenSize)</span>
+                                    <input
+                                        className="aa-input aa-mono"
+                                        style=${({minWidth: 140})}
+                                        value=${String(hedgingCfg.positionOpenSize != null ? hedgingCfg.positionOpenSize : '')}
+                                        disabled=${hedgingCfg.loading || hedgeUi.saving}
+                                        onChange=${e => setHedgingCfg(s => ({...s, positionOpenSize: Number(e.target.value)}))}
+                                        onBlur=${e => saveHedgingConfigSilent({...hedgingCfg, positionOpenSize: Number(e.target.value)})}
+                                        placeholder="与 Size 独立，开仓专用"
+                                    />
+                                </div>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">开仓买入源</span>
+                                    <select
+                                        className="aa-input"
+                                        value=${hedgingCfg.openPositionSide === 'B' ? 'B' : 'A'}
+                                        disabled=${hedgingCfg.loading || hedgeUi.saving}
+                                        onChange=${e => { const v = e.target.value; setHedgingCfg(s => ({...s, openPositionSide: v})); saveHedgingConfigSilent({...hedgingCfg, openPositionSide: v}); }}
+                                    >
+                                        <option value="A">A</option>
+                                        <option value="B">B</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="aa-row" style=${({marginTop: 12, flexWrap: 'wrap', gap: 12, alignItems: 'flex-end'})}>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">总仓位</span>
+                                    <input
+                                        className="aa-input aa-mono"
+                                        style=${({minWidth: 160})}
+                                        value=${String(hedgingCfg.position != null ? hedgingCfg.position : '')}
+                                        disabled=${hedgingCfg.loading || hedgeUi.saving}
+                                        onChange=${e => setHedgingCfg(s => ({...s, position: Number(e.target.value)}))}
+                                        onBlur=${e => saveHedgingConfigSilent({...hedgingCfg, position: Number(e.target.value)})}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <button
+                                    className="aa-btn aa-btnGreen"
+                                    disabled=${hedgeUi.opening || hedgingCfg.loading}
+                                    onClick=${async () => {
+                                        setHedgeUi(s => ({...s, opening: true, error: '', openMsg: ''}));
+                                        try{
+                                            // 开仓前先检查并自动保存配置（如果 Position 或 Size 有值）
+                                            if ((hedgingCfg.position > 0 || hedgingCfg.size > 0) && !hedgingCfg.loading) {
+                                                const saveBody = {
+                                                    symbol: symbol,
+                                                    triggerId: (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '',
+                                                    enabled: true,
+                                                    exchangeType: hedgingCfg.exchangeType,
+                                                    hedgingSymbol: hedgingCfg.hedgingSymbol || symbol,
+                                                    size: Number(hedgingCfg.size) || 0,
+                                                    positionOpenSize: Number(hedgingCfg.positionOpenSize) || 0,
+                                                    position: Number(hedgingCfg.position) || 0,
+                                                    openPositionSide: (hedgingCfg.openPositionSide === 'B' ? 'B' : 'A'),
+                                                    autoWithdrawEnabled: !!hedgingCfg.autoWithdrawEnabled,
+                                                    autoWithdrawUseFixed: !!hedgingCfg.autoWithdrawUseFixed,
+                                                    autoWithdrawFixedSize: Number(hedgingCfg.autoWithdrawFixedSize) || 0,
+                                                    autoWithdrawPercentage: Number(hedgingCfg.autoWithdrawPercentage) || 0,
+                                                    quoteAsset: hedgingCfg.quoteAsset || 'USDT',
+                                                };
+                                                const saveRes = await fetchJSON('/api/brick-moving/trigger/hedging', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(saveBody) });
+                                                if (!saveRes.ok) {
+                                                    setHedgeUi(s => ({...s, opening:false, error: '保存配置失败：' + ((saveRes.data && saveRes.data.error) || saveRes.text || saveRes.statusText)}));
+                                                    return;
+                                                }
+                                            }
+                                            const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '';
+                                            const r = await fetchJSON('/api/brick-moving/trigger/open-position', {
+                                                method:'POST',
+                                                headers:{'Content-Type':'application/json'},
+                                                body: JSON.stringify({ triggerSymbol: symbol, triggerId: tid })
+                                            });
+                                            if (!r.ok) {
+                                                const errMsg = (r.data && r.data.error) || r.text || r.statusText;
+                                                setHedgeUi(s => ({...s, opening:false, error: errMsg}));
+                                                return;
+                                            }
+                                            const msg = (r.data && (r.data.msg || r.data.status)) ? (r.data.msg || r.data.status) : 'ok';
+                                            setHedgeUi(s => ({...s, opening:false, openMsg: msg}));
+                                            refreshPos();
+                                        }catch(e){
+                                            setHedgeUi(s => ({...s, opening:false, error: e.message || String(e)}));
+                                        }
+                                    }}
+                                >
+                                    ${hedgeUi.opening ? '开仓中...' : '开仓'}
+                                </button>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">平仓数量</span>
+                                    <input
+                                        className="aa-input aa-mono"
+                                        style=${({minWidth: 140})}
+                                        value=${closePositionSize}
+                                        disabled=${hedgeUi.closing}
+                                        onChange=${e => setClosePositionSize(e.target.value)}
+                                        placeholder="与开仓数量一致"
+                                    />
+                                </div>
+                                <button
+                                    className="aa-btn aa-btnRed"
+                                    disabled=${hedgeUi.closing || !closePositionSize || parseFloat(closePositionSize) <= 0}
+                                    onClick=${async () => {
+                                        const size = parseFloat(closePositionSize);
+                                        if (!size || size <= 0) return;
+                                        if (!confirm('确定平仓？将先在套保所市价买入（平空）' + size + '，再在 A 端卖出 ' + size + '。')) return;
+                                        setHedgeUi(s => ({...s, closing: true, error: '', closeMsg: ''}));
+                                        try{
+                                            const tid = (typeof getEffectiveTriggerId === 'function' ? getEffectiveTriggerId() : '') || '';
+                                            const r = await fetchJSON('/api/brick-moving/trigger/close-position', {
+                                                method:'POST',
+                                                headers:{'Content-Type':'application/json'},
+                                                body: JSON.stringify({ triggerSymbol: symbol, triggerId: tid, size })
+                                            });
+                                            if (r.ok) {
+                                                const msg = (r.data && (r.data.msg || r.data.status)) ? (r.data.msg || r.data.status) : '平仓已提交';
+                                                setHedgeUi(s => ({...s, closing: false, closeMsg: msg}));
+                                                setClosePositionSize('');
+                                                refreshPos();
+                                            } else {
+                                                setHedgeUi(s => ({...s, closing: false, error: (r.data && r.data.error) || r.text || r.statusText}));
+                                            }
+                                        }catch(e){
+                                            setHedgeUi(s => ({...s, closing: false, error: e.message || String(e)}));
+                                        }
+                                    }}
+                                >
+                                    ${hedgeUi.closing ? '平仓中...' : '平仓'}
+                                </button>
+                            </div>
+                            <div className="aa-divider"></div>
+                            <div className="aa-cardTitle" style=${({fontSize:12, fontWeight:800})}>套保仓位详情</div>
+                            ${posState.loading && !posState.data ? html`<div className="aa-subtle" style=${({marginTop:8})}>加载中...</div>` : null}
+                            ${posState.data ? html`
+                                <div className="aa-subtle aa-mono" style=${({marginTop:8, padding:10, background:'#1a2e1a', border:'1px solid var(--aa-green)', borderRadius:6, fontSize:12})}>
+                                    ${posState.data.margin ? '保证金: ' + posState.data.margin + ' · ' : ''}
+                                    ${posState.data.maxProfit ? '最大盈利: ' + posState.data.maxProfit + ' · ' : ''}
+                                    ${posState.data.positions && posState.data.positions.length ? '持仓: ' + posState.data.positions.map(p => (p.exchange_type || p.exchangeType || '') + ' ' + (p.symbol || '') + ' ' + (p.size != null ? p.size : p.balance)).join('; ') + ' · ' : ''}
+                                    ${posState.data.onchain && posState.data.onchain.length ? '链上: ' + posState.data.onchain.map(o => (o.chain_id || o.chainId || '') + ' ' + (o.balance != null ? o.balance : '')).join('; ') + ' · ' : ''}
+                                    ${posState.data.spreadOpenPct != null && !isNaN(posState.data.spreadOpenPct) ? '开仓价差: ' + parseFloat(posState.data.spreadOpenPct).toFixed(2) + '% · ' : ''}
+                                    ${posState.data.spreadClosePct != null && !isNaN(posState.data.spreadClosePct) ? '平仓价差: ' + parseFloat(posState.data.spreadClosePct).toFixed(2) + '%' : ''}
+                                    ${!posState.data.margin && !posState.data.maxProfit && (!posState.data.positions || !posState.data.positions.length) && (!posState.data.onchain || !posState.data.onchain.length) && (posState.data.spreadOpenPct == null || isNaN(posState.data.spreadOpenPct)) && (posState.data.spreadClosePct == null || isNaN(posState.data.spreadClosePct)) ? '暂无套保仓位数据' : ''}
+                                </div>
+                            ` : (!posState.loading ? html`<div className="aa-subtle" style=${({marginTop:8})}>暂无数据</div>` : null)}
+                            ${hedgingCfg.error ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-red)'})}>加载失败：${hedgingCfg.error}</div>` : null}
+                            ${hedgeUi.error ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-red)'})}>${hedgeUi.error}</div>` : null}
+                            ${hedgeUi.openMsg ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-green)'})}>${hedgeUi.openMsg}</div>` : null}
+                            ${hedgeUi.closeMsg ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-green)'})}>${hedgeUi.closeMsg}</div>` : null}
+                        </${CollapsibleSection}>
+
+                        <div className="aa-grid2">
+                            <${CollapsibleSection} title=${'💰 自动充提'} defaultCollapsed=${true}>
+                                <div className="aa-card">
+                                    <div className="aa-cardTitle"><span>💰 自动充提</span></div>
+                                    <div className="aa-row" style=${({marginTop: 10, flexWrap: 'wrap', gap: 8})}>
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">提币方式</span>
+                                            <select
+                                                className="aa-input"
+                                                value=${hedgingCfg.autoWithdrawUseFixed ? 'fixed' : 'percentage'}
+                                                disabled=${autoUi.saving}
+                                                onChange=${e => {
+                                                    const v = e.target.value;
+                                                    setHedgingCfg(s => ({...s, autoWithdrawUseFixed: v === 'fixed'}));
+                                                }}
+                                            >
+                                                <option value="fixed">固定 Size</option>
+                                                <option value="percentage">按仓位百分比</option>
+                                            </select>
+                                        </div>
+                                        ${hedgingCfg.autoWithdrawUseFixed ? html`
+                                            <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                                <span className="aa-subtle">固定 Size</span>
+                                                <input
+                                                    className="aa-input aa-mono"
+                                                    style=${({minWidth: 140})}
+                                                    value=${String(hedgingCfg.autoWithdrawFixedSize != null ? hedgingCfg.autoWithdrawFixedSize : '')}
+                                                    disabled=${autoUi.saving}
+                                                    onChange=${e => setHedgingCfg(s => ({...s, autoWithdrawFixedSize: Number(e.target.value)}))}
+                                                    placeholder="例如 100"
+                                                />
+                                            </div>
+                                        ` : html`
+                                            <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                                <span className="aa-subtle">仓位百分比 (0-1)</span>
+                                                <input
+                                                    className="aa-input aa-mono"
+                                                    style=${({minWidth: 140})}
+                                                    value=${String(hedgingCfg.autoWithdrawPercentage != null ? hedgingCfg.autoWithdrawPercentage : '')}
+                                                    disabled=${autoUi.saving}
+                                                    onChange=${e => setHedgingCfg(s => ({...s, autoWithdrawPercentage: Number(e.target.value)}))}
+                                                    placeholder="例如 0.5"
+                                                />
+                                            </div>
+                                        `}
+                                        <button
+                                            className="aa-btn aa-btnBlue"
+                                            disabled=${autoUi.saving}
+                                            onClick=${() => saveHedgingAll({ autoWithdrawEnabled: true })}
+                                        >启用并保存</button>
+                                    </div>
+                                    ${autoUi.error ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-red)'})}>${autoUi.error}</div>` : null}
+
+                                    <div className="aa-divider"></div>
+                                    <div className="aa-row">
+                                        ${autoRunning.forward ? html`
+                                            <button className="aa-btn aa-btnRed" onClick=${() => stopAuto('forward')}>停止自动充提 A→B</button>
+                                        ` : html`
+                                            <button className="aa-btn aa-btnGreen" onClick=${() => startAuto('forward')}>自动检测并提币 A→B</button>
+                                        `}
+                                        ${autoRunning.backward ? html`
+                                            <button className="aa-btn aa-btnRed" onClick=${() => stopAuto('backward')}>停止自动充提 B→A</button>
+                                        ` : html`
+                                            <button className="aa-btn aa-btnGreen" onClick=${() => startAuto('backward')}>自动检测并提币 B→A</button>
+                                        `}
+                                    </div>
+                                    <div className="aa-subtle" style=${({marginTop:10})}>
+                                        ${autoUi.last.forward ? html`<div>Forward：${autoUi.last.forward.ok ? 'balance=' + fmtNum(autoUi.last.forward.balance, 6) + ' ' + (autoUi.last.forward.balanceAsset || '') + ' threshold=' + fmtNum(autoUi.last.forward.threshold, 6) : ('error=' + (autoUi.last.forward.error || '--'))}</div>` : null}
+                                        ${autoUi.last.backward ? html`<div>Backward：${autoUi.last.backward.ok ? 'balance=' + fmtNum(autoUi.last.backward.balance, 6) + ' ' + (autoUi.last.backward.balanceAsset || '') + ' threshold=' + fmtNum(autoUi.last.backward.threshold, 6) : ('error=' + (autoUi.last.backward.error || '--'))}</div>` : null}
+                                    </div>
+                                </div>
+                            </${CollapsibleSection}>
+                        </div>
+
+                        <div className="aa-card" style=${({marginBottom:16})}>
+                            <div className="aa-sepLabel">─── 交易公用 ───</div>
+                            <div className="aa-row" style=${({flexWrap: 'wrap', gap: 12})}>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">尝试交易间隔 (ms)</span>
+                                    <input type="number" min="100" className="aa-input aa-mono" style=${({width:100})} disabled=${triggerState.enabledAB || triggerState.enabledBA} value=${triggerState.orderLoopMs} onChange=${e => { const v = parseInt(e.target.value,10); if (!Number.isNaN(v)) setTriggerState(s => ({...s, orderLoopMs: v})); }} onBlur=${e => { const v = parseInt(e.target.value,10); if (!Number.isNaN(v) && v >= 100) { setTriggerState(s => ({...s, orderLoopMs: v})); updateTriggerConfig({ orderLoopMs: v }); } }} />
+                                </div>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">冷却 (秒)</span>
+                                    <input type="number" min="0" className="aa-input aa-mono" style=${({width:80})} disabled=${triggerState.enabledAB || triggerState.enabledBA} value=${triggerState.cooldownSec} onChange=${e => { const v = parseInt(e.target.value,10); if (!Number.isNaN(v)) setTriggerState(s => ({...s, cooldownSec: v})); }} onBlur=${e => { const v = parseInt(e.target.value,10); if (!Number.isNaN(v) && v >= 0) { setTriggerState(s => ({...s, cooldownSec: v})); updateTriggerConfig({ cooldownSec: v }); } }} />
+                                </div>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">滑点 (%)</span>
+                                    <input className="aa-input aa-mono" style=${({width:100})} disabled=${triggerState.enabledAB || triggerState.enabledBA} value=${String(triggerState.onChainSlippage)} onChange=${e => { const v = e.target.value; setTriggerState(s => ({...s, onChainSlippage: v})); updateTriggerConfig({ onChainSlippageA: v, onChainSlippageB: v }); }} placeholder="0.2" />
+                                </div>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">Gas Limit</span>
+                                    <input className="aa-input aa-mono" style=${({width:120})} disabled=${triggerState.enabledAB || triggerState.enabledBA} value=${String(triggerState.gasLimit)} onChange=${e => { const v = e.target.value; setTriggerState(s => ({...s, gasLimit: v})); updateTriggerConfig({ onChainGasLimitA: v, onChainGasLimitB: v }); }} placeholder="500000" />
+                                </div>
+                                <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                    <span className="aa-subtle">Gas 倍数</span>
+                                    <input className="aa-input aa-mono" style=${({width:80})} disabled=${triggerState.enabledAB || triggerState.enabledBA} value=${String(triggerState.gasMultiplier)} onChange=${e => { const v = Number(e.target.value); if (Number.isNaN(v)) return; setTriggerState(s => ({...s, gasMultiplier: v})); updateTriggerConfig({ gasMultiplierA: v, gasMultiplierB: v }); }} placeholder="1" />
+                                </div>
+                            </div>
+                            <div className="aa-subtle" style=${({fontSize:'11px', marginTop:6, opacity:0.85})}>间隔/冷却两方向共用；滑点/Gas 在 A 或 B 为链上时生效。</div>
+                        </div>
+
+                        <div style=${({display:'flex', flexDirection:'row', flexWrap:'wrap', gap:16, alignItems:'flex-start'})}>
+                            <div style=${({flex:'1 1 340px', minWidth:0})}>
+                                <${CollapsibleSection}
+                                    title=${html`<span className="aa-row" style=${({gap:8})}><span>+A-B (Forward)</span><span className=${'aa-dot ' + (triggerState.enabledAB ? 'aa-dotRunning' : 'aa-dotStopped')}></span><span className="aa-subtle">${triggerState.enabledAB ? '运行中' : '已停止'}</span></span>`}
+                                    summary=${'价差 ' + (priceDiff.exists && priceDiff.diffAB != null ? (fmtNum(priceDiff.diffAB, 4) + '%') : '--') + ' │ 阈值 ' + fmtNum(triggerState.thresholdAB, 4) + '% │ Size ' + fmtNum(triggerState.triggerABSize, 0)}
+                                    defaultCollapsed=${false}
+                                >
+                                    <div className="aa-subtle" style=${({fontSize:'12px', marginTop:6})}>当前配置：阈值 ${fmtNum(triggerState.thresholdAB, 4)}% │ Size ${fmtNum(triggerState.triggerABSize, 0)}</div>
+                                    <div className="aa-subtle" style=${({fontSize:'12px', marginTop:4})}>交易状态：A: <span style=${({color: fmtTradeStatus(triggerState.tradeStatusABA).c})}>${fmtTradeStatus(triggerState.tradeStatusABA).t}</span>  →  B: <span style=${({color: fmtTradeStatus(triggerState.tradeStatusABB).c})}>${fmtTradeStatus(triggerState.tradeStatusABB).t}</span></div>
+                                    ${posState.data ? html`
+                                    <div className="aa-mono aa-subtle" style=${({fontSize:11, marginTop:8, padding:'6px 8px', background:'var(--aa-bg2)', borderRadius:4})}>
+                                        <div>A: ${(symbol||'').replace(/usdt$/i,'') || '--'}: ${fmtNum(posState.data.aPositionCoin, 6)} &nbsp; usdt: ${fmtNum(posState.data.aPositionUsdt, 2)}</div>
+                                        <div>B: ${(symbol||'').replace(/usdt$/i,'') || '--'}: ${fmtNum(posState.data.bPositionCoin, 6)} &nbsp; usdt: ${fmtNum(posState.data.bPositionUsdt, 2)}</div>
+                                    </div>
+                                    ` : null}
+                                    <div className="aa-subtle" style=${({fontSize:'11px', marginTop:4, opacity:0.85})}>阈值：价差超过该值(%)时触发；Size：该方向单次下单/链上 swap 数量。余额不足时不触发。</div>
+                                    <div className="aa-row" style=${({marginTop:10})}>
+                                        <span className="aa-subtle">📈 价差：</span>
+                                        <span className="aa-mono" style=${({color: (priceDiff.diffAB != null && priceDiff.diffAB >= 0) ? 'var(--aa-green)' : 'var(--aa-red)'})}>
+                                            ${priceDiff.exists && priceDiff.diffAB != null ? (fmtNum(priceDiff.diffAB, 4) + '%') : '--'}
+                                        </span>
+                                        ${priceDiff.error ? html`<span className="aa-subtle" style=${({color:'var(--aa-red)'})}>(${priceDiff.error})</span>` : null}
+                                    </div>
+                                    <div className="aa-row" style=${({marginTop: 10, flexWrap: 'wrap', gap: 8})}>
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">触发阈值 (%)</span>
+                                            <input type="text" inputmode="decimal" className="aa-input aa-mono" disabled=${triggerState.enabledAB} value=${String(triggerState.thresholdAB)} onChange=${e => { const raw = e.target.value; setTriggerState(s => ({...s, thresholdAB: raw})); }} onBlur=${e => { const v = Number(e.target.value); if (!Number.isNaN(v)) { setTriggerState(s => ({...s, thresholdAB: v})); updateTriggerConfig({ thresholdAB: v }); } else if (e.target.value.trim() !== '') { setTriggerState(s => ({...s, thresholdAB: triggerState.thresholdAB})); } }} placeholder="可负，失焦保存" />
+                                        </div>
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">Size +A-B</span>
+                                            <input type="text" inputmode="decimal" className="aa-input aa-mono" disabled=${triggerState.enabledAB} value=${String(triggerState.triggerABSize)} onChange=${e => setTriggerState(s => ({...s, triggerABSize: e.target.value}))} onBlur=${e => { const v = Number(e.target.value); if (!Number.isNaN(v) && v >= 0) { setTriggerState(s => ({...s, triggerABSize: v})); updateTriggerConfig({ triggerABSize: v }); } else if (e.target.value.trim() !== '') { setTriggerState(s => ({...s, triggerABSize: triggerState.triggerABSize})); } }} placeholder="失焦保存" />
+                                        </div>
+                                    </div>
+                                    <div className="aa-row" style=${({marginTop: 12})}>
+                                        <button className="aa-btn aa-btnGreen" disabled=${triggerState.enabledAB} onClick=${() => updateTriggerConfig({ enabledAB: true })}>🚀 启动+A-B</button>
+                                        <button className="aa-btn aa-btnRed" disabled=${!triggerState.enabledAB} onClick=${() => updateTriggerConfig({ enabledAB: false })}>⏹ 停止</button>
+                                    </div>
+                                    ${triggerState.error ? html`<div className="aa-subtle" style=${({marginTop:10, color:'var(--aa-red)'})}>加载/同步失败：${triggerState.error}</div>` : null}
+                                </${CollapsibleSection}>
+                            </div>
+
+                            <div style=${({flex:'1 1 340px', minWidth:0})}>
+                                <${CollapsibleSection}
+                                    title=${html`<span className="aa-row" style=${({gap:8})}><span>-A+B (Backward)</span><span className=${'aa-dot ' + (triggerState.enabledBA ? 'aa-dotRunning' : 'aa-dotStopped')}></span><span className="aa-subtle">${triggerState.enabledBA ? '运行中' : '已停止'}</span></span>`}
+                                    summary=${'价差 ' + (priceDiff.exists && priceDiff.diffBA != null ? (fmtNum(priceDiff.diffBA, 4) + '%') : '--') + ' │ 阈值 ' + fmtNum(triggerState.thresholdBA, 4) + '% │ Size ' + fmtNum(triggerState.triggerBASize, 0)}
+                                    defaultCollapsed=${false}
+                                >
+                                    <div className="aa-subtle" style=${({fontSize:'12px', marginTop:6})}>当前配置：阈值 ${fmtNum(triggerState.thresholdBA, 4)}% │ Size ${fmtNum(triggerState.triggerBASize, 0)}</div>
+                                    <div className="aa-subtle" style=${({fontSize:'12px', marginTop:4})}>交易状态：B: <span style=${({color: fmtTradeStatus(triggerState.tradeStatusBAB).c})}>${fmtTradeStatus(triggerState.tradeStatusBAB).t}</span>  →  A: <span style=${({color: fmtTradeStatus(triggerState.tradeStatusBAA).c})}>${fmtTradeStatus(triggerState.tradeStatusBAA).t}</span></div>
+                                    ${posState.data ? html`
+                                    <div className="aa-mono aa-subtle" style=${({fontSize:11, marginTop:8, padding:'6px 8px', background:'var(--aa-bg2)', borderRadius:4})}>
+                                        <div>A: ${(symbol||'').replace(/usdt$/i,'') || '--'}: ${fmtNum(posState.data.aPositionCoin, 6)} &nbsp; usdt: ${fmtNum(posState.data.aPositionUsdt, 2)}</div>
+                                        <div>B: ${(symbol||'').replace(/usdt$/i,'') || '--'}: ${fmtNum(posState.data.bPositionCoin, 6)} &nbsp; usdt: ${fmtNum(posState.data.bPositionUsdt, 2)}</div>
+                                    </div>
+                                    ` : null}
+                                    <div className="aa-subtle" style=${({fontSize:'11px', marginTop:4, opacity:0.85})}>阈值：价差超过该值(%)时触发；Size：该方向单次下单/链上 swap 数量。余额不足时不触发。</div>
+                                    <div className="aa-row" style=${({marginTop:10})}>
+                                        <span className="aa-subtle">📈 价差：</span>
+                                        <span className="aa-mono" style=${({color: (priceDiff.diffBA != null && priceDiff.diffBA >= 0) ? 'var(--aa-green)' : 'var(--aa-red)'})}>
+                                            ${priceDiff.exists && priceDiff.diffBA != null ? (fmtNum(priceDiff.diffBA, 4) + '%') : '--'}
+                                        </span>
+                                    </div>
+                                    <div className="aa-row" style=${({marginTop: 10, flexWrap: 'wrap', gap: 8})}>
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">触发阈值 (%)</span>
+                                            <input type="text" inputmode="decimal" className="aa-input aa-mono" disabled=${triggerState.enabledBA} value=${String(triggerState.thresholdBA)} onChange=${e => { const raw = e.target.value; setTriggerState(s => ({...s, thresholdBA: raw})); }} onBlur=${e => { const v = Number(e.target.value); if (!Number.isNaN(v)) { setTriggerState(s => ({...s, thresholdBA: v})); updateTriggerConfig({ thresholdBA: v }); } else if (e.target.value.trim() !== '') { setTriggerState(s => ({...s, thresholdBA: triggerState.thresholdBA})); } }} placeholder="可负，失焦保存" />
+                                        </div>
+                                        <div style=${({display:'flex', flexDirection:'column', gap:4})}>
+                                            <span className="aa-subtle">Size -A+B</span>
+                                            <input type="text" inputmode="decimal" className="aa-input aa-mono" disabled=${triggerState.enabledBA} value=${String(triggerState.triggerBASize)} onChange=${e => setTriggerState(s => ({...s, triggerBASize: e.target.value}))} onBlur=${e => { const v = Number(e.target.value); if (!Number.isNaN(v) && v >= 0) { setTriggerState(s => ({...s, triggerBASize: v})); updateTriggerConfig({ triggerBASize: v }); } else if (e.target.value.trim() !== '') { setTriggerState(s => ({...s, triggerBASize: triggerState.triggerBASize})); } }} placeholder="失焦保存" />
+                                        </div>
+                                    </div>
+                                    <div className="aa-row" style=${({marginTop: 12})}>
+                                        <button className="aa-btn aa-btnGreen" disabled=${triggerState.enabledBA} onClick=${() => updateTriggerConfig({ enabledBA: true })}>🚀 启动-A+B</button>
+                                        <button className="aa-btn aa-btnRed" disabled=${!triggerState.enabledBA} onClick=${() => updateTriggerConfig({ enabledBA: false })}>⏹ 停止</button>
+                                    </div>
+                                </${CollapsibleSection}>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const rootEl = document.getElementById('app');
+            if (!rootEl) return;
+            ReactDOM.createRoot(rootEl).render(html`<${App} />`);
+        })();
+    </script>
+</body>
+</html>
