@@ -3,6 +3,7 @@
 
 # Build
 bin/
+server
 
 # Scripts
 logs/

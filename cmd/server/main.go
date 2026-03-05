@@ -55,8 +55,8 @@ func main() {
 		fetchSpread = ssAdapter.FetchSpread
 	}
 
-	// 路由探测（待迁移：替换 MockDetector 为真实实现）
-	det := detector.NewMock()
+	// 路由探测：使用 pipeline 迁移的 ArbitrageAdapter（bridgeMgr 为 nil 时跨链段不可用）
+	det := detector.NewArbitrageAdapter(nil)
 
 	// Runner
 	r := runner.New(det, cfg.Threshold.Spread)
