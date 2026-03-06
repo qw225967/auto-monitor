@@ -400,6 +400,7 @@ var bitgetNetworkToChainID = map[string]string{
 	"MATIC": "137", "POLYGON": "137", "ARBITRUM": "42161", "ARB": "42161",
 	"OPTIMISM": "10", "OP": "10", "AVAX": "43114", "BASE": "8453",
 	"TRON": "195", "TRC20": "195", "TRX": "195",
+	"ECLIPSE": "1111", "SUI": "784", "TON": "607", "ALLORA": "allora",
 }
 
 var bybitNetworkToChainID = map[string]string{
@@ -407,11 +408,13 @@ var bybitNetworkToChainID = map[string]string{
 	"MATIC": "137", "POLYGON": "137", "ARBITRUM": "42161", "ARBITRUMONE": "42161",
 	"OPTIMISM": "10", "OP": "10", "AVAX": "43114", "AVAXC": "43114",
 	"BASE": "8453", "TRON": "195", "TRC20": "195", "TRX": "195",
+	"ECLIPSE": "1111", "SUI": "784", "TON": "607", "ALLORA": "allora",
 }
 
 var gateNetworkToChainID = map[string]string{
 	"ETH": "1", "ERC20": "1", "BSC": "56", "BEP20": "56", "BNB": "56",
 	"MATIC": "137", "POLYGON": "137", "ARBITRUM": "42161",
 	"OPTIMISM": "10", "AVAX": "43114", "BASE": "8453",
-	"TRON": "195", "TRC20": "195",
+	"TRON": "195", "TRC20": "195", "TRX": "195",
+	"ECLIPSE": "1111", "SUI": "784", "TON": "607", "ALLORA": "allora",
 }

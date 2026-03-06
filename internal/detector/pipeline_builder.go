@@ -210,7 +210,7 @@ func (b *PipelineBuilder) buildAdjacency(buy, sell string, buyChains, sellChains
 		adj[nodeID] = append(adj[nodeID], sell)
 	}
 
-	// 链 -> 链（跨链桥，常见链之间）
+	// 链 -> 链（跨链桥）：用 allChains 枚举，支持 API 返回的任意链（如 Eclipse、SUI、TON）
 	allChains := make(map[string]bool)
 	for c := range buyChains {
 		allChains[c] = true
@@ -218,17 +218,11 @@ func (b *PipelineBuilder) buildAdjacency(buy, sell string, buyChains, sellChains
 	for c := range sellChains {
 		allChains[c] = true
 	}
-	commonChains := []string{"1", "56", "195", "137", "42161", "10", "8453", "43114"}
-	for _, c1 := range commonChains {
-		if !allChains[c1] {
-			continue
-		}
+	allChainList := mapKeys(allChains)
+	for _, c1 := range allChainList {
 		n1 := onchainPrefix + c1
-		for _, c2 := range commonChains {
+		for _, c2 := range allChainList {
 			if c1 == c2 {
-				continue
-			}
-			if !allChains[c2] {
 				continue
 			}
 			adj[n1] = append(adj[n1], onchainPrefix+c2)
