@@ -3,6 +3,8 @@ package config
 import (
 	"errors"
 	"net/http"
+	"os"
+	"sync"
 
 	"github.com/qw225967/auto-monitor/internal/model"
 )
@@ -22,6 +24,65 @@ func (o *okexKeyManagerStub) Init() error {
 
 func (o *okexKeyManagerStub) GetNextAppKey(canBroadcast bool) (model.OkexKeyRecord, error) {
 	return model.OkexKeyRecord{}, errors.New("OKEx API keys not configured")
+}
+
+// okexKeyManagerEnv 从环境变量读取的 OKEx Key 管理器
+type okexKeyManagerEnv struct {
+	appKey     string
+	secretKey  string
+	passphrase string
+	mu         sync.Mutex
+	initialized bool
+}
+
+func (o *okexKeyManagerEnv) Init() error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.initialized {
+		return nil
+	}
+	if o.appKey == "" || o.secretKey == "" || o.passphrase == "" {
+		return errors.New("OKEx API keys incomplete, set OKEX_APP_KEY, OKEX_SECRET_KEY, OKEX_PASSPHRASE")
+	}
+	o.initialized = true
+	return nil
+}
+
+func (o *okexKeyManagerEnv) GetNextAppKey(canBroadcast bool) (model.OkexKeyRecord, error) {
+	return model.OkexKeyRecord{
+		AppKey:       o.appKey,
+		SecretKey:    o.secretKey,
+		Passphrase:   o.passphrase,
+		Index:        0,
+		CanBroadcast: canBroadcast,
+	}, nil
+}
+
+// NewOkexKeyManagerFromEnv 从环境变量创建 OKEx Key 管理器
+func NewOkexKeyManagerFromEnv() OkexKeyManager {
+	appKey := os.Getenv("OKEX_APP_KEY")
+	secretKey := os.Getenv("OKEX_SECRET_KEY")
+	passphrase := os.Getenv("OKEX_PASSPHRASE")
+	if appKey == "" && secretKey == "" && passphrase == "" {
+		return &okexKeyManagerStub{}
+	}
+	return &okexKeyManagerEnv{
+		appKey:     appKey,
+		secretKey:  secretKey,
+		passphrase: passphrase,
+	}
+}
+
+// NewOkexKeyManagerFromConfig 从 Config 创建 OKEx Key 管理器
+func NewOkexKeyManagerFromConfig(appKey, secretKey, passphrase string) OkexKeyManager {
+	if appKey == "" || secretKey == "" || passphrase == "" {
+		return &okexKeyManagerStub{}
+	}
+	return &okexKeyManagerEnv{
+		appKey:     appKey,
+		secretKey:  secretKey,
+		passphrase: passphrase,
+	}
 }
 
 var okexKeyManager OkexKeyManager = &okexKeyManagerStub{}

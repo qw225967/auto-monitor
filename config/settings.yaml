@@ -26,3 +26,9 @@ chain_price:
   interval: 60     # 链上价格拉取间隔 (秒)
   cache_ttl: 30    # 链上价格缓存时长 (秒)
   concurrency: 3   # 并发查询数
+
+# OKEx API（用于 DEX Quote / 链上价格，建议用环境变量）
+# okex:
+#   app_key: ""
+#   secret_key: ""
+#   passphrase: ""

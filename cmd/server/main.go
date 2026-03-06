@@ -44,6 +44,11 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
+	// OKEx Key：用于 DEX Quote / 链上价格
+	if cfg.Okex.AppKey != "" && cfg.Okex.SecretKey != "" && cfg.Okex.Passphrase != "" {
+		config.SetOkexKeyManager(config.NewOkexKeyManagerFromConfig(cfg.Okex.AppKey, cfg.Okex.SecretKey, cfg.Okex.Passphrase))
+	}
+
 	// 数据源（MockMode 时使用模拟数据）
 	var fetchSpread func(context.Context) ([]model.SpreadItem, error)
 	if cfg.MockMode {

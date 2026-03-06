@@ -14,7 +14,15 @@ type Config struct {
 	Intervals     IntervalsConfig
 	TokenRegistry TokenRegistryConfig
 	ChainPrice    ChainPriceConfig
+	Okex          OkexConfig
 	MockMode      bool // 开发模式：使用模拟数据，不请求真实 API
+}
+
+// OkexConfig OKEx API 配置（用于 DEX Quote / 链上价格）
+type OkexConfig struct {
+	AppKey     string
+	SecretKey  string
+	Passphrase string
 }
 
 type ServerConfig struct {
@@ -75,6 +83,9 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("chain_price.interval", "CHAIN_PRICE_INTERVAL")
 	_ = viper.BindEnv("chain_price.cache_ttl", "CHAIN_PRICE_CACHE_TTL")
 	_ = viper.BindEnv("chain_price.concurrency", "CHAIN_PRICE_CONCURRENCY")
+	_ = viper.BindEnv("okex.app_key", "OKEX_APP_KEY")
+	_ = viper.BindEnv("okex.secret_key", "OKEX_SECRET_KEY")
+	_ = viper.BindEnv("okex.passphrase", "OKEX_PASSPHRASE")
 
 	// 默认值
 	viper.SetDefault("seeingstone.api_url", "https://seeingstone.cloud")
@@ -116,6 +127,11 @@ func Load() (*Config, error) {
 			Interval:    viper.GetInt("chain_price.interval"),
 			CacheTTL:    viper.GetInt("chain_price.cache_ttl"),
 			Concurrency: viper.GetInt("chain_price.concurrency"),
+		},
+		Okex: OkexConfig{
+			AppKey:     viper.GetString("okex.app_key"),
+			SecretKey:  viper.GetString("okex.secret_key"),
+			Passphrase: viper.GetString("okex.passphrase"),
 		},
 		MockMode: viper.GetBool("mock_mode") || viper.GetBool("MOCK_MODE"),
 	}
