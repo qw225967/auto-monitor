@@ -241,6 +241,7 @@ func (a *APINetworkRegistry) fetchGate(ctx context.Context, asset string) (withd
 	}
 	var chains []struct {
 		Chain              string `json:"chain"`
+		IsDisabled         int    `json:"is_disabled"`
 		IsDepositDisabled  int    `json:"is_deposit_disabled"`
 		IsWithdrawDisabled int    `json:"is_withdraw_disabled"`
 	}
@@ -248,6 +249,10 @@ func (a *APINetworkRegistry) fetchGate(ctx context.Context, asset string) (withd
 		return nil, nil
 	}
 	for _, ch := range chains {
+		// 暂停提币/充币或整链禁用的不加入
+		if ch.IsDisabled == 1 {
+			continue
+		}
 		chainID := gateNetworkToChainID[strings.ToUpper(ch.Chain)]
 		if chainID == "" {
 			chainID = ch.Chain

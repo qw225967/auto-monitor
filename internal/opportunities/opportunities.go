@@ -153,11 +153,33 @@ func ComputeDexDex(chainPrices map[string]float64, threshold float64) []model.Ov
 }
 
 // MergeAndSort 合并 CEX-CEX、CEX-DEX、DEX-DEX，按价差降序
+// 过滤正反重复：同一标的 (A,B) 与 (B,A) 只保留一条（价差高的为正向，反向负价差过滤）
 func MergeAndSort(cexCex, cexDex, dexDex []model.OverviewRow) []model.OverviewRow {
 	var all []model.OverviewRow
 	all = append(all, cexCex...)
 	all = append(all, cexDex...)
 	all = append(all, dexDex...)
-	sort.Slice(all, func(i, j int) bool { return all[i].SpreadPercent > all[j].SpreadPercent })
-	return all
+
+	// 按 (symbol, 有序对) 去重，只保留价差更高的一条（正向）
+	type pairKey struct {
+		symbol string
+		a, b   string
+	}
+	best := make(map[pairKey]model.OverviewRow)
+	for _, row := range all {
+		a, b := row.BuyExchange, row.SellExchange
+		if a > b {
+			a, b = b, a
+		}
+		k := pairKey{row.Symbol, a, b}
+		if cur, ok := best[k]; !ok || row.SpreadPercent > cur.SpreadPercent {
+			best[k] = row
+		}
+	}
+	var out []model.OverviewRow
+	for _, row := range best {
+		out = append(out, row)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].SpreadPercent > out[j].SpreadPercent })
+	return out
 }
