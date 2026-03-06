@@ -235,6 +235,23 @@ func (f *ChainPriceFetcher) GetAllTokenChains(asset string) []string {
 	return chains
 }
 
+// ChainsWithUSDT 返回 registry 中 USDT 存在的所有链（用于过滤报价对）
+func (f *ChainPriceFetcher) ChainsWithUSDT() map[string]bool {
+	f.rdMu.RLock()
+	defer f.rdMu.RUnlock()
+	out := make(map[string]bool)
+	if f.rd.Assets["USDT"] == nil {
+		return out
+	}
+	for c := range f.rd.Assets["USDT"] {
+		info := f.rd.Assets["USDT"][c]
+		if info.Address != "" {
+			out[c] = true
+		}
+	}
+	return out
+}
+
 // GetAllAssets 从 registry 获取所有资产（排除 USDT，用于报价需 USDT 计价）
 func (f *ChainPriceFetcher) GetAllAssets() []string {
 	f.rdMu.RLock()

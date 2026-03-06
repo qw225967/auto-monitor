@@ -165,10 +165,13 @@ func main() {
 				// 启动时立即拉取一次链上价格
 				go func() {
 					fetcher.ReloadRegistry()
+					usdtChains := fetcher.ChainsWithUSDT()
 					var pairs []price.AssetChainPair
 					for _, asset := range fetcher.GetAllAssets() {
 						for _, chainID := range fetcher.GetAllTokenChains(asset) {
-							pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
+							if usdtChains[chainID] {
+								pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
+							}
 						}
 					}
 					if len(pairs) > 0 {
@@ -183,10 +186,13 @@ func main() {
 					defer ticker.Stop()
 					for range ticker.C {
 						fetcher.ReloadRegistry()
+						usdtChains := fetcher.ChainsWithUSDT()
 						pairs = pairs[:0]
 						for _, asset := range fetcher.GetAllAssets() {
 							for _, chainID := range fetcher.GetAllTokenChains(asset) {
-								pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
+								if usdtChains[chainID] {
+									pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
+								}
 							}
 						}
 						if len(pairs) > 0 {
