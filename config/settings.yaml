@@ -10,7 +10,7 @@ seeingstone:
   request_timeout: 10
 
 threshold:
-  spread: 1.0
+  spread: 0.5
 
 intervals:
   fetch: 10   # 价差拉取间隔 (秒)

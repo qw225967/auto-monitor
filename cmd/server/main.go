@@ -101,7 +101,7 @@ func main() {
 		go func() {
 			// 启动时立即执行一次
 			ctx0, cancel0 := context.WithTimeout(context.Background(), 5*time.Minute)
-			if updated, err := tokenregistry.			RunSync(ctx0, tokenregistry.SyncConfig{
+			if updated, err := tokenregistry.RunSync(ctx0, tokenregistry.SyncConfig{
 				RegistryPath:     cfg.TokenRegistry.Path,
 				APIURL:           cfg.SeeingStone.APIURL,
 				APIToken:         cfg.SeeingStone.APIToken,
@@ -119,7 +119,7 @@ func main() {
 			defer ticker.Stop()
 			for range ticker.C {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-				updated, err := 				tokenregistry.RunSync(ctx, tokenregistry.SyncConfig{
+				updated, err := tokenregistry.RunSync(ctx, tokenregistry.SyncConfig{
 					RegistryPath:    cfg.TokenRegistry.Path,
 					APIURL:          cfg.SeeingStone.APIURL,
 					APIToken:        cfg.SeeingStone.APIToken,
@@ -157,12 +157,26 @@ func main() {
 				log.Printf("[Config] ChainPrice 创建失败: %v", err)
 			} else {
 				chainPriceFetcher = fetcher
+				// 启动时立即拉取一次链上价格
 				go func() {
+					fetcher.ReloadRegistry()
+					var pairs []price.AssetChainPair
+					for _, asset := range fetcher.GetAllAssets() {
+						for _, chainID := range fetcher.GetAllTokenChains(asset) {
+							pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
+						}
+					}
+					if len(pairs) > 0 {
+						prices := fetcher.BatchQueryDexPrices(pairs, cfg.ChainPrice.Concurrency)
+						handler.UpdateChainPrices(prices)
+						log.Printf("[ChainPrice] 启动同步: 更新 %d 条", len(prices))
+					}
+
 					ticker := time.NewTicker(cfg.ChainPriceInterval())
 					defer ticker.Stop()
 					for range ticker.C {
 						fetcher.ReloadRegistry()
-						var pairs []price.AssetChainPair
+						pairs = pairs[:0]
 						for _, asset := range fetcher.GetAllAssets() {
 							for _, chainID := range fetcher.GetAllTokenChains(asset) {
 								pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})

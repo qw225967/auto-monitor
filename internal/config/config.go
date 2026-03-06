@@ -78,7 +78,7 @@ func Load() (*Config, error) {
 
 	// 默认值
 	viper.SetDefault("seeingstone.api_url", "https://seeingstone.cloud")
-	viper.SetDefault("threshold.spread", 1.0)
+	viper.SetDefault("threshold.spread", 0.5)
 	viper.SetDefault("intervals.fetch", 10)
 	viper.SetDefault("intervals.detect", 30)
 	viper.SetDefault("seeingstone.request_timeout", 10)
