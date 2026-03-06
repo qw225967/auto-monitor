@@ -2,17 +2,25 @@ package registry
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/config"
 	"github.com/qw225967/auto-monitor/internal/model"
 	"github.com/qw225967/auto-monitor/internal/tokenregistry"
 )
@@ -49,11 +57,8 @@ func (a *APINetworkRegistry) cacheKey(exchange, asset string) string {
 func (a *APINetworkRegistry) Refresh(ctx context.Context, symbols []string) {
 	assets := tokenregistry.ExtractAssetsFromSymbols(symbols)
 	if len(assets) == 0 {
-		log.Printf("[Registry] Refresh: 无 assets，symbols=%v", symbols)
 		return
 	}
-	log.Printf("[Registry] Refresh: symbols=%d assets=%d 示例=%v", len(symbols), len(assets), truncateSlice(assets, 5))
-
 	wd := make(map[string][]model.WithdrawNetworkInfo)
 	dep := make(map[string][]model.WithdrawNetworkInfo)
 	var mergeMu sync.Mutex
@@ -71,39 +76,34 @@ func (a *APINetworkRegistry) Refresh(ctx context.Context, symbols []string) {
 	}
 	wg.Wait()
 
-	// 统计每所缓存数量
-	wdByEx := make(map[string]int)
-	depByEx := make(map[string]int)
-	for k := range wd {
-		ex := strings.SplitN(k, ":", 2)[0]
-		wdByEx[ex]++
-	}
-	for k := range dep {
-		ex := strings.SplitN(k, ":", 2)[0]
-		depByEx[ex]++
-	}
-	log.Printf("[Registry] Refresh 完成: wd=%v dep=%v", wdByEx, depByEx)
-
 	a.mu.Lock()
 	a.withdraw = wd
 	a.deposit = dep
 	a.mu.Unlock()
 }
 
-func truncateSlice(s []string, n int) []string {
-	if len(s) <= n {
-		return s
-	}
-	return append(append([]string{}, s[:n]...), "...")
-}
-
 // refreshOneExchange 单所串行请求，每次请求后等待，铺满间隔
+// Binance/OKX 需认证，一次请求获取全部，按 asset 过滤
 func (a *APINetworkRegistry) refreshOneExchange(ctx context.Context, exchange string, assets []string, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo) {
+	assetSet := make(map[string]bool)
+	for _, s := range assets {
+		assetSet[strings.ToUpper(strings.TrimSpace(s))] = true
+	}
+
+	// Binance/OKX：一次请求获取全部，需 key
+	if exchange == "binance" {
+		a.refreshBinanceAll(ctx, assetSet, mergeMu, wd, dep)
+		return
+	}
+	if exchange == "okex" || exchange == "okx" {
+		a.refreshOkexAll(ctx, assetSet, mergeMu, wd, dep)
+		return
+	}
+
 	okCount := 0
 	for i, asset := range assets {
 		select {
 		case <-ctx.Done():
-			log.Printf("[Registry] %s 被取消，已缓存 %d/%d", exchange, okCount, len(assets))
 			return
 		default:
 		}
@@ -121,7 +121,6 @@ func (a *APINetworkRegistry) refreshOneExchange(ctx context.Context, exchange st
 			}
 			mergeMu.Unlock()
 		}
-		// 请求间隔，最后一次不等待
 		if i < len(assets)-1 {
 			select {
 			case <-ctx.Done():
@@ -130,7 +129,6 @@ func (a *APINetworkRegistry) refreshOneExchange(ctx context.Context, exchange st
 			}
 		}
 	}
-	log.Printf("[Registry] %s 完成: %d/%d 有数据", exchange, okCount, len(assets))
 }
 
 func (a *APINetworkRegistry) fetchNetworksWithRetry(ctx context.Context, exchange, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
@@ -344,15 +342,274 @@ func (a *APINetworkRegistry) fetchGateWithRetry(ctx context.Context, asset strin
 	return withdraw, deposit
 }
 
-// fetchBinance GET /sapi/v1/capital/config/getall 需认证，暂用空
+// refreshBinanceAll 一次请求获取 Binance 全部充提网络，需 config.GetExchangeKeys()
+func (a *APINetworkRegistry) refreshBinanceAll(ctx context.Context, assetSet map[string]bool, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo) {
+	keys := config.GetExchangeKeys()
+	if keys == nil || !keys.HasKeys("binance") {
+		return
+	}
+	apiKey, secretKey := keys.BinanceKeys()
+	if apiKey == "" || secretKey == "" {
+		return
+	}
+	timestamp := time.Now().UnixMilli()
+	params := map[string]string{
+		"timestamp":  strconv.FormatInt(timestamp, 10),
+		"recvWindow": strconv.Itoa(constants.BinanceRecvWindow),
+	}
+	params = binanceSignParams(params, secretKey)
+	queryStr := binanceBuildQueryString(params)
+	apiURL := fmt.Sprintf("%s%s?%s", constants.BinanceRestBaseSpotUrl, constants.BinanceCapitalConfigGetAll, queryStr)
+	body, err := a.doGetWithHeaders(ctx, apiURL, map[string]string{
+		"X-MBX-APIKEY": apiKey,
+		"Content-Type": "application/json",
+	})
+	if err != nil {
+		log.Printf("[Registry] Binance getall: %v", err)
+		return
+	}
+	// Binance 错误时返回 {"code":-1022,"msg":"..."}
+	if len(body) > 0 && body[0] == '{' {
+		var errResp struct {
+			Code int    `json:"code"`
+			Msg  string `json:"msg"`
+		}
+		if json.Unmarshal(body, &errResp) == nil && errResp.Code != 0 {
+			log.Printf("[Registry] Binance getall: code=%d msg=%s", errResp.Code, errResp.Msg)
+			return
+		}
+	}
+	var coins []struct {
+		Coin        string `json:"coin"`
+		NetworkList []struct {
+			Network        string `json:"network"`
+			WithdrawEnable bool   `json:"withdrawEnable"`
+			DepositEnable  bool   `json:"depositEnable"`
+		} `json:"networkList"`
+	}
+	if err := json.Unmarshal(body, &coins); err != nil {
+		return
+	}
+	for _, c := range coins {
+		asset := strings.ToUpper(strings.TrimSpace(c.Coin))
+		if !assetSet[asset] {
+			continue
+		}
+		var wdNets, depNets []model.WithdrawNetworkInfo
+		for _, n := range c.NetworkList {
+			chainID := binanceNetworkToChainID[strings.ToUpper(n.Network)]
+			if chainID == "" && n.Network != "" {
+				chainID = n.Network
+			}
+			if n.WithdrawEnable {
+				wdNets = append(wdNets, model.WithdrawNetworkInfo{
+					Network:        n.Network,
+					ChainID:        chainID,
+					WithdrawEnable: true,
+				})
+			}
+			if n.DepositEnable {
+				depNets = append(depNets, model.WithdrawNetworkInfo{
+					Network:        n.Network,
+					ChainID:        chainID,
+					WithdrawEnable: true,
+				})
+			}
+		}
+		if len(wdNets) > 0 || len(depNets) > 0 {
+			mergeMu.Lock()
+			k := a.cacheKey("binance", asset)
+			if len(wdNets) > 0 {
+				wd[k] = wdNets
+			}
+			if len(depNets) > 0 {
+				dep[k] = depNets
+			}
+			mergeMu.Unlock()
+		}
+	}
+}
+
+// refreshOkexAll 一次请求获取 OKX 全部充提网络，需 config.GetExchangeKeys()
+func (a *APINetworkRegistry) refreshOkexAll(ctx context.Context, assetSet map[string]bool, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo) {
+	keys := config.GetExchangeKeys()
+	if keys == nil || !keys.HasKeys("okx") {
+		return
+	}
+	apiKey, secretKey, passphrase := keys.OKXKeys()
+	if apiKey == "" || secretKey == "" {
+		return
+	}
+	requestPath := "/api/v5/asset/currencies"
+	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	sign := okxBuildSign(timestamp, "GET", requestPath, "", secretKey)
+	headers := map[string]string{
+		constants.OkexAccessKey:       apiKey,
+		constants.OkexAccessSign:      sign,
+		constants.OkexAccessTimestamp: timestamp,
+		constants.OkexAccessPassphrase: passphrase,
+		"Content-Type":               "application/json",
+	}
+	apiURL := fmt.Sprintf("%s%s", constants.OkexBaseUrl, requestPath)
+	body, err := a.doGetWithHeaders(ctx, apiURL, headers)
+	if err != nil {
+		log.Printf("[Registry] OKX currencies: %v", err)
+		return
+	}
+	var resp struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+		Data []struct {
+			Ccy    string `json:"ccy"`
+			Chain  string `json:"chain"`
+			CanDep bool   `json:"canDep"`
+			CanWd  bool   `json:"canWd"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return
+	}
+	if resp.Code != "0" {
+		log.Printf("[Registry] OKX currencies: code=%s msg=%s", resp.Code, resp.Msg)
+		return
+	}
+	// 按 asset 聚合
+	wdByAsset := make(map[string][]model.WithdrawNetworkInfo)
+	depByAsset := make(map[string][]model.WithdrawNetworkInfo)
+	for _, c := range resp.Data {
+		asset := strings.ToUpper(strings.TrimSpace(c.Ccy))
+		if !assetSet[asset] {
+			continue
+		}
+		chainID := okxChainToChainID(c.Chain)
+		if chainID == "" && c.Chain != "" {
+			chainID = c.Chain
+		}
+		info := model.WithdrawNetworkInfo{
+			Network:        c.Chain,
+			ChainID:        chainID,
+			WithdrawEnable: c.CanWd,
+		}
+		if c.CanWd {
+			wdByAsset[asset] = append(wdByAsset[asset], info)
+		}
+		if c.CanDep {
+			depByAsset[asset] = append(depByAsset[asset], info)
+		}
+	}
+	for asset := range assetSet {
+		wdNets := wdByAsset[asset]
+		depNets := depByAsset[asset]
+		if len(wdNets) > 0 || len(depNets) > 0 {
+			mergeMu.Lock()
+			k := a.cacheKey("okex", asset)
+			if len(wdNets) > 0 {
+				wd[k] = wdNets
+			}
+			if len(depNets) > 0 {
+				dep[k] = depNets
+			}
+			mergeMu.Unlock()
+		}
+	}
+}
+
+func (a *APINetworkRegistry) doGetWithHeaders(ctx context.Context, urlStr string, headers map[string]string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("status %d: %s", resp.StatusCode, string(body))
+	}
+	return io.ReadAll(resp.Body)
+}
+
+func binanceSignParams(params map[string]string, secretKey string) map[string]string {
+	queryString := binanceBuildQueryString(params)
+	mac := hmac.New(sha256.New, []byte(secretKey))
+	mac.Write([]byte(queryString))
+	params["signature"] = hex.EncodeToString(mac.Sum(nil))
+	return params
+}
+
+func binanceBuildQueryString(params map[string]string) string {
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var parts []string
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%s", k, url.QueryEscape(params[k])))
+	}
+	return strings.Join(parts, "&")
+}
+
+func okxBuildSign(timestamp, method, requestPath, body, secretKey string) string {
+	message := timestamp + method + requestPath + body
+	mac := hmac.New(sha256.New, []byte(secretKey))
+	mac.Write([]byte(message))
+	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func okxChainToChainID(chain string) string {
+	if chain == "" {
+		return ""
+	}
+	okxMap := map[string]string{
+		"ETH": "1", "ERC20": "1", "BSC": "56", "BEP20": "56", "BNB": "56",
+		"MATIC": "137", "POLYGON": "137", "ARBITRUM": "42161", "ARBITRUM ONE": "42161",
+		"OPTIMISM": "10", "OP": "10", "AVAX": "43114", "AVALANCHE C-CHAIN": "43114",
+		"BASE": "8453", "TRX": "195", "TRC20": "195",
+	}
+	if id := okxMap[strings.ToUpper(strings.TrimSpace(chain))]; id != "" {
+		return id
+	}
+	if idx := strings.Index(chain, "-"); idx >= 0 && idx < len(chain)-1 {
+		suffix := strings.TrimSpace(chain[idx+1:])
+		if id := okxMap[strings.ToUpper(suffix)]; id != "" {
+			return id
+		}
+		if strings.HasPrefix(strings.ToUpper(suffix), "ARBITRUM") {
+			return "42161"
+		}
+		if strings.HasPrefix(strings.ToUpper(suffix), "OPTIMISM") || strings.HasPrefix(strings.ToUpper(suffix), "OP ") {
+			return "10"
+		}
+		if strings.HasPrefix(strings.ToUpper(suffix), "AVALANCHE") || strings.HasPrefix(strings.ToUpper(suffix), "AVAX") {
+			return "43114"
+		}
+		if strings.HasPrefix(strings.ToUpper(suffix), "POLYGON") || strings.HasPrefix(strings.ToUpper(suffix), "MATIC") {
+			return "137"
+		}
+	}
+	return ""
+}
+
+var binanceNetworkToChainID = map[string]string{
+	"ETH": "1", "ERC20": "1", "BSC": "56", "BEP20": "56", "BNB": "56",
+	"MATIC": "137", "POLYGON": "137", "ARBITRUM": "42161", "ARB": "42161",
+	"OPTIMISM": "10", "OP": "10", "AVAX": "43114", "AVAXC": "43114",
+	"BASE": "8453", "TRON": "195", "TRC20": "195", "TRX": "195",
+}
+
+// fetchBinance 单资产调用（由 refreshBinanceAll 替代，此处保留供 fetchNetworksWithRetry 兜底）
 func (a *APINetworkRegistry) fetchBinance(ctx context.Context, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
-	// Binance capital config 需 API Key，暂不实现
 	return nil, nil
 }
 
-// fetchOkex GET /api/v5/asset/currencies 需认证，暂用空
+// fetchOkex 单资产调用（由 refreshOkexAll 替代，此处保留供 fetchNetworksWithRetry 兜底）
 func (a *APINetworkRegistry) fetchOkex(ctx context.Context, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
-	// OKX 需认证，暂不实现
 	return nil, nil
 }
 
@@ -368,10 +625,6 @@ func (a *APINetworkRegistry) GetWithdrawNetworks(exchangeType, asset string) ([]
 	a.mu.RUnlock()
 	if ok {
 		return v, nil
-	}
-	// 仅对有公开 API 的交易所记录未命中（binance/okex 需认证，预期为空）
-	if ex == "bitget" || ex == "gate" || ex == "bybit" {
-		log.Printf("[Registry] GetWithdrawNetworks 缓存未命中: %s", k)
 	}
 	return nil, nil
 }
@@ -389,9 +642,6 @@ func (a *APINetworkRegistry) GetDepositNetworks(exchangeType, asset string) ([]m
 	if ok {
 		return v, nil
 	}
-	if ex == "bitget" || ex == "gate" || ex == "bybit" {
-		log.Printf("[Registry] GetDepositNetworks 缓存未命中: %s", k)
-	}
 	return nil, nil
 }
 
@@ -401,6 +651,7 @@ var bitgetNetworkToChainID = map[string]string{
 	"OPTIMISM": "10", "OP": "10", "AVAX": "43114", "BASE": "8453",
 	"TRON": "195", "TRC20": "195", "TRX": "195",
 	"ECLIPSE": "1111", "SUI": "784", "TON": "607", "ALLORA": "allora",
+	"MANTRA": "1442", "SOL": "solana", "VANRY": "vanry",
 }
 
 var bybitNetworkToChainID = map[string]string{
@@ -409,6 +660,7 @@ var bybitNetworkToChainID = map[string]string{
 	"OPTIMISM": "10", "OP": "10", "AVAX": "43114", "AVAXC": "43114",
 	"BASE": "8453", "TRON": "195", "TRC20": "195", "TRX": "195",
 	"ECLIPSE": "1111", "SUI": "784", "TON": "607", "ALLORA": "allora",
+	"MANTRA": "1442", "SOL": "solana", "VANRY": "vanry",
 }
 
 var gateNetworkToChainID = map[string]string{
@@ -417,4 +669,5 @@ var gateNetworkToChainID = map[string]string{
 	"OPTIMISM": "10", "AVAX": "43114", "BASE": "8453",
 	"TRON": "195", "TRC20": "195", "TRX": "195",
 	"ECLIPSE": "1111", "SUI": "784", "TON": "607", "ALLORA": "allora",
+	"MANTRA": "1442", "SOL": "solana", "VANRY": "vanry",
 }

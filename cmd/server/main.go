@@ -123,8 +123,9 @@ func main() {
 		fetchSpread = ssAdapter.FetchSpread
 	}
 
-	// 路由探测：使用 pipeline 迁移的 ArbitrageAdapter（bridgeMgr 为 nil 时跨链段不可用）
-	det := detector.NewArbitrageAdapter(nil)
+		// 路由探测：初始化跨链桥管理器，仅展示经 GetBridgeQuote 验证的跨链协议
+		bridgeMgr := detector.NewBridgeManagerForDetect()
+		det := detector.NewArbitrageAdapter(bridgeMgr)
 
 	// Runner
 	r := runner.New(det, cfg.Threshold.Spread)

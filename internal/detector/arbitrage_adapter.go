@@ -3,7 +3,6 @@ package detector
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/qw225967/auto-monitor/internal/detector/registry"
@@ -117,9 +116,6 @@ func (a *ArbitrageAdapter) DetectRoutes(ctx context.Context, symbol, buyExchange
 		}
 	}
 
-	if len(result) == 0 && len(paths) > 0 {
-		log.Printf("[Detect] %s %s->%s 0条可达 path数=%d asset=%s", symbol, buyExchange, sellExchange, len(paths), asset)
-	}
 	// 无可达路径时返回空，由 Runner 过滤掉该标的（不展示 Mock 占位）
 	return result, nil
 }
@@ -168,12 +164,23 @@ func chainName(chainID string) string {
 	}
 }
 
+// bridgeProtocolDisplay 跨链协议展示名（经验证的协议）
+var bridgeProtocolDisplay = map[string]string{
+	"layerzero": "LayerZero",
+	"wormhole":  "Wormhole",
+	"ccip":      "CCIP",
+}
+
 func edgeDescFromSegment(seg model.SegmentProbeResult) string {
 	if seg.EdgeLabel != "" {
 		return seg.EdgeLabel
 	}
 	if seg.BridgeProtocol != "" {
-		return "跨链" + seg.BridgeProtocol
+		display := bridgeProtocolDisplay[seg.BridgeProtocol]
+		if display == "" {
+			display = seg.BridgeProtocol
+		}
+		return "跨链(" + display + ")"
 	}
 	if seg.WithdrawNetworkChainID != "" {
 		return "提现" + chainName(seg.WithdrawNetworkChainID)
