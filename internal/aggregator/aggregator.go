@@ -11,6 +11,9 @@ func Aggregate(items []model.SpreadItem, threshold float64) model.AggregatedPath
 		if item.SpreadPercent < threshold {
 			continue
 		}
+		if item.BuyExchange == item.SellExchange {
+			continue
+		}
 		path := model.PathItem{
 			Symbol:        item.Symbol,
 			BuyExchange:   item.BuyExchange,

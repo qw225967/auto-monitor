@@ -17,6 +17,9 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 	var rows []model.OverviewRow
 	seen := make(map[string]bool)
 	for _, it := range items {
+		if it.BuyExchange == it.SellExchange {
+			continue
+		}
 		base, _ := tokenregistry.SymbolToAsset(it.Symbol)
 		if base == "" {
 			continue
