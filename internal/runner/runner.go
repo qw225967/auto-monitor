@@ -49,13 +49,7 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 		return r.runDetectCexDexDexOnly(ctx, cexDex, dexDex)
 	}
 
-	// 用价差 symbol 刷新充提网络（价差+链上机会的 symbol 去重，从交易所 API 实时获取）
-	if refresher, ok := r.det.(detector.RegistryRefresher); ok {
-		symbols := extractSymbolsForRefresh(items, cexDex, dexDex)
-		refresher.RefreshNetworks(ctx, symbols)
-	}
-
-	// 收集所有 (symbol, buyEx, sellEx) 用于探测：CEX-CEX + CEX-DEX
+	// 收集所有 (symbol, buyEx, sellEx) 用于探测：CEX-CEX + CEX-DEX + DEX-DEX
 	pathSet := make(map[pathKey]model.PathItem)
 	for symbol, paths := range agg {
 		for _, p := range paths {
@@ -84,6 +78,12 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 				SpreadPercent: row.SpreadPercent,
 			}
 		}
+	}
+
+	// 仅对 pathSet 中的 symbol 刷新充提网络（避免 3 万+ symbol 导致超时、漏刷）
+	if refresher, ok := r.det.(detector.RegistryRefresher); ok {
+		symbols := extractSymbolsFromPathSet(pathSet)
+		refresher.RefreshNetworks(ctx, symbols)
 	}
 
 	// 并发探测
@@ -265,7 +265,7 @@ func filterNoAvailablePaths(rows []model.OverviewRow) []model.OverviewRow {
 	return out
 }
 
-// extractSymbolsForRefresh 从价差+链上机会提取去重 symbol（用于充提网络刷新）
+// extractSymbolsForRefresh 从价差+链上机会提取去重 symbol（用于 runDetectCexDexDexOnly）
 func extractSymbolsForRefresh(items []model.SpreadItem, cexDex, dexDex []model.OverviewRow) []string {
 	seen := make(map[string]bool)
 	for _, it := range items {
@@ -281,6 +281,21 @@ func extractSymbolsForRefresh(items []model.SpreadItem, cexDex, dexDex []model.O
 	for _, row := range dexDex {
 		if row.Symbol != "" {
 			seen[row.Symbol] = true
+		}
+	}
+	var out []string
+	for s := range seen {
+		out = append(out, s)
+	}
+	return out
+}
+
+// extractSymbolsFromPathSet 仅从 pathSet 提取 symbol，用于 Refresh（避免全量 3 万+ 导致超时漏刷）
+func extractSymbolsFromPathSet(pathSet map[pathKey]model.PathItem) []string {
+	seen := make(map[string]bool)
+	for k := range pathSet {
+		if k.symbol != "" {
+			seen[k.symbol] = true
 		}
 	}
 	var out []string

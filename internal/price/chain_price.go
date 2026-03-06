@@ -195,7 +195,11 @@ func (f *ChainPriceFetcher) queryDexPriceUncached(asset, chainID string) (float6
 		return 0, fmt.Errorf("token %s on chain %s not in registry", asset, chainID)
 	}
 	if !usdtOk || usdtInfo.Address == "" {
-		return 0, fmt.Errorf("USDT on chain %s not in registry", chainID)
+		if wk, ok := wellKnownUSDT[chainID]; ok && wk.Address != "" {
+			usdtInfo = tokenregistry.TokenChainInfo{Address: wk.Address, Decimals: wk.Decimals}
+		} else {
+			return 0, fmt.Errorf("USDT on chain %s not in registry", chainID)
+		}
 	}
 
 	chainIndex := constants.GetChainIndex(chainID)
@@ -331,17 +335,34 @@ func (f *ChainPriceFetcher) GetAllTokenChains(asset string) []string {
 	return chains
 }
 
-// ChainsWithUSDT 返回 registry 中 USDT 存在的所有链（用于过滤报价对）
+// wellKnownUSDT 常见链上 USDT 地址（registry 无时兜底，确保 BSC 等链可询价）
+var wellKnownUSDT = map[string]struct {
+	Address  string
+	Decimals int
+}{
+	"1":     {"0xdAC17F958D2ee523a2206206994597C13D831ec7", 6},   // ETH
+	"56":    {"0x55d398326f99059fF775485246999027B3197955", 18}, // BSC
+	"137":   {"0xc2132D05D31c914a87C6611C10748AEb04B58e8F", 6},   // Polygon
+	"42161": {"0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", 6},   // Arbitrum
+	"10":    {"0x94b008aA00579c1307B0EF2c499aD98a8ce58e58", 6},   // Optimism
+	"43114": {"0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7", 6},   // Avalanche
+	"8453":  {"0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2", 6},   // Base
+}
+
+// ChainsWithUSDT 返回 registry 中 USDT 存在的所有链；若 registry 无 BSC 等，用 wellKnownUSDT 兜底
 func (f *ChainPriceFetcher) ChainsWithUSDT() map[string]bool {
 	f.rdMu.RLock()
-	defer f.rdMu.RUnlock()
 	out := make(map[string]bool)
-	if f.rd.Assets["USDT"] == nil {
-		return out
+	if f.rd.Assets["USDT"] != nil {
+		for c := range f.rd.Assets["USDT"] {
+			if f.rd.Assets["USDT"][c].Address != "" {
+				out[c] = true
+			}
+		}
 	}
-	for c := range f.rd.Assets["USDT"] {
-		info := f.rd.Assets["USDT"][c]
-		if info.Address != "" {
+	f.rdMu.RUnlock()
+	for c := range wellKnownUSDT {
+		if wellKnownUSDT[c].Address != "" {
 			out[c] = true
 		}
 	}
