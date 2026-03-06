@@ -14,6 +14,11 @@ const (
 	chainPrefix   = "chain_"
 )
 
+// chainPreference 链展示优先级（ETH 优先于 BSC），同长度路径时优先展示
+var chainPreference = map[string]int{
+	"1": 0, "56": 1, "195": 2, "137": 3, "42161": 4, "10": 5, "8453": 6, "43114": 7,
+}
+
 // chainFromDisplay 解析 "Chain_56" -> "56"
 func chainFromDisplay(s string) (chainID string, ok bool) {
 	s = strings.ToLower(strings.TrimSpace(s))
@@ -61,10 +66,30 @@ func (b *PipelineBuilder) BuildPaths(asset, buyExchange, sellExchange string) ([
 	adj := b.buildAdjacency(buy, sell, buyChains, sellChains)
 	paths := findAllRoutes(buy, sell, adj, maxRouteHops)
 
-	// 优先展示直连/短路径（如 Bitget 直提 ETH），避免绕道 BSC 的路径排前面
-	sort.Slice(paths, func(i, j int) bool { return len(paths[i]) < len(paths[j]) })
+	// 1) 优先短路径  2) 同长度时优先 ETH 等常用链（Bitget 支持 ETH 时不应显示 BSC）
+	sort.Slice(paths, func(i, j int) bool {
+		pi, pj := paths[i], paths[j]
+		if len(pi) != len(pj) {
+			return len(pi) < len(pj)
+		}
+		return pathChainScore(pi) < pathChainScore(pj)
+	})
 
 	return paths, nil
+}
+
+// pathChainScore 路径中首个链的优先级分（越小越优先展示）
+func pathChainScore(path []string) int {
+	for _, node := range path {
+		if strings.HasPrefix(node, onchainPrefix) {
+			cid := strings.TrimPrefix(node, onchainPrefix)
+			if p, ok := chainPreference[cid]; ok {
+				return p
+			}
+			return 999
+		}
+	}
+	return 999
 }
 
 // findAllRoutes 在图上从 source 到 dest 枚举所有路径（自 pipeline 复制，避免依赖 pipeline 包）
@@ -109,6 +134,25 @@ func findAllRoutes(source, dest string, adj map[string][]string, maxHops int) []
 	return out
 }
 
+func sortedChainsByPreference(chains map[string]bool) []string {
+	var out []string
+	for cid := range chains {
+		out = append(out, cid)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		pi, oki := chainPreference[out[i]]
+		pj, okj := chainPreference[out[j]]
+		if !oki {
+			pi = 999
+		}
+		if !okj {
+			pj = 999
+		}
+		return pi < pj
+	})
+	return out
+}
+
 func chainIDsFromNetworks(nets []model.WithdrawNetworkInfo) map[string]bool {
 	m := make(map[string]bool)
 	for _, n := range nets {
@@ -129,14 +173,14 @@ func (b *PipelineBuilder) buildAdjacency(buy, sell string, buyChains, sellChains
 	// 买交易所 -> 卖交易所（直连，交易所间转账）
 	adj[buy] = append(adj[buy], sell)
 
-	// 买交易所 -> 可提现的链
-	for cid := range buyChains {
-		nodeID := onchainPrefix + cid
-		adj[buy] = append(adj[buy], nodeID)
+	// 买交易所 -> 可提现的链（按链优先级排序，ETH 优先）
+	buyChainList := sortedChainsByPreference(buyChains)
+	for _, cid := range buyChainList {
+		adj[buy] = append(adj[buy], onchainPrefix+cid)
 	}
 
 	// 链 -> 卖交易所（若卖方可充值该链）；或 链 -> 目标链（跨链）
-	for cid := range sellChains {
+	for _, cid := range sortedChainsByPreference(sellChains) {
 		nodeID := onchainPrefix + cid
 		if nodeID == sell {
 			continue // 避免自环

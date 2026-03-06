@@ -117,10 +117,7 @@ func (a *ArbitrageAdapter) DetectRoutes(ctx context.Context, symbol, buyExchange
 		}
 	}
 
-	if len(result) == 0 {
-		// 无可达路径时回退 Mock，供前端展示占位
-		return NewMock().DetectRoutes(ctx, symbol, buyExchange, sellExchange)
-	}
+	// 无可达路径时返回空，由 Runner 过滤掉该标的（不展示 Mock 占位）
 	return result, nil
 }
 

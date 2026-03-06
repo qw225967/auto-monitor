@@ -48,9 +48,9 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 		return r.runDetectCexDexDexOnly(ctx, cexDex, dexDex)
 	}
 
-	// 用价差 symbol 刷新充提网络（跟随 30s 探测周期，从交易所 API 实时获取）
+	// 用价差 symbol 刷新充提网络（价差+链上机会的 symbol 去重，从交易所 API 实时获取）
 	if refresher, ok := r.det.(detector.RegistryRefresher); ok {
-		symbols := extractSymbolsFromItems(items)
+		symbols := extractSymbolsForRefresh(items, cexDex, dexDex)
 		refresher.RefreshNetworks(ctx, symbols)
 	}
 
@@ -169,7 +169,9 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 	}
 	cexDexWithPaths := attachPathsToRows(cexDex, resultMap)
 	dexDexWithPaths := attachPathsToRows(dexDex, resultMap)
-	resp.Overview = opportunities.MergeAndSort(resp.Overview, cexDexWithPaths, dexDexWithPaths)
+	merged := opportunities.MergeAndSort(resp.Overview, cexDexWithPaths, dexDexWithPaths)
+	// 过滤掉完全没有可用通路的标的
+	resp.Overview = filterNoAvailablePaths(merged)
 	return resp, nil
 }
 
@@ -240,17 +242,39 @@ func (r *Runner) runDetectCexDexDexOnly(ctx context.Context, cexDex, dexDex []mo
 	}
 	cexDexWithPaths := attachPathsToRows(cexDex, resultMap)
 	dexDexWithPaths := attachPathsToRows(dexDex, resultMap)
+	merged := opportunities.MergeAndSort(nil, cexDexWithPaths, dexDexWithPaths)
 	return &model.OverviewResponse{
-		Overview: opportunities.MergeAndSort(nil, cexDexWithPaths, dexDexWithPaths),
+		Overview: filterNoAvailablePaths(merged),
 	}, nil
 }
 
-// extractSymbolsFromItems 从价差数据提取去重 symbol
-func extractSymbolsFromItems(items []model.SpreadItem) []string {
+// filterNoAvailablePaths 过滤掉完全没有可用通路的标的
+func filterNoAvailablePaths(rows []model.OverviewRow) []model.OverviewRow {
+	var out []model.OverviewRow
+	for _, row := range rows {
+		if row.AvailablePathCount > 0 {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
+// extractSymbolsForRefresh 从价差+链上机会提取去重 symbol（用于充提网络刷新）
+func extractSymbolsForRefresh(items []model.SpreadItem, cexDex, dexDex []model.OverviewRow) []string {
 	seen := make(map[string]bool)
 	for _, it := range items {
 		if it.Symbol != "" {
 			seen[it.Symbol] = true
+		}
+	}
+	for _, row := range cexDex {
+		if row.Symbol != "" {
+			seen[row.Symbol] = true
+		}
+	}
+	for _, row := range dexDex {
+		if row.Symbol != "" {
+			seen[row.Symbol] = true
 		}
 	}
 	var out []string

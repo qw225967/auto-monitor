@@ -1,4 +1,9 @@
 // Package detector - 内嵌精简版 RouteProbe，避免依赖完整 pipeline（exchange_node/position 等）
+//
+// 通路探测逻辑（以 Binance->BSC->ETH->Gate 为例）：
+// 1) Binance->BSC：提现段，校验 Binance 是否支持向 BSC 提现对应 symbol
+// 2) BSC->ETH：跨链段，校验是否有支持的跨链协议且可用（bridgeManager 非空时）
+// 3) ETH->Gate：充值段，校验 Gate 是否支持从 ETH 充值对应 symbol
 package detector
 
 import (
@@ -13,7 +18,7 @@ import (
 const maxRouteProbeHops = 4
 
 // routeProbe 执行提币路由探测：依次根据节点和边校验每条路径是否可达
-// reg 用于校验提现/充值段（交易所是否支持该链）
+// reg 用于校验提现/充值段（交易所是否支持该链），bridgeManager 用于跨链段
 func routeProbe(req *model.RouteProbeRequest, bridgeManager *bridge.Manager, reg registry.NetworkRegistry) (*model.RouteProbeResult, error) {
 	path := req.Path
 	if len(path) == 0 && req.Source != "" && req.Destination != "" {
@@ -80,15 +85,15 @@ func routeProbe(req *model.RouteProbeRequest, bridgeManager *bridge.Manager, reg
 			} else if fromChain == "" && toChain != "" {
 				seg.Type = model.SegmentTypeWithdraw
 				seg.EstimatedTimeSec = 60
-				// 校验：源交易所（fromID）是否支持向该链提现
-				if reg != nil && !canWithdrawToChain(reg, fromID, symbol, toChain) {
+				// 校验：源交易所（fromID）是否支持向该链提现对应 symbol
+				if reg == nil || !canWithdrawToChain(reg, fromID, symbol, toChain) {
 					seg.Available = false
 				}
 			} else {
 				seg.Type = model.SegmentTypeDeposit
 				seg.EstimatedTimeSec = 60
-				// 校验：目标交易所（toID）是否支持从该链充值
-				if reg != nil && !canDepositFromChain(reg, toID, symbol, fromChain) {
+				// 校验：目标交易所（toID）是否支持从该链充值对应 symbol
+				if reg == nil || !canDepositFromChain(reg, toID, symbol, fromChain) {
 					seg.Available = false
 				}
 			}
