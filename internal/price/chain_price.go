@@ -61,9 +61,26 @@ func parseQuoteResponse(resp string, tokenDecimals int) (float64, error) {
 		}
 	}
 
-	// 2) 回退：dexRouterList[0].toToken.tokenUnitPrice（v6 新结构）
+	// 2) 尝试 data[0].toToken.tokenUnitPrice（聚合结果，v6 顶层）
+	if toToken, ok := first["toToken"].(map[string]interface{}); ok {
+		if v := toToken["tokenUnitPrice"]; v != nil {
+			var price float64
+			switch val := v.(type) {
+			case string:
+				price, _ = strconv.ParseFloat(val, 64)
+			case float64:
+				price = val
+			}
+			if price > 0 {
+				return price, nil
+			}
+		}
+	}
+
+	// 3) 回退：dexRouterList 最后一项的 toToken.tokenUnitPrice（多跳时第一项可能是中间代币如 USDC）
 	if list, ok := first["dexRouterList"].([]interface{}); ok && len(list) > 0 {
-		if item, ok := list[0].(map[string]interface{}); ok {
+		lastIdx := len(list) - 1
+		if item, ok := list[lastIdx].(map[string]interface{}); ok {
 			if toToken, ok := item["toToken"].(map[string]interface{}); ok {
 				if v := toToken["tokenUnitPrice"]; v != nil {
 					var price float64

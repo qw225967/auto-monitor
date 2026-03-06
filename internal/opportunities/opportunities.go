@@ -9,10 +9,14 @@ import (
 	"github.com/qw225967/auto-monitor/internal/tokenregistry"
 )
 
+// maxSpreadAnomaly 价差超过此阈值视为非同一币种（单位/代币不匹配），过滤掉
+const maxSpreadAnomaly = 500.0
+
 // ComputeCexDex 从价差数据和链上价格计算 CEX-DEX 套利机会
 // chainPrices: key "asset:chainID" -> price
 // 1) 若 SpreadItem 有 BuyPrice/SellPrice，直接计算
 // 2) 若无价格，用 DEX 价 + spread_percent 估算 CEX 价（假设 DEX≈mid，buy≈dex/(1+spread/200)）
+// 3) 价差 > maxCexDexSpread 视为异常数据（如单位不匹配），过滤
 func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, threshold float64) []model.OverviewRow {
 	var rows []model.OverviewRow
 	seen := make(map[string]bool)
@@ -37,7 +41,7 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 			if hasExplicitPrice {
 				if it.BuyPrice > 0 {
 					spread := math.Abs(dexPrice-it.BuyPrice) / it.BuyPrice * 100
-					if spread >= threshold {
+					if spread >= threshold && spread <= maxSpreadAnomaly {
 						k := it.Symbol + ":" + it.BuyExchange + ":Chain_" + chainID
 						if !seen[k] {
 							seen[k] = true
@@ -54,7 +58,7 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 				}
 				if it.SellPrice > 0 {
 					spread := math.Abs(dexPrice-it.SellPrice) / it.SellPrice * 100
-					if spread >= threshold {
+					if spread >= threshold && spread <= maxSpreadAnomaly {
 						k := it.Symbol + ":Chain_" + chainID + ":" + it.SellExchange
 						if !seen[k] {
 							seen[k] = true
@@ -118,7 +122,7 @@ func ComputeDexDex(chainPrices map[string]float64, threshold float64) []model.Ov
 			}
 			minP := math.Min(p1, p2)
 			spread := math.Abs(p1-p2) / minP * 100
-			if spread >= threshold {
+			if spread >= threshold && spread <= maxSpreadAnomaly {
 				kk := asset + ":" + c1 + ":" + c2
 				if c1 > c2 {
 					kk = asset + ":" + c2 + ":" + c1
