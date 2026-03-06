@@ -28,7 +28,8 @@ export function OverviewTable({ rows }: Props) {
     setExpandedSymbol((prev) => (prev === symbol ? null : symbol))
   }
 
-  if (rows.length === 0) {
+  const list = rows ?? []
+  if (list.length === 0) {
     return (
       <div className="empty-state">
         暂无数据，请稍后刷新（价差 10s 更新，通路 30s 更新）
@@ -50,7 +51,7 @@ export function OverviewTable({ rows }: Props) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, idx) => (
+          {list.map((row, idx) => (
             <React.Fragment key={`${row.symbol}-${row.path_display}-${idx}`}>
               <tr>
                 <td>{OppTypeLabels[row.type ?? 'cex_cex'] ?? row.type}</td>

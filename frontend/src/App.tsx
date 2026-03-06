@@ -133,7 +133,7 @@ function App() {
       <main className="main">
         {loading && !data && <div className="loading">加载中...</div>}
         {error && <div className="error">{error}</div>}
-        {data && <OverviewTable rows={data.overview} />}
+        {data && <OverviewTable rows={data.overview ?? []} />}
       </main>
     </div>
   )
