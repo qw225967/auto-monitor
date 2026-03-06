@@ -114,17 +114,14 @@ func (f *ChainPriceFetcher) queryDexPriceUncached(asset, chainID string) (float6
 	}
 
 	chainIndex := constants.GetChainIndex(chainID)
-	fromAddr := ensure0x(tokenInfo.Address)
-	toAddr := ensure0x(usdtInfo.Address)
-	// 1 单位 token 换 USDT：fromToken=目标token, toToken=USDT, amount=1
-	amount := "1"
-	resp, err := f.client.QueryDexQuotePrice(
-		fromAddr,
-		toAddr,
-		chainIndex,
-		amount,
-		strconv.Itoa(tokenInfo.Decimals),
-	)
+	usdtAddr := ensure0x(usdtInfo.Address)
+	tokenAddr := ensure0x(tokenInfo.Address)
+
+	// 按 500 USDT 询价：fromToken=USDT, toToken=目标token，price = 500 / tokenAmount
+	usdtAmount := "500"
+	usdtDecimalsStr := strconv.Itoa(usdtInfo.Decimals)
+
+	resp, err := f.client.QueryDexQuotePrice(usdtAddr, tokenAddr, chainIndex, usdtAmount, usdtDecimalsStr)
 	if err != nil {
 		return 0, fmt.Errorf("quote: %w", err)
 	}
@@ -139,7 +136,7 @@ func (f *ChainPriceFetcher) queryDexPriceUncached(asset, chainID string) (float6
 		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(resp), &apiResp); err != nil {
-		return 0, fmt.Errorf("parse response: %w", err)
+		return 0, fmt.Errorf("parse: %w", err)
 	}
 	if apiResp.Code != "0" {
 		return 0, fmt.Errorf("api code %s: %s", apiResp.Code, apiResp.Msg)
@@ -147,20 +144,19 @@ func (f *ChainPriceFetcher) queryDexPriceUncached(asset, chainID string) (float6
 	if len(apiResp.Data) == 0 {
 		return 0, fmt.Errorf("empty quote data")
 	}
-
 	toAmountStr := apiResp.Data[0].RouterResult.ToTokenAmount
 	if toAmountStr == "" {
 		return 0, fmt.Errorf("empty toTokenAmount")
 	}
-
 	toAmount, err := strconv.ParseFloat(toAmountStr, 64)
 	if err != nil {
 		return 0, fmt.Errorf("parse toTokenAmount: %w", err)
 	}
-	price := toAmount / math.Pow(10, float64(usdtInfo.Decimals))
-	if price <= 0 {
-		return 0, fmt.Errorf("invalid price %.6f", price)
+	tokenAmount := toAmount / math.Pow(10, float64(tokenInfo.Decimals))
+	if tokenAmount <= 0 {
+		return 0, fmt.Errorf("invalid token amount %.6f", tokenAmount)
 	}
+	price := 500 / tokenAmount
 	return price, nil
 }
 
