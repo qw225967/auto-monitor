@@ -15,46 +15,72 @@ import (
 	"github.com/qw225967/auto-monitor/internal/tokenregistry"
 )
 
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "..."
-}
-
-// extractToTokenAmountFromRaw 从原始 JSON 中尝试多种路径提取 toTokenAmount
-func extractToTokenAmountFromRaw(resp string) string {
+// parseQuoteResponse 解析 OKX v6 quote 响应，支持 routerResult.toTokenAmount 或 dexRouterList[].toToken.tokenUnitPrice
+func parseQuoteResponse(resp string, tokenDecimals int) (float64, error) {
 	var raw map[string]interface{}
 	if err := json.Unmarshal([]byte(resp), &raw); err != nil {
-		return ""
+		return 0, fmt.Errorf("parse: %w", err)
+	}
+	if code, _ := raw["code"].(string); code != "0" {
+		msg, _ := raw["msg"].(string)
+		return 0, fmt.Errorf("api code %s: %s", code, msg)
 	}
 	data, ok := raw["data"].([]interface{})
 	if !ok || len(data) == 0 {
-		return ""
+		return 0, fmt.Errorf("empty quote data")
 	}
 	first, ok := data[0].(map[string]interface{})
 	if !ok {
-		return ""
+		return 0, fmt.Errorf("invalid data format")
 	}
-	rr, ok := first["routerResult"].(map[string]interface{})
-	if !ok {
-		return ""
-	}
-	for _, key := range []string{"toTokenAmount", "toTokenAmountOut", "ToTokenAmount"} {
-		if v, ok := rr[key]; ok && v != nil {
-			switch val := v.(type) {
-			case string:
-				if val != "" {
-					return val
+
+	// 1) 尝试 routerResult.toTokenAmount
+	if rr, ok := first["routerResult"].(map[string]interface{}); ok {
+		for _, key := range []string{"toTokenAmount", "toTokenAmountOut"} {
+			if v := rr[key]; v != nil {
+				var s string
+				switch val := v.(type) {
+				case string:
+					s = val
+				case float64:
+					s = strconv.FormatFloat(val, 'f', -1, 64)
+				case json.Number:
+					s = val.String()
 				}
-			case float64:
-				return strconv.FormatFloat(val, 'f', -1, 64)
-			case json.Number:
-				return val.String()
+				if s != "" {
+					toAmount, err := strconv.ParseFloat(s, 64)
+					if err != nil {
+						continue
+					}
+					tokenAmount := toAmount / math.Pow(10, float64(tokenDecimals))
+					if tokenAmount > 0 {
+						return 500 / tokenAmount, nil
+					}
+				}
 			}
 		}
 	}
-	return ""
+
+	// 2) 回退：dexRouterList[0].toToken.tokenUnitPrice（v6 新结构）
+	if list, ok := first["dexRouterList"].([]interface{}); ok && len(list) > 0 {
+		if item, ok := list[0].(map[string]interface{}); ok {
+			if toToken, ok := item["toToken"].(map[string]interface{}); ok {
+				if v := toToken["tokenUnitPrice"]; v != nil {
+					var price float64
+					switch val := v.(type) {
+					case string:
+						price, _ = strconv.ParseFloat(val, 64)
+					case float64:
+						price = val
+					}
+					if price > 0 {
+						return price, nil
+					}
+				}
+			}
+		}
+	}
+	return 0, fmt.Errorf("empty toTokenAmount and tokenUnitPrice")
 }
 
 func ensure0x(addr string) string {
@@ -168,45 +194,10 @@ func (f *ChainPriceFetcher) queryDexPriceUncached(asset, chainID string) (float6
 		return 0, fmt.Errorf("quote: %w", err)
 	}
 
-	var apiResp struct {
-		Code string `json:"code"`
-		Msg  string `json:"msg"`
-		Data []struct {
-			RouterResult struct {
-				ToTokenAmount    string `json:"toTokenAmount"`
-				ToTokenAmountOut string `json:"toTokenAmountOut"`
-			} `json:"routerResult"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal([]byte(resp), &apiResp); err != nil {
-		return 0, fmt.Errorf("parse: %w", err)
-	}
-	if apiResp.Code != "0" {
-		return 0, fmt.Errorf("api code %s: %s", apiResp.Code, apiResp.Msg)
-	}
-	if len(apiResp.Data) == 0 {
-		return 0, fmt.Errorf("empty quote data")
-	}
-	toAmountStr := apiResp.Data[0].RouterResult.ToTokenAmount
-	if toAmountStr == "" {
-		toAmountStr = apiResp.Data[0].RouterResult.ToTokenAmountOut
-	}
-	if toAmountStr == "" {
-		toAmountStr = extractToTokenAmountFromRaw(resp)
-	}
-	if toAmountStr == "" {
-		log.Printf("[ChainPrice] empty toTokenAmount, resp sample: %s", truncate(resp, 500))
-		return 0, fmt.Errorf("empty toTokenAmount")
-	}
-	toAmount, err := strconv.ParseFloat(toAmountStr, 64)
+	price, err := parseQuoteResponse(resp, tokenInfo.Decimals)
 	if err != nil {
-		return 0, fmt.Errorf("parse toTokenAmount: %w", err)
+		return 0, err
 	}
-	tokenAmount := toAmount / math.Pow(10, float64(tokenInfo.Decimals))
-	if tokenAmount <= 0 {
-		return 0, fmt.Errorf("invalid token amount %.6f", tokenAmount)
-	}
-	price := 500 / tokenAmount
 	return price, nil
 }
 

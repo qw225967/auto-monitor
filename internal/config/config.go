@@ -90,14 +90,14 @@ func Load() (*Config, error) {
 	// 默认值
 	viper.SetDefault("seeingstone.api_url", "https://seeingstone.cloud")
 	viper.SetDefault("threshold.spread", 0.5)
-	viper.SetDefault("intervals.fetch", 10)
+	viper.SetDefault("intervals.fetch", 3)
 	viper.SetDefault("intervals.detect", 30)
 	viper.SetDefault("seeingstone.request_timeout", 10)
 	viper.SetDefault("server.port", 8080)
 	viper.SetDefault("mock_mode", false)
 	viper.SetDefault("token_registry.path", "data/token_registry.json")
 	viper.SetDefault("token_registry.sync_interval", 300)
-	viper.SetDefault("chain_price.interval", 60)
+	viper.SetDefault("chain_price.interval", 3)
 	viper.SetDefault("chain_price.cache_ttl", 30)
 	viper.SetDefault("chain_price.concurrency", 3)
 
@@ -143,7 +143,7 @@ func Load() (*Config, error) {
 		cfg.SeeingStone.RequestTimeout = 10
 	}
 	if cfg.Intervals.Fetch == 0 {
-		cfg.Intervals.Fetch = 10
+		cfg.Intervals.Fetch = 3
 	}
 	if cfg.Intervals.Detect == 0 {
 		cfg.Intervals.Detect = 30
@@ -155,7 +155,7 @@ func Load() (*Config, error) {
 		cfg.TokenRegistry.SyncInterval = 300
 	}
 	if cfg.ChainPrice.Interval == 0 {
-		cfg.ChainPrice.Interval = 60
+		cfg.ChainPrice.Interval = 3
 	}
 	if cfg.ChainPrice.CacheTTL == 0 {
 		cfg.ChainPrice.CacheTTL = 30

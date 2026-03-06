@@ -13,7 +13,7 @@ threshold:
   spread: 0.5
 
 intervals:
-  fetch: 10   # 价差拉取间隔 (秒)
+  fetch: 3    # 价差拉取间隔 (秒)
   detect: 30  # 全 symbol 通路探测间隔 (秒)
 
 token_registry:
@@ -23,7 +23,7 @@ token_registry:
   # coingecko_pro: false    # Pro 用户设为 true
 
 chain_price:
-  interval: 60     # 链上价格拉取间隔 (秒)
+  interval: 3      # 链上价格拉取间隔 (秒)
   cache_ttl: 30    # 链上价格缓存时长 (秒)
   concurrency: 3   # 并发查询数
 
