@@ -125,6 +125,10 @@ type GlobalConfig struct {
 			RPCURLs map[string]string
 		}
 	}
+	Wallet struct {
+		PrivateSecret  string // 私钥，用于跨链广播（BridgeToken）
+		WalletAddress  string // 钱包地址
+	}
 }
 
 var globalConfig *GlobalConfig
