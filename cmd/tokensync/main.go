@@ -39,7 +39,8 @@ func main() {
 
 	// 1. 仅获取符合阈值的 symbol，提取资产列表
 	assets, err := tokenregistry.AssetsFromSeeingStoneWithThreshold(ctx,
-		cfg.SeeingStone.APIURL, cfg.SeeingStone.APIToken, cfg.Threshold.Spread)
+		cfg.SeeingStone.APIURL, cfg.SeeingStone.APIToken, cfg.Threshold.Spread,
+		cfg.RequestTimeout())
 	if err != nil {
 		log.Fatalf("获取价差数据: %v", err)
 	}

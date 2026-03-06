@@ -25,9 +25,9 @@ type SyncConfig struct {
 func RunSync(ctx context.Context, cfg SyncConfig) (updated int, err error) {
 	var assets []string
 	if cfg.UseAllSymbols {
-		assets, err = AssetsFromSeeingStone(ctx, cfg.APIURL, cfg.APIToken)
+		assets, err = AssetsFromSeeingStone(ctx, cfg.APIURL, cfg.APIToken, cfg.RequestTimeout)
 	} else {
-		assets, err = AssetsFromSeeingStoneWithThreshold(ctx, cfg.APIURL, cfg.APIToken, cfg.SpreadThreshold)
+		assets, err = AssetsFromSeeingStoneWithThreshold(ctx, cfg.APIURL, cfg.APIToken, cfg.SpreadThreshold, cfg.RequestTimeout)
 	}
 	if err != nil {
 		return 0, err

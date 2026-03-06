@@ -58,9 +58,9 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 			if dexPrice <= 0 {
 				continue
 			}
-			// 流动性阈值过滤：若设置了阈值且该链流动性低于阈值，跳过（无数据时也跳过）
+			// 流动性阈值过滤：仅当有数据且低于阈值时跳过；无数据(!ok)时不过滤，避免误杀
 			if liqThreshold > 0 && liquidity != nil && len(liquidity) > 0 {
-				if r, ok := liquidity[base+":"+chainID]; !ok || r < liqThreshold {
+				if r, ok := liquidity[base+":"+chainID]; ok && r < liqThreshold {
 					continue
 				}
 			}
@@ -169,12 +169,12 @@ func ComputeDexDex(chainPrices map[string]float64, threshold float64, liquidity 
 			if p2 <= 0 {
 				continue
 			}
-			// 流动性阈值过滤：两条链都需满足（无数据时不过滤）
+			// 流动性阈值过滤：仅当有数据且低于阈值时跳过；无数据时不过滤
 			if liqThreshold > 0 && liquidity != nil && len(liquidity) > 0 {
-				if r1, ok := liquidity[asset+":"+c1]; !ok || r1 < liqThreshold {
+				if r1, ok := liquidity[asset+":"+c1]; ok && r1 < liqThreshold {
 					continue
 				}
-				if r2, ok := liquidity[asset+":"+c2]; !ok || r2 < liqThreshold {
+				if r2, ok := liquidity[asset+":"+c2]; ok && r2 < liqThreshold {
 					continue
 				}
 			}

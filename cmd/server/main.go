@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -24,6 +25,57 @@ import (
 	"github.com/qw225967/auto-monitor/internal/source/seeingstone"
 	"github.com/qw225967/auto-monitor/internal/tokenregistry"
 )
+
+// chainDistribution 返回链分布摘要，如 "链分布: ETH=50 BSC=20"
+func chainDistribution(prices map[string]float64) string {
+	names := map[string]string{"1": "ETH", "56": "BSC", "137": "Polygon", "42161": "Arbitrum", "10": "OP", "43114": "AVAX", "8453": "Base", "195": "TRON"}
+	count := make(map[string]int)
+	for k := range prices {
+		if idx := strings.Index(k, ":"); idx > 0 {
+			c := k[idx+1:]
+			if n, ok := names[c]; ok {
+				count[n]++
+			} else {
+				count["链"+c]++
+			}
+		}
+	}
+	order := []string{"ETH", "BSC", "Polygon", "Arbitrum", "OP", "AVAX", "Base", "TRON"}
+	var parts []string
+	for _, n := range order {
+		if count[n] > 0 {
+			parts = append(parts, n+"="+fmt.Sprint(count[n]))
+		}
+	}
+	for n, v := range count {
+		if !strings.Contains(strings.Join(order, " "), n) {
+			parts = append(parts, n+"="+fmt.Sprint(v))
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "链分布: " + strings.Join(parts, " ")
+}
+
+func pairDistribution(byChain map[string]int) string {
+	names := map[string]string{"1": "ETH", "56": "BSC", "137": "Polygon", "42161": "Arbitrum", "10": "OP", "43114": "AVAX", "8453": "Base", "195": "TRON"}
+	var parts []string
+	for cid, v := range byChain {
+		if v <= 0 {
+			continue
+		}
+		n := names[cid]
+		if n == "" {
+			n = "链" + cid
+		}
+		parts = append(parts, n+"="+fmt.Sprint(v))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " " + strings.Join(parts, " ")
+}
 
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -224,17 +276,21 @@ func main() {
 					fetcher.ReloadRegistry()
 					usdtChains := fetcher.ChainsWithUSDT()
 					var pairs []price.AssetChainPair
+					pairByChain := make(map[string]int)
 					for _, asset := range fetcher.GetAllAssets() {
 						for _, chainID := range fetcher.GetAllTokenChains(asset) {
 							if usdtChains[chainID] && constants.OKXChainSupported(chainID) {
 								pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
+								pairByChain[chainID]++
 							}
 						}
 					}
 					if len(pairs) > 0 {
 						prices := fetcher.BatchQueryDexPrices(pairs, cfg.ChainPrice.Concurrency)
 						handler.UpdateChainPrices(prices)
-						log.Printf("[ChainPrice] 启动同步: %d 对中成功 %d 条", len(pairs), len(prices))
+						chainDist := chainDistribution(prices)
+						reqDist := pairDistribution(pairByChain)
+						log.Printf("[ChainPrice] 启动同步: %d 对中成功 %d 条 %s (请求%s)", len(pairs), len(prices), chainDist, reqDist)
 					} else {
 						log.Printf("[ChainPrice] 无可用 (asset,chain) 对，请先运行 tokensync 补全 token 信息")
 					}
@@ -245,17 +301,21 @@ func main() {
 						fetcher.ReloadRegistry()
 						usdtChains := fetcher.ChainsWithUSDT()
 						pairs = pairs[:0]
+						pairByChain = make(map[string]int)
 						for _, asset := range fetcher.GetAllAssets() {
 							for _, chainID := range fetcher.GetAllTokenChains(asset) {
 								if usdtChains[chainID] && constants.OKXChainSupported(chainID) {
 									pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
+									pairByChain[chainID]++
 								}
 							}
 						}
 						if len(pairs) > 0 {
 							prices := fetcher.BatchQueryDexPrices(pairs, cfg.ChainPrice.Concurrency)
 							handler.UpdateChainPrices(prices)
-							log.Printf("[ChainPrice] %d 对中成功 %d 条", len(pairs), len(prices))
+							chainDist := chainDistribution(prices)
+							reqDist := pairDistribution(pairByChain)
+							log.Printf("[ChainPrice] %d 对中成功 %d 条 %s (请求%s)", len(pairs), len(prices), chainDist, reqDist)
 						}
 					}
 				}()

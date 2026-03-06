@@ -250,9 +250,14 @@ func (r *Runner) runDetectCexDexDexOnly(ctx context.Context, cexDex, dexDex []mo
 }
 
 // filterNoAvailablePaths 过滤掉完全没有可用通路的标的
+// CEX-CEX（交易所-交易所）始终保留，仅对 CEX-DEX、DEX-DEX 按通路过滤
 func filterNoAvailablePaths(rows []model.OverviewRow) []model.OverviewRow {
 	var out []model.OverviewRow
 	for _, row := range rows {
+		if row.Type == model.OppTypeCexCex {
+			out = append(out, row)
+			continue
+		}
 		if row.AvailablePathCount > 0 {
 			out = append(out, row)
 		}

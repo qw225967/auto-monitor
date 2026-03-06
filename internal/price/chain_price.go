@@ -218,6 +218,12 @@ func (f *ChainPriceFetcher) queryDexPriceUncached(asset, chainID string) (float6
 	return price, nil
 }
 
+// chainDisplayName 链 ID 转展示名（用于日志）
+var chainDisplayName = map[string]string{
+	"1": "ETH", "56": "BSC", "137": "Polygon", "42161": "Arbitrum",
+	"10": "OP", "8453": "Base", "43114": "AVAX", "195": "TRON",
+}
+
 // BatchQueryDexPrices 批量查询多个 (asset, chainID) 的价格
 // 返回 map["asset:chainID"]price，失败的项不包含在结果中
 func (f *ChainPriceFetcher) BatchQueryDexPrices(pairs []AssetChainPair, concurrency int) map[string]float64 {
@@ -228,8 +234,12 @@ func (f *ChainPriceFetcher) BatchQueryDexPrices(pairs []AssetChainPair, concurre
 		key   string
 		price float64
 	}
+	type failRecord struct {
+		chainID string
+		err     error
+	}
 	results := make(chan result, len(pairs))
-	errChan := make(chan error, len(pairs))
+	failChan := make(chan failRecord, len(pairs))
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 	for _, p := range pairs {
@@ -244,7 +254,7 @@ func (f *ChainPriceFetcher) BatchQueryDexPrices(pairs []AssetChainPair, concurre
 				results <- result{key: p.Asset + ":" + p.ChainID, price: price}
 			} else {
 				select {
-				case errChan <- err:
+				case failChan <- failRecord{chainID: p.ChainID, err: err}:
 				default:
 				}
 			}
@@ -253,16 +263,48 @@ func (f *ChainPriceFetcher) BatchQueryDexPrices(pairs []AssetChainPair, concurre
 	go func() {
 		wg.Wait()
 		close(results)
-		close(errChan)
+		close(failChan)
 	}()
 
 	out := make(map[string]float64)
 	for r := range results {
 		out[r.key] = r.price
 	}
+	// 统计失败按链分布，便于排查为何只显示 ETH
+	failByChain := make(map[string]int)
+	var sampleErr map[string]error
+	for fr := range failChan {
+		failByChain[fr.chainID]++
+		if sampleErr == nil {
+			sampleErr = make(map[string]error)
+		}
+		if sampleErr[fr.chainID] == nil {
+			sampleErr[fr.chainID] = fr.err
+		}
+	}
+	if len(failByChain) > 0 {
+		var parts []string
+		for cid, n := range failByChain {
+			name := chainDisplayName[cid]
+			if name == "" {
+				name = "链" + cid
+			}
+			sample := ""
+			if sampleErr != nil && sampleErr[cid] != nil {
+				sample = " 示例:" + sampleErr[cid].Error()
+			}
+			parts = append(parts, name+"失败"+strconv.Itoa(n)+"次"+sample)
+		}
+		log.Printf("[ChainPrice] 失败按链: %s", strings.Join(parts, "; "))
+	}
 	if len(out) == 0 && len(pairs) > 0 {
-		if e := <-errChan; e != nil {
-			log.Printf("[ChainPrice] 全部失败，示例错误: %v", e)
+		if len(sampleErr) > 0 {
+			for _, e := range sampleErr {
+				if e != nil {
+					log.Printf("[ChainPrice] 全部失败，示例错误: %v", e)
+					break
+				}
+			}
 		}
 	}
 	return out

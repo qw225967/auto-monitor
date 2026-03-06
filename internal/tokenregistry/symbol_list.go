@@ -42,17 +42,21 @@ func ExtractAssetsFromSymbols(symbols []string) []string {
 }
 
 // AssetsFromSeeingStone 从 SeeingStone API 拉取价差数据，提取资产列表（不过滤阈值）
-func AssetsFromSeeingStone(ctx context.Context, baseURL, token string) ([]string, error) {
-	return AssetsFromSeeingStoneWithThreshold(ctx, baseURL, token, 0)
+// timeout=0 时使用 60s
+func AssetsFromSeeingStone(ctx context.Context, baseURL, token string, timeout time.Duration) ([]string, error) {
+	return AssetsFromSeeingStoneWithThreshold(ctx, baseURL, token, 0, timeout)
 }
 
 // AssetsFromSeeingStoneWithThreshold 从 SeeingStone 拉取价差，仅保留符合阈值的 symbol，再提取资产
-// threshold=0 表示不过滤
-func AssetsFromSeeingStoneWithThreshold(ctx context.Context, baseURL, token string, threshold float64) ([]string, error) {
+// threshold=0 表示不过滤；timeout=0 时使用 60s（数据量大时需更长）
+func AssetsFromSeeingStoneWithThreshold(ctx context.Context, baseURL, token string, threshold float64, timeout time.Duration) ([]string, error) {
+	if timeout <= 0 {
+		timeout = 60 * time.Second
+	}
 	adapter := seeingstone.New(seeingstone.Config{
 		BaseURL:        baseURL,
 		Token:          token,
-		RequestTimeout: 10 * time.Second,
+		RequestTimeout: timeout,
 	})
 	raw, err := adapter.Fetch(ctx)
 	if err != nil {
