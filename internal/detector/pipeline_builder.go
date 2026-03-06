@@ -8,9 +8,19 @@ import (
 )
 
 const (
-	maxRouteHops   = 4
-	onchainPrefix  = "onchain:"
+	maxRouteHops  = 4
+	onchainPrefix = "onchain:"
+	chainPrefix   = "chain_"
 )
+
+// chainFromDisplay 解析 "Chain_56" -> "56"
+func chainFromDisplay(s string) (chainID string, ok bool) {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if strings.HasPrefix(s, chainPrefix) {
+		return strings.TrimPrefix(s, chainPrefix), true
+	}
+	return "", false
+}
 
 // PipelineBuilder 根据 NetworkRegistry 构建邻接图并枚举路径
 type PipelineBuilder struct {
@@ -23,16 +33,29 @@ func NewPipelineBuilder(reg registry.NetworkRegistry) *PipelineBuilder {
 }
 
 // BuildPaths 从 buyExchange 到 sellExchange 枚举所有可达路径（基于充提网络）
+// 支持交易所或链：buyExchange/sellExchange 可为 "BITGET" 或 "Chain_56"
 // 返回路径列表，每条路径为节点 ID 序列，如 ["binance","onchain:56","bitget"]
 func (b *PipelineBuilder) BuildPaths(asset, buyExchange, sellExchange string) ([][]string, error) {
-	buy := exchangeToNodeID(buyExchange)
-	sell := exchangeToNodeID(sellExchange)
+	var buy, sell string
+	var buyChains, sellChains map[string]bool
 
-	wd, _ := b.reg.GetWithdrawNetworks(buy, asset)
-	dep, _ := b.reg.GetDepositNetworks(sell, asset)
+	if cid, ok := chainFromDisplay(buyExchange); ok {
+		buy = onchainPrefix + cid
+		buyChains = map[string]bool{cid: true}
+	} else {
+		buy = exchangeToNodeID(buyExchange)
+		wd, _ := b.reg.GetWithdrawNetworks(buy, asset)
+		buyChains = chainIDsFromNetworks(wd)
+	}
 
-	buyChains := chainIDsFromNetworks(wd)
-	sellChains := chainIDsFromNetworks(dep)
+	if cid, ok := chainFromDisplay(sellExchange); ok {
+		sell = onchainPrefix + cid
+		sellChains = map[string]bool{cid: true}
+	} else {
+		sell = exchangeToNodeID(sellExchange)
+		dep, _ := b.reg.GetDepositNetworks(sell, asset)
+		sellChains = chainIDsFromNetworks(dep)
+	}
 
 	adj := b.buildAdjacency(buy, sell, buyChains, sellChains)
 	paths := findAllRoutes(buy, sell, adj, maxRouteHops)
@@ -108,9 +131,12 @@ func (b *PipelineBuilder) buildAdjacency(buy, sell string, buyChains, sellChains
 		adj[buy] = append(adj[buy], nodeID)
 	}
 
-	// 链 -> 卖交易所（若卖方可充值该链）
+	// 链 -> 卖交易所（若卖方可充值该链）；或 链 -> 目标链（跨链）
 	for cid := range sellChains {
 		nodeID := onchainPrefix + cid
+		if nodeID == sell {
+			continue // 避免自环
+		}
 		adj[nodeID] = append(adj[nodeID], sell)
 	}
 

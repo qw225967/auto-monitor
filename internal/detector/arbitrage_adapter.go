@@ -8,6 +8,7 @@ import (
 	"github.com/qw225967/auto-monitor/internal/detector/registry"
 	"github.com/qw225967/auto-monitor/internal/model"
 	"github.com/qw225967/auto-monitor/internal/onchain/bridge"
+	"github.com/qw225967/auto-monitor/internal/tokenregistry"
 )
 
 // ArbitrageAdapter 适配 auto-arbitrage 的 pipeline 路由探测
@@ -38,6 +39,18 @@ func exchangeToNodeID(ex string) string {
 	return s
 }
 
+// nodeIDFromDisplay 将 "BITGET" 或 "Chain_56" 转为节点 ID，不支持则返回空
+func nodeIDFromDisplay(s string) string {
+	if cid, ok := chainFromDisplay(s); ok {
+		return "onchain:" + cid
+	}
+	node := exchangeToNodeID(s)
+	if supportedExchanges[node] {
+		return node
+	}
+	return ""
+}
+
 // 常用链节点
 var commonChains = []string{"onchain:56", "onchain:1", "onchain:195"} // BSC, ETH, TRON
 
@@ -48,17 +61,21 @@ var supportedExchanges = map[string]bool{
 }
 
 // DetectRoutes 探测从 buyExchange 到 sellExchange 的物理通路
+// 支持交易所到链：buyExchange/sellExchange 可为 "BITGET" 或 "Chain_56"
 func (a *ArbitrageAdapter) DetectRoutes(ctx context.Context, symbol, buyExchange, sellExchange string) ([]model.PhysicalPath, error) {
 	_ = ctx
-	buy := exchangeToNodeID(buyExchange)
-	sell := exchangeToNodeID(sellExchange)
-	if !supportedExchanges[buy] || !supportedExchanges[sell] {
-		return nil, fmt.Errorf("unsupported exchange pair: %s -> %s", buyExchange, sellExchange)
+	buyNode := nodeIDFromDisplay(buyExchange)
+	sellNode := nodeIDFromDisplay(sellExchange)
+	if buyNode == "" {
+		return nil, fmt.Errorf("unsupported buy: %s", buyExchange)
+	}
+	if sellNode == "" {
+		return nil, fmt.Errorf("unsupported sell: %s", sellExchange)
 	}
 
-	// 提取资产符号（如 POWERUSDT -> USDT）
-	asset := "USDT"
-	if len(symbol) > 4 && strings.HasSuffix(symbol, "USDT") {
+	// 提取资产符号（如 ETHUSDT -> ETH，用于充提网络查询）
+	asset, _ := tokenregistry.SymbolToAsset(symbol)
+	if asset == "" {
 		asset = "USDT"
 	}
 
@@ -66,9 +83,9 @@ func (a *ArbitrageAdapter) DetectRoutes(ctx context.Context, symbol, buyExchange
 	paths, err := a.builder.BuildPaths(asset, buyExchange, sellExchange)
 	if err != nil || len(paths) == 0 {
 		// 回退：简单直连 + 经常见链
-		paths = [][]string{{buy, sell}}
+		paths = [][]string{{buyNode, sellNode}}
 		for _, chain := range commonChains {
-			paths = append(paths, []string{buy, chain, sell})
+			paths = append(paths, []string{buyNode, chain, sellNode})
 		}
 	}
 

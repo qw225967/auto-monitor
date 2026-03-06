@@ -14,6 +14,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// pathKey 探测路径键
+type pathKey struct {
+	symbol, buy, sell string
+}
+
 // Runner 主流程编排：聚合 → 探测 → 表格组装
 type Runner struct {
 	det       detector.Detector
@@ -32,26 +37,45 @@ func New(det detector.Detector, threshold float64) *Runner {
 // chainPrices 可选，key "asset:chainID"，用于 CEX-DEX、DEX-DEX 机会计算
 func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainPrices map[string]float64) (*model.OverviewResponse, error) {
 	agg := aggregator.Aggregate(items, r.threshold)
-	if len(agg) == 0 && len(chainPrices) == 0 {
+	cexDex := opportunities.ComputeCexDex(items, chainPrices, r.threshold)
+	dexDex := opportunities.ComputeDexDex(chainPrices, r.threshold)
+
+	if len(agg) == 0 && len(cexDex) == 0 && len(dexDex) == 0 {
 		return &model.OverviewResponse{Overview: []model.OverviewRow{}}, nil
 	}
-	if len(agg) == 0 {
-		cexDex := opportunities.ComputeCexDex(items, chainPrices, r.threshold)
-		dexDex := opportunities.ComputeDexDex(chainPrices, r.threshold)
-		return &model.OverviewResponse{
-			Overview: opportunities.MergeAndSort(nil, cexDex, dexDex),
-		}, nil
+	if len(agg) == 0 && len(chainPrices) > 0 {
+		// 仅 CEX-DEX/DEX-DEX，需探测后附加路径
+		return r.runDetectCexDexDexOnly(ctx, cexDex, dexDex)
 	}
 
-	// 收集所有 (symbol, buyEx, sellEx) 用于探测
-	type pathKey struct {
-		symbol, buy, sell string
-	}
+	// 收集所有 (symbol, buyEx, sellEx) 用于探测：CEX-CEX + CEX-DEX
 	pathSet := make(map[pathKey]model.PathItem)
 	for symbol, paths := range agg {
 		for _, p := range paths {
 			k := pathKey{symbol, p.BuyExchange, p.SellExchange}
 			pathSet[k] = p
+		}
+	}
+	for _, row := range cexDex {
+		k := pathKey{row.Symbol, row.BuyExchange, row.SellExchange}
+		if _, ok := pathSet[k]; !ok {
+			pathSet[k] = model.PathItem{
+				Symbol:        row.Symbol,
+				BuyExchange:   row.BuyExchange,
+				SellExchange:  row.SellExchange,
+				SpreadPercent: row.SpreadPercent,
+			}
+		}
+	}
+	for _, row := range dexDex {
+		k := pathKey{row.Symbol, row.BuyExchange, row.SellExchange}
+		if _, ok := pathSet[k]; !ok {
+			pathSet[k] = model.PathItem{
+				Symbol:        row.Symbol,
+				BuyExchange:   row.BuyExchange,
+				SellExchange:  row.SellExchange,
+				SpreadPercent: row.SpreadPercent,
+			}
 		}
 	}
 
@@ -84,12 +108,21 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 		return nil, err
 	}
 
-	// 组装 AggregatedInput
+	// 组装 AggregatedInput（仅 CEX-CEX，builder 只处理交易所间）
+	aggKeys := make(map[pathKey]bool)
+	for symbol, paths := range agg {
+		for _, p := range paths {
+			aggKeys[pathKey{symbol, p.BuyExchange, p.SellExchange}] = true
+		}
+	}
 	input := &builder.AggregatedInput{
 		Paths:           make(map[string][]builder.PathItemWithRoutes),
 		SpreadThreshold: r.threshold,
 	}
 	for _, res := range results {
+		if !aggKeys[res.key] {
+			continue
+		}
 		var physRows []builder.PhysicalPathRow
 		for _, p := range res.phys {
 			physRows = append(physRows, builder.PhysicalPathRow{
@@ -115,11 +148,109 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 	}
 	resp := out.(*model.OverviewResponse)
 
-	// 合并 CEX-DEX、DEX-DEX 机会
-	if len(chainPrices) > 0 {
-		cexDex := opportunities.ComputeCexDex(items, chainPrices, r.threshold)
-		dexDex := opportunities.ComputeDexDex(chainPrices, r.threshold)
-		resp.Overview = opportunities.MergeAndSort(resp.Overview, cexDex, dexDex)
+	// 合并 CEX-DEX、DEX-DEX，并附加探测路径
+	resultMap := make(map[pathKey][]builder.PhysicalPathRow)
+	for _, res := range results {
+		var physRows []builder.PhysicalPathRow
+		for _, p := range res.phys {
+			physRows = append(physRows, builder.PhysicalPathRow{
+				PathID:       p.PathID,
+				PhysicalFlow: p.PhysicalFlow(),
+				Status:       p.OverallStatus,
+			})
+		}
+		resultMap[res.key] = physRows
 	}
+	cexDexWithPaths := attachPathsToRows(cexDex, resultMap)
+	dexDexWithPaths := attachPathsToRows(dexDex, resultMap)
+	resp.Overview = opportunities.MergeAndSort(resp.Overview, cexDexWithPaths, dexDexWithPaths)
 	return resp, nil
+}
+
+// runDetectCexDexDexOnly 仅 CEX-DEX/DEX-DEX 时的探测与组装
+func (r *Runner) runDetectCexDexDexOnly(ctx context.Context, cexDex, dexDex []model.OverviewRow) (*model.OverviewResponse, error) {
+	pathSet := make(map[pathKey]model.OverviewRow)
+	for _, row := range cexDex {
+		k := pathKey{row.Symbol, row.BuyExchange, row.SellExchange}
+		pathSet[k] = row
+	}
+	for _, row := range dexDex {
+		k := pathKey{row.Symbol, row.BuyExchange, row.SellExchange}
+		pathSet[k] = row
+	}
+	if len(pathSet) == 0 {
+		return &model.OverviewResponse{Overview: opportunities.MergeAndSort(nil, cexDex, dexDex)}, nil
+	}
+
+	type result struct {
+		key  pathKey
+		phys []model.PhysicalPath
+	}
+	var mu sync.Mutex
+	var results []result
+	g, gctx := errgroup.WithContext(ctx)
+	for k := range pathSet {
+		k := k
+		g.Go(func() error {
+			paths, err := r.det.DetectRoutes(gctx, k.symbol, k.buy, k.sell)
+			if err != nil {
+				log.Printf("[Runner] detect %s %s->%s: %v", k.symbol, k.buy, k.sell, err)
+				return nil
+			}
+			mu.Lock()
+			results = append(results, result{key: k, phys: paths})
+			mu.Unlock()
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	resultMap := make(map[pathKey][]builder.PhysicalPathRow)
+	for _, res := range results {
+		var physRows []builder.PhysicalPathRow
+		for _, p := range res.phys {
+			physRows = append(physRows, builder.PhysicalPathRow{
+				PathID:       p.PathID,
+				PhysicalFlow: p.PhysicalFlow(),
+				Status:       p.OverallStatus,
+			})
+		}
+		resultMap[res.key] = physRows
+	}
+	cexDexWithPaths := attachPathsToRows(cexDex, resultMap)
+	dexDexWithPaths := attachPathsToRows(dexDex, resultMap)
+	return &model.OverviewResponse{
+		Overview: opportunities.MergeAndSort(nil, cexDexWithPaths, dexDexWithPaths),
+	}, nil
+}
+
+// attachPathsToRows 为 CEX-DEX/DEX-DEX 行附加探测路径
+func attachPathsToRows(rows []model.OverviewRow, resultMap map[pathKey][]builder.PhysicalPathRow) []model.OverviewRow {
+	var out []model.OverviewRow
+	for _, row := range rows {
+		k := pathKey{row.Symbol, row.BuyExchange, row.SellExchange}
+		physRows, ok := resultMap[k]
+		if !ok {
+			out = append(out, row)
+			continue
+		}
+		availableCount := 0
+		var detailPaths []model.DetailPathRow
+		for _, pp := range physRows {
+			if pp.Status == "ok" {
+				availableCount++
+			}
+			detailPaths = append(detailPaths, model.DetailPathRow{
+				PathID:       pp.PathID,
+				PhysicalFlow: pp.PhysicalFlow,
+				Status:       pp.Status,
+			})
+		}
+		row.AvailablePathCount = availableCount
+		row.DetailPaths = detailPaths
+		out = append(out, row)
+	}
+	return out
 }

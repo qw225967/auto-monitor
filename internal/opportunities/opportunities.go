@@ -10,7 +10,7 @@ import (
 )
 
 // maxSpreadAnomaly 价差超过此阈值视为非同一币种（单位/代币不匹配），过滤掉
-const maxSpreadAnomaly = 500.0
+const maxSpreadAnomaly = 50.0
 
 // ComputeCexDex 从价差数据和链上价格计算 CEX-DEX 套利机会
 // chainPrices: key "asset:chainID" -> price
