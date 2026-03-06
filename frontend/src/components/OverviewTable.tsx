@@ -55,7 +55,12 @@ export function OverviewTable({ rows }: Props) {
               <tr>
                 <td>{OppTypeLabels[row.type ?? 'cex_cex'] ?? row.type}</td>
                 <td>{row.symbol}</td>
-                <td>{row.path_display}</td>
+                <td>
+                  {row.path_display}
+                  {row.chain_liquidity && (
+                    <span className="chain-liquidity"> · {row.chain_liquidity}</span>
+                  )}
+                </td>
                 <td>{row.spread_percent.toFixed(2)}%</td>
                 <td>{(row.available_path_count ?? 0)}条</td>
                 <td>

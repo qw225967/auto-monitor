@@ -76,6 +76,7 @@ type OverviewRow struct {
 	Type               string          `json:"type"`                 // cex_cex | cex_dex | dex_dex
 	Symbol             string          `json:"symbol"`
 	PathDisplay        string          `json:"path_display"`
+	ChainLiquidity     string          `json:"chain_liquidity,omitempty"` // 链流动性展示，如 "ETH: 100万" 或 "ETH: 100万 | BSC: 50万"
 	BuyExchange        string          `json:"buy_exchange"`         // CEX 名或 Chain_56
 	SellExchange       string          `json:"sell_exchange"`        // CEX 名或 Chain_1
 	SpreadPercent      float64         `json:"spread_percent"`

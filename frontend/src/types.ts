@@ -8,6 +8,7 @@ export interface OverviewRow {
   type?: string // cex_cex | cex_dex | dex_dex
   symbol: string
   path_display: string
+  chain_liquidity?: string // 链流动性，如 "ETH: 100万"
   buy_exchange: string
   sell_exchange: string
   spread_percent: number

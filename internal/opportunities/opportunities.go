@@ -1,6 +1,7 @@
 package opportunities
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -12,6 +13,25 @@ import (
 
 // maxSpreadAnomaly 价差超过此阈值视为非同一币种（单位/代币不匹配），过滤掉
 const maxSpreadAnomaly = 50.0
+
+// chainDisplayName 链 ID 转展示名
+var chainDisplayName = map[string]string{
+	"1": "ETH", "56": "BSC", "195": "TRON", "137": "Polygon", "42161": "Arbitrum",
+	"10": "OP", "8453": "Base", "43114": "AVAX",
+}
+
+func formatLiquidityUsd(v float64) string {
+	if v <= 0 {
+		return ""
+	}
+	if v >= 1e8 {
+		return fmt.Sprintf("%.0f亿", v/1e8)
+	}
+	if v >= 1e4 {
+		return fmt.Sprintf("%.0f万", v/1e4)
+	}
+	return fmt.Sprintf("%.0f", v)
+}
 
 // ComputeCexDex 从价差数据和链上价格计算 CEX-DEX 套利机会
 // chainPrices: key "asset:chainID" -> price
@@ -51,13 +71,24 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 						k := it.Symbol + ":" + it.BuyExchange + ":Chain_" + chainID
 						if !seen[k] {
 							seen[k] = true
+							liqStr := ""
+							if liquidity != nil {
+								if r, ok := liquidity[base+":"+chainID]; ok && r > 0 {
+									name := chainDisplayName[chainID]
+									if name == "" {
+										name = "Chain_" + chainID
+									}
+									liqStr = name + ": " + formatLiquidityUsd(r)
+								}
+							}
 							rows = append(rows, model.OverviewRow{
-								Type:          model.OppTypeCexDex,
-								Symbol:        it.Symbol,
-								PathDisplay:   it.BuyExchange + " ↔ Chain_" + chainID,
-								BuyExchange:   it.BuyExchange,
-								SellExchange:  "Chain_" + chainID,
-								SpreadPercent: spread,
+								Type:           model.OppTypeCexDex,
+								Symbol:         it.Symbol,
+								PathDisplay:    it.BuyExchange + " ↔ Chain_" + chainID,
+								ChainLiquidity: liqStr,
+								BuyExchange:    it.BuyExchange,
+								SellExchange:   "Chain_" + chainID,
+								SpreadPercent:  spread,
 							})
 						}
 					}
@@ -68,10 +99,21 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 						k := it.Symbol + ":Chain_" + chainID + ":" + it.SellExchange
 						if !seen[k] {
 							seen[k] = true
+							liqStr := ""
+							if liquidity != nil {
+								if r, ok := liquidity[base+":"+chainID]; ok && r > 0 {
+									name := chainDisplayName[chainID]
+									if name == "" {
+										name = "Chain_" + chainID
+									}
+									liqStr = name + ": " + formatLiquidityUsd(r)
+								}
+							}
 							rows = append(rows, model.OverviewRow{
-								Type:          model.OppTypeCexDex,
-								Symbol:        it.Symbol,
+								Type:           model.OppTypeCexDex,
+								Symbol:         it.Symbol,
 								PathDisplay:   "Chain_" + chainID + " ↔ " + it.SellExchange,
+								ChainLiquidity: liqStr,
 								BuyExchange:   "Chain_" + chainID,
 								SellExchange:  it.SellExchange,
 								SpreadPercent: spread,
@@ -156,10 +198,32 @@ func ComputeDexDex(chainPrices map[string]float64, threshold float64, liquidity 
 	}
 	var rows []model.OverviewRow
 	for _, p := range pairs {
+		liqStr := ""
+		if liquidity != nil {
+			var parts []string
+			if r1, ok := liquidity[p.asset+":"+p.buyChain]; ok && r1 > 0 {
+				name := chainDisplayName[p.buyChain]
+				if name == "" {
+					name = "Chain_" + p.buyChain
+				}
+				parts = append(parts, name+"(低): "+formatLiquidityUsd(r1))
+			}
+			if r2, ok := liquidity[p.asset+":"+p.sellChain]; ok && r2 > 0 {
+				name := chainDisplayName[p.sellChain]
+				if name == "" {
+					name = "Chain_" + p.sellChain
+				}
+				parts = append(parts, name+"(高): "+formatLiquidityUsd(r2))
+			}
+			if len(parts) > 0 {
+				liqStr = strings.Join(parts, " | ")
+			}
+		}
 		rows = append(rows, model.OverviewRow{
-			Type:          model.OppTypeDexDex,
+			Type:           model.OppTypeDexDex,
 			Symbol:        p.asset + "USDT",
 			PathDisplay:   "Chain_" + p.buyChain + "(低) → Chain_" + p.sellChain + "(高)",
+			ChainLiquidity: liqStr,
 			BuyExchange:   "Chain_" + p.buyChain,
 			SellExchange:  "Chain_" + p.sellChain,
 			SpreadPercent: p.spread,

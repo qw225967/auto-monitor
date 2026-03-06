@@ -76,6 +76,7 @@ func Load() (*Config, error) {
 	// 显式绑定环境变量（.env 通过 godotenv 加载后生效）
 	_ = viper.BindEnv("seeingstone.api_token", "SEEINGSTONE_API_TOKEN")
 	_ = viper.BindEnv("seeingstone.api_url", "SEEINGSTONE_API_URL")
+	_ = viper.BindEnv("seeingstone.request_timeout", "REQUEST_TIMEOUT")
 	_ = viper.BindEnv("server.port", "SERVER_PORT")
 	_ = viper.BindEnv("token_registry.path", "TOKEN_REGISTRY_PATH")
 	_ = viper.BindEnv("token_registry.sync_interval", "TOKEN_SYNC_INTERVAL")
@@ -94,7 +95,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("threshold.spread", 0.5)
 	viper.SetDefault("intervals.fetch", 3)
 	viper.SetDefault("intervals.detect", 30)
-	viper.SetDefault("seeingstone.request_timeout", 10)
+	viper.SetDefault("seeingstone.request_timeout", 30)
 	viper.SetDefault("server.port", 8080)
 	viper.SetDefault("mock_mode", false)
 	viper.SetDefault("token_registry.path", "data/token_registry.json")
@@ -144,7 +145,7 @@ func Load() (*Config, error) {
 		cfg.Server.Port = 8080
 	}
 	if cfg.SeeingStone.RequestTimeout == 0 {
-		cfg.SeeingStone.RequestTimeout = 10
+		cfg.SeeingStone.RequestTimeout = 30
 	}
 	if cfg.Intervals.Fetch == 0 {
 		cfg.Intervals.Fetch = 3

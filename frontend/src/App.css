@@ -211,6 +211,12 @@
   font-size: 0.875rem;
 }
 
+.chain-liquidity {
+  color: #8b949e;
+  font-size: 0.85em;
+  margin-left: 0.25rem;
+}
+
 .physical-flow {
   font-family: ui-monospace, monospace;
   font-size: 0.8rem;

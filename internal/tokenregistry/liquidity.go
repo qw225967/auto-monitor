@@ -11,7 +11,8 @@ import (
 	"time"
 )
 
-// chainIDToOnchainNetwork CoinGecko onchain API 使用的 network ID（与 chain ID 不同）
+// chainIDToOnchainNetwork CoinGecko onchain API 使用的 network ID
+// 支持 EVM 链 ID（数字）及部分 CoinGecko platform ID（如 solana、ton）
 var chainIDToOnchainNetwork = map[string]string{
 	"1":     "eth",
 	"56":    "bsc",
@@ -28,6 +29,15 @@ var chainIDToOnchainNetwork = map[string]string{
 	"1101":  "polygon_zkevm",
 	"66":    "okc",
 	"250":   "fantom",
+	"solana": "solana",
+	"the-open-network": "ton",
+	"ronin": "ronin",
+}
+
+// chainSupportedForLiquidity 该链是否支持流动性查询（onchain API 支持）
+func chainSupportedForLiquidity(chainID string) bool {
+	_, ok := chainIDToOnchainNetwork[chainID]
+	return ok
 }
 
 // LiquidityFetcher 从 CoinGecko onchain API 获取池子流动性
@@ -90,8 +100,9 @@ func (f *LiquidityFetcher) FetchReserveUSD(ctx context.Context, chainID, tokenAd
 	if addr == "" {
 		return 0, fmt.Errorf("empty token address")
 	}
-	// 部分链需要 0x 前缀
-	if chainID != "195" && !strings.HasPrefix(strings.ToLower(addr), "0x") {
+	// EVM 链需要 0x 前缀；Solana/TON 等非 EVM 保持原样
+	nonEVM := map[string]bool{"solana": true, "ton": true, "the-open-network": true, "ronin": true}
+	if !nonEVM[chainID] && chainID != "195" && !strings.HasPrefix(strings.ToLower(addr), "0x") {
 		addr = "0x" + addr
 	}
 
@@ -170,6 +181,13 @@ func RunLiquiditySync(ctx context.Context, cfg LiquiditySyncConfig) (map[string]
 			if info.Address == "" {
 				continue
 			}
+			if !chainSupportedForLiquidity(chainID) {
+				// 不支持的链（如 provenance、aptos、cardano）静默跳过，不占 API 配额
+				if info.ReserveUSD > 0 {
+					liquidityMap[asset+":"+chainID] = info.ReserveUSD
+				}
+				continue
+			}
 			select {
 			case <-ctx.Done():
 				return liquidityMap, ctx.Err()
@@ -177,8 +195,11 @@ func RunLiquiditySync(ctx context.Context, cfg LiquiditySyncConfig) (map[string]
 			}
 			reserve, err := fetcher.FetchReserveUSD(ctx, chainID, info.Address)
 			if err != nil {
-				log.Printf("[LiquiditySync] %s %s: %v", asset, chainID, err)
-				// 失败时保留原值，不覆盖
+				// 404/无池子等常见情况不打印，仅保留原值
+				errStr := err.Error()
+				if !strings.Contains(errStr, "status 404") && !strings.Contains(errStr, "not supported") {
+					log.Printf("[LiquiditySync] %s %s: %v", asset, chainID, err)
+				}
 				if info.ReserveUSD > 0 {
 					liquidityMap[asset+":"+chainID] = info.ReserveUSD
 				}
