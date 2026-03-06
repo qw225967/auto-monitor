@@ -19,6 +19,8 @@ intervals:
 token_registry:
   path: data/token_registry.json
   sync_interval: 300  # Token 信息补全间隔 (秒)，全量 symbol 增量更新
+  # coingecko_api_key: ""   # CoinGecko Demo/Pro Key，避免 429
+  # coingecko_pro: false    # Pro 用户设为 true
 
 chain_price:
   interval: 60     # 链上价格拉取间隔 (秒)

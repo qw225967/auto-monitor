@@ -38,13 +38,24 @@ var platformToChainID = map[string]string{
 type CoinGeckoFetcher struct {
 	client  *http.Client
 	baseURL string
+	apiKey  string
+	header  string // x-cg-demo-api-key 或 x-cg-pro-api-key
 }
 
-// NewCoinGeckoFetcher 创建
-func NewCoinGeckoFetcher() *CoinGeckoFetcher {
+// NewCoinGeckoFetcher 创建，apiKey 为空时使用免费版（易 429）
+// usePro: true 时使用 Pro API (pro-api.coingecko.com)
+func NewCoinGeckoFetcher(apiKey string, usePro bool) *CoinGeckoFetcher {
+	baseURL := coingeckoBase
+	header := "x-cg-demo-api-key"
+	if usePro {
+		baseURL = "https://pro-api.coingecko.com/api/v3"
+		header = "x-cg-pro-api-key"
+	}
 	return &CoinGeckoFetcher{
 		client:  &http.Client{Timeout: 15 * time.Second},
-		baseURL: coingeckoBase,
+		baseURL: baseURL,
+		apiKey:  apiKey,
+		header:  header,
 	}
 }
 
@@ -73,12 +84,19 @@ type searchResponse struct {
 	} `json:"coins"`
 }
 
+func (f *CoinGeckoFetcher) setAuth(req *http.Request) {
+	if f.apiKey != "" && f.header != "" {
+		req.Header.Set(f.header, f.apiKey)
+	}
+}
+
 func (f *CoinGeckoFetcher) searchCoin(ctx context.Context, query string) (string, error) {
 	u := f.baseURL + "/search?query=" + url.QueryEscape(query)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return "", err
 	}
+	f.setAuth(req)
 	resp, err := f.client.Do(req)
 	if err != nil {
 		return "", err
@@ -122,6 +140,7 @@ func (f *CoinGeckoFetcher) getCoinPlatforms(ctx context.Context, coinID, asset s
 	if err != nil {
 		return nil, err
 	}
+	f.setAuth(req)
 	resp, err := f.client.Do(req)
 	if err != nil {
 		return nil, err

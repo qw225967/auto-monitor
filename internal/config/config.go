@@ -38,8 +38,10 @@ type IntervalsConfig struct {
 
 // TokenRegistryConfig Token 信息补全配置
 type TokenRegistryConfig struct {
-	Path         string
-	SyncInterval int // 秒
+	Path            string
+	SyncInterval    int    // 秒
+	CoinGeckoAPIKey string // CoinGecko Demo/Pro API Key，避免 429 限流
+	CoinGeckoPro    bool   // true 时使用 Pro API (pro-api.coingecko.com)
 }
 
 // ChainPriceConfig 链上价格配置
@@ -68,6 +70,8 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("server.port", "SERVER_PORT")
 	_ = viper.BindEnv("token_registry.path", "TOKEN_REGISTRY_PATH")
 	_ = viper.BindEnv("token_registry.sync_interval", "TOKEN_SYNC_INTERVAL")
+	_ = viper.BindEnv("token_registry.coingecko_api_key", "COINGECKO_API_KEY")
+	_ = viper.BindEnv("token_registry.coingecko_pro", "COINGECKO_PRO")
 	_ = viper.BindEnv("chain_price.interval", "CHAIN_PRICE_INTERVAL")
 	_ = viper.BindEnv("chain_price.cache_ttl", "CHAIN_PRICE_CACHE_TTL")
 	_ = viper.BindEnv("chain_price.concurrency", "CHAIN_PRICE_CONCURRENCY")
@@ -103,8 +107,10 @@ func Load() (*Config, error) {
 			Detect: viper.GetInt("intervals.detect"),
 		},
 		TokenRegistry: TokenRegistryConfig{
-			Path:         viper.GetString("token_registry.path"),
-			SyncInterval: viper.GetInt("token_registry.sync_interval"),
+			Path:            viper.GetString("token_registry.path"),
+			SyncInterval:    viper.GetInt("token_registry.sync_interval"),
+			CoinGeckoAPIKey: viper.GetString("token_registry.coingecko_api_key"),
+			CoinGeckoPro:    viper.GetBool("token_registry.coingecko_pro"),
 		},
 		ChainPrice: ChainPriceConfig{
 			Interval:    viper.GetInt("chain_price.interval"),

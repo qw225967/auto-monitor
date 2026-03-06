@@ -13,6 +13,11 @@ import (
 	"github.com/qw225967/auto-monitor/internal/tokenregistry"
 )
 
+const (
+	delaySuccess   = 10 * time.Second // 成功后的间隔（CoinGecko 免费版约 10-30 次/分钟）
+	delayRateLimit = 65 * time.Second // 429 后等待（免费版约 1 分钟冷却）
+)
+
 func main() {
 	_ = godotenv.Load()
 
@@ -52,7 +57,7 @@ func main() {
 	}
 
 	// 3. 仅拉取本地未保存的资产；已有则使用本地，不请求
-	fetcher := tokenregistry.NewCoinGeckoFetcher()
+	fetcher := tokenregistry.NewCoinGeckoFetcher(cfg.TokenRegistry.CoinGeckoAPIKey, cfg.TokenRegistry.CoinGeckoPro)
 	totalUpdated := 0
 	fetchIdx := 0
 	for _, asset := range assets {
@@ -68,13 +73,21 @@ func main() {
 		log.Printf("[tokensync] [%d] 拉取 %s ...", fetchIdx, asset)
 		infos, err := fetcher.FetchTokenInfos(ctx, asset)
 		if err != nil {
-			log.Printf("[tokensync] 跳过 %s: %v", asset, err)
-			continue
+			// 429 时等待后重试一次
+			if strings.Contains(err.Error(), "429") {
+				log.Printf("[tokensync] %s 限流，等待 %v 后重试", asset, delayRateLimit)
+				time.Sleep(delayRateLimit)
+				infos, err = fetcher.FetchTokenInfos(ctx, asset)
+			}
+			if err != nil {
+				log.Printf("[tokensync] 跳过 %s: %v", asset, err)
+				continue
+			}
 		}
 		n := store.MergeIncremental(rd, infos)
 		totalUpdated += n
 		log.Printf("[tokensync] %s: 新增/更新 %d 条", asset, n)
-		time.Sleep(3 * time.Second)
+		time.Sleep(delaySuccess)
 	}
 
 	// 4. 保存

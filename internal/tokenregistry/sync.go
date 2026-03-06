@@ -9,15 +9,15 @@ import (
 
 // SyncConfig Token 同步配置
 type SyncConfig struct {
-	RegistryPath   string
-	APIURL         string
-	APIToken       string
-	RequestTimeout time.Duration
-	// UseAllSymbols true=全量 symbol 去重，false=仅符合阈值的 symbol
-	UseAllSymbols bool
-	SpreadThreshold float64
-	// CoingeckoDelay 每次 CoinGecko 请求间隔，避免限流
-	CoingeckoDelay time.Duration
+	RegistryPath     string
+	APIURL           string
+	APIToken         string
+	RequestTimeout   time.Duration
+	UseAllSymbols    bool
+	SpreadThreshold  float64
+	CoingeckoDelay   time.Duration
+	CoinGeckoAPIKey  string
+	CoinGeckoPro     bool
 }
 
 // RunSync 执行一轮 token 信息同步
@@ -42,11 +42,12 @@ func RunSync(ctx context.Context, cfg SyncConfig) (updated int, err error) {
 		return 0, err
 	}
 
-	fetcher := NewCoinGeckoFetcher()
+	fetcher := NewCoinGeckoFetcher(cfg.CoinGeckoAPIKey, cfg.CoinGeckoPro)
 	delay := cfg.CoingeckoDelay
 	if delay == 0 {
-		delay = 3 * time.Second
+		delay = 10 * time.Second
 	}
+	delay429 := 65 * time.Second
 
 	for _, asset := range assets {
 		asset = strings.ToUpper(strings.TrimSpace(asset))
@@ -59,14 +60,21 @@ func RunSync(ctx context.Context, cfg SyncConfig) (updated int, err error) {
 		infos, err := fetcher.FetchTokenInfos(ctx, asset)
 		if err != nil {
 			log.Printf("[TokenSync] 跳过 %s: %v", asset, err)
+			if strings.Contains(err.Error(), "429") {
+				log.Printf("[TokenSync] 触发限流，等待 %v", delay429)
+				select {
+				case <-ctx.Done():
+					return updated, ctx.Err()
+				case <-time.After(delay429):
+				}
+			}
 			continue
 		}
 		updated += store.MergeIncremental(rd, infos)
 		select {
 		case <-ctx.Done():
 			return updated, ctx.Err()
-		default:
-			time.Sleep(delay)
+		case <-time.After(delay):
 		}
 	}
 

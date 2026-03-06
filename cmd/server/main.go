@@ -101,13 +101,15 @@ func main() {
 		go func() {
 			// 启动时立即执行一次
 			ctx0, cancel0 := context.WithTimeout(context.Background(), 5*time.Minute)
-			if updated, err := tokenregistry.RunSync(ctx0, tokenregistry.SyncConfig{
-				RegistryPath:  cfg.TokenRegistry.Path,
-				APIURL:        cfg.SeeingStone.APIURL,
-				APIToken:      cfg.SeeingStone.APIToken,
-				RequestTimeout: cfg.RequestTimeout(),
-				UseAllSymbols: true,
-				CoingeckoDelay: 3 * time.Second,
+			if updated, err := tokenregistry.			RunSync(ctx0, tokenregistry.SyncConfig{
+				RegistryPath:     cfg.TokenRegistry.Path,
+				APIURL:           cfg.SeeingStone.APIURL,
+				APIToken:         cfg.SeeingStone.APIToken,
+				RequestTimeout:   cfg.RequestTimeout(),
+				UseAllSymbols:    true,
+				CoingeckoDelay:   10 * time.Second,
+				CoinGeckoAPIKey:  cfg.TokenRegistry.CoinGeckoAPIKey,
+				CoinGeckoPro:     cfg.TokenRegistry.CoinGeckoPro,
 			}); err == nil && updated > 0 {
 				log.Printf("[TokenSync] 启动同步: 更新 %d 条", updated)
 			}
@@ -117,13 +119,15 @@ func main() {
 			defer ticker.Stop()
 			for range ticker.C {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-				updated, err := tokenregistry.RunSync(ctx, tokenregistry.SyncConfig{
+				updated, err := 				tokenregistry.RunSync(ctx, tokenregistry.SyncConfig{
 					RegistryPath:    cfg.TokenRegistry.Path,
 					APIURL:          cfg.SeeingStone.APIURL,
 					APIToken:        cfg.SeeingStone.APIToken,
 					RequestTimeout:  cfg.RequestTimeout(),
 					UseAllSymbols:   true,
-					CoingeckoDelay:  3 * time.Second,
+					CoingeckoDelay:  10 * time.Second,
+					CoinGeckoAPIKey: cfg.TokenRegistry.CoinGeckoAPIKey,
+					CoinGeckoPro:    cfg.TokenRegistry.CoinGeckoPro,
 				})
 				cancel()
 				if err != nil {
