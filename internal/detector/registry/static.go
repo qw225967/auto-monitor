@@ -99,7 +99,8 @@ func (s *StaticRegistry) getNetworks(exchangeType, asset string) ([]model.Withdr
 	}
 	chainIDs, ok := assets[assetUpper]
 	if !ok {
-		chainIDs = assets["USDT"]
+		// 未显式配置的资产不假定支持，避免误报（如 POWER 在 Bybit 可能不支持充提）
+		return nil, nil
 	}
 	if len(chainIDs) == 0 {
 		return nil, nil
