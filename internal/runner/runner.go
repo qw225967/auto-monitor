@@ -48,6 +48,12 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 		return r.runDetectCexDexDexOnly(ctx, cexDex, dexDex)
 	}
 
+	// 用价差 symbol 刷新充提网络（跟随 30s 探测周期，从交易所 API 实时获取）
+	if refresher, ok := r.det.(detector.RegistryRefresher); ok {
+		symbols := extractSymbolsFromItems(items)
+		refresher.RefreshNetworks(ctx, symbols)
+	}
+
 	// 收集所有 (symbol, buyEx, sellEx) 用于探测：CEX-CEX + CEX-DEX
 	pathSet := make(map[pathKey]model.PathItem)
 	for symbol, paths := range agg {
@@ -170,16 +176,29 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 // runDetectCexDexDexOnly 仅 CEX-DEX/DEX-DEX 时的探测与组装
 func (r *Runner) runDetectCexDexDexOnly(ctx context.Context, cexDex, dexDex []model.OverviewRow) (*model.OverviewResponse, error) {
 	pathSet := make(map[pathKey]model.OverviewRow)
+	var symbols []string
+	seen := make(map[string]bool)
 	for _, row := range cexDex {
 		k := pathKey{row.Symbol, row.BuyExchange, row.SellExchange}
 		pathSet[k] = row
+		if row.Symbol != "" && !seen[row.Symbol] {
+			seen[row.Symbol] = true
+			symbols = append(symbols, row.Symbol)
+		}
 	}
 	for _, row := range dexDex {
 		k := pathKey{row.Symbol, row.BuyExchange, row.SellExchange}
 		pathSet[k] = row
+		if row.Symbol != "" && !seen[row.Symbol] {
+			seen[row.Symbol] = true
+			symbols = append(symbols, row.Symbol)
+		}
 	}
 	if len(pathSet) == 0 {
 		return &model.OverviewResponse{Overview: opportunities.MergeAndSort(nil, cexDex, dexDex)}, nil
+	}
+	if refresher, ok := r.det.(detector.RegistryRefresher); ok {
+		refresher.RefreshNetworks(ctx, symbols)
 	}
 
 	type result struct {
@@ -224,6 +243,21 @@ func (r *Runner) runDetectCexDexDexOnly(ctx context.Context, cexDex, dexDex []mo
 	return &model.OverviewResponse{
 		Overview: opportunities.MergeAndSort(nil, cexDexWithPaths, dexDexWithPaths),
 	}, nil
+}
+
+// extractSymbolsFromItems 从价差数据提取去重 symbol
+func extractSymbolsFromItems(items []model.SpreadItem) []string {
+	seen := make(map[string]bool)
+	for _, it := range items {
+		if it.Symbol != "" {
+			seen[it.Symbol] = true
+		}
+	}
+	var out []string
+	for s := range seen {
+		out = append(out, s)
+	}
+	return out
 }
 
 // attachPathsToRows 为 CEX-DEX/DEX-DEX 行附加探测路径

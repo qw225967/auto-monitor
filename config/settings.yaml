@@ -32,3 +32,7 @@ chain_price:
 #   app_key: ""
 #   secret_key: ""
 #   passphrase: ""
+
+# 交易所 API 密钥：复制 config/exchange_keys.json.example 为 exchange_keys.json 并填写
+# 格式: { "BitGet": { "APIKey": "", "Secret": "", "Passphrase": "" }, "Bybit": {...}, "Gate": {...}, ... }
+# 环境变量 EXCHANGE_KEYS_PATH 可指定路径

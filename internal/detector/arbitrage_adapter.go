@@ -13,6 +13,7 @@ import (
 
 // ArbitrageAdapter 适配 auto-arbitrage 的 pipeline 路由探测
 var _ Detector = (*ArbitrageAdapter)(nil)
+var _ RegistryRefresher = (*ArbitrageAdapter)(nil)
 
 type ArbitrageAdapter struct {
 	bridgeMgr *bridge.Manager
@@ -20,9 +21,17 @@ type ArbitrageAdapter struct {
 	builder   *PipelineBuilder
 }
 
+// RefreshNetworks 实现 RegistryRefresher，用价差 symbol 刷新充提网络（每 30s 探测前调用）
+func (a *ArbitrageAdapter) RefreshNetworks(ctx context.Context, symbols []string) {
+	if apiReg, ok := a.reg.(*registry.APINetworkRegistry); ok {
+		apiReg.Refresh(ctx, symbols)
+	}
+}
+
 // NewArbitrageAdapter 创建适配器，bridgeMgr 可为 nil（跨链段将标记为不可用）
+// 使用 APINetworkRegistry 从交易所公开 API 实时获取充提网络，不再依赖静态配置
 func NewArbitrageAdapter(bridgeMgr *bridge.Manager) *ArbitrageAdapter {
-	reg := registry.NewStaticRegistry()
+	reg := registry.NewAPINetworkRegistry()
 	return &ArbitrageAdapter{
 		bridgeMgr: bridgeMgr,
 		reg:       reg,

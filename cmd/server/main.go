@@ -28,7 +28,7 @@ import (
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -43,6 +43,13 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("load config: %v", err)
+	}
+
+	// 交易所 API 密钥（config/exchange_keys.json，用于充提网络查询等）
+	if keys := config.TryLoadExchangeKeys(); keys != nil {
+		log.Println("[Config] 已加载交易所密钥: Bitget/Bybit/Gate 等")
+	} else {
+		log.Println("[Config] 未找到 exchange_keys.json，充提网络将使用公开 API（Binance/OKX 需密钥）")
 	}
 
 	// OKEx Key：用于 DEX Quote / 链上价格
@@ -78,6 +85,7 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery(), corsMiddleware())
 	router.GET("/api/overview", handler.GetOverview)
+	router.POST("/api/config/exchange-keys", handler.PostExchangeKeys)
 
 	// 缓存：最新价差数据
 	var cachedItems []model.SpreadItem

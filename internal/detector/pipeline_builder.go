@@ -1,6 +1,7 @@
 package detector
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/qw225967/auto-monitor/internal/detector/registry"
@@ -59,6 +60,9 @@ func (b *PipelineBuilder) BuildPaths(asset, buyExchange, sellExchange string) ([
 
 	adj := b.buildAdjacency(buy, sell, buyChains, sellChains)
 	paths := findAllRoutes(buy, sell, adj, maxRouteHops)
+
+	// 优先展示直连/短路径（如 Bitget 直提 ETH），避免绕道 BSC 的路径排前面
+	sort.Slice(paths, func(i, j int) bool { return len(paths[i]) < len(paths[j]) })
 
 	return paths, nil
 }

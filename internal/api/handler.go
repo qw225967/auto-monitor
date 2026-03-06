@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/qw225967/auto-monitor/internal/config"
 	"github.com/qw225967/auto-monitor/internal/model"
 )
 
@@ -62,4 +63,24 @@ func (h *Handler) GetOverview(c *gin.Context) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	c.JSON(http.StatusOK, h.overview)
+}
+
+// PostExchangeKeys 接收交易所密钥 JSON（仅存内存，不落盘，避免泄露）
+func (h *Handler) PostExchangeKeys(c *gin.Context) {
+	var body struct {
+		Keys string `json:"keys"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 JSON"})
+		return
+	}
+	if body.Keys == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "keys 不能为空"})
+		return
+	}
+	if err := config.SetExchangeKeysFromJSON(body.Keys); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "JSON 格式错误: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "已保存，仅存内存"})
 }

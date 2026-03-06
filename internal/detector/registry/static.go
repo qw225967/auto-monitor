@@ -66,11 +66,16 @@ var staticExchangeNetworks = map[string]map[string][]string{
 }
 
 // StaticRegistry 静态配置的交易所充提网络注册表（无 API 调用）
-type StaticRegistry struct{}
+// 优先从 config/networks.yaml 加载，支持按资产精确配置（如某币在 Bitget 不支持 BSC）
+type StaticRegistry struct {
+	fileConfig map[string]map[string][]string // 从 YAML 加载的配置，可覆盖 static
+}
 
-// NewStaticRegistry 创建静态注册表
+// NewStaticRegistry 创建静态注册表，会尝试从 config/networks.yaml 加载
 func NewStaticRegistry() *StaticRegistry {
-	return &StaticRegistry{}
+	path := findConfigPath()
+	fileConfig := loadNetworksFromFile(path)
+	return &StaticRegistry{fileConfig: fileConfig}
 }
 
 // GetWithdrawNetworks 获取交易所在某资产上支持的提现网络
@@ -93,6 +98,15 @@ func (s *StaticRegistry) getNetworks(exchangeType, asset string) ([]model.Withdr
 		assetUpper = "USDT"
 	}
 
+	// 优先使用 YAML 配置（支持按资产精确配置，如某币不支持 BSC）
+	if s.fileConfig != nil {
+		if assets, ok := s.fileConfig[ex]; ok {
+			if chainIDs, ok := assets[assetUpper]; ok && len(chainIDs) > 0 {
+				return s.chainIDsToNetworks(chainIDs), nil
+			}
+		}
+	}
+
 	assets, ok := staticExchangeNetworks[ex]
 	if !ok {
 		return nil, nil
@@ -106,6 +120,11 @@ func (s *StaticRegistry) getNetworks(exchangeType, asset string) ([]model.Withdr
 		return nil, nil
 	}
 
+	return s.chainIDsToNetworks(chainIDs), nil
+}
+
+func (s *StaticRegistry) chainIDsToNetworks(chainIDs []string) []model.WithdrawNetworkInfo {
+
 	out := make([]model.WithdrawNetworkInfo, 0, len(chainIDs))
 	for _, cid := range chainIDs {
 		if cid == "" {
@@ -118,7 +137,7 @@ func (s *StaticRegistry) getNetworks(exchangeType, asset string) ([]model.Withdr
 			IsDefault:      cid == ChainBSC || cid == ChainETH,
 		})
 	}
-	return out, nil
+	return out
 }
 
 func chainIDToNetworkName(chainID string) string {
