@@ -23,17 +23,15 @@ type ArbitrageAdapter struct {
 
 // RefreshNetworks 实现 RegistryRefresher，用价差 symbol 刷新充提网络（每 30s 探测前调用）
 func (a *ArbitrageAdapter) RefreshNetworks(ctx context.Context, symbols []string) {
-	if cr, ok := a.reg.(*registry.CompositeRegistry); ok {
-		cr.Refresh(ctx, symbols)
-	} else if apiReg, ok := a.reg.(*registry.APINetworkRegistry); ok {
+	if apiReg, ok := a.reg.(*registry.APINetworkRegistry); ok {
 		apiReg.Refresh(ctx, symbols)
 	}
 }
 
 // NewArbitrageAdapter 创建适配器，bridgeMgr 可为 nil（跨链段将标记为不可用）
-// 使用 CompositeRegistry：API 优先，无数据时用 USDT 链兜底
+// 使用 APINetworkRegistry 从交易所公开 API 实时获取充提网络
 func NewArbitrageAdapter(bridgeMgr *bridge.Manager) *ArbitrageAdapter {
-	reg := registry.NewCompositeRegistry()
+	reg := registry.NewAPINetworkRegistry()
 	return &ArbitrageAdapter{
 		bridgeMgr: bridgeMgr,
 		reg:       reg,

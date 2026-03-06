@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,12 @@ import (
 	"github.com/qw225967/auto-monitor/constants"
 	"github.com/qw225967/auto-monitor/internal/model"
 	"github.com/qw225967/auto-monitor/internal/tokenregistry"
+)
+
+const (
+	doGetMaxRetries      = 3
+	doGetRetryBackoff    = 500 * time.Millisecond
+	delayBetweenRequests = 250 * time.Millisecond // 交易所间请求间隔，铺满探测周期
 )
 
 // APINetworkRegistry 从交易所公开 API 实时获取充提网络，按价差 symbol 刷新（跟随 30s 探测周期）
@@ -28,7 +35,7 @@ func NewAPINetworkRegistry() *APINetworkRegistry {
 	return &APINetworkRegistry{
 		withdraw: make(map[string][]model.WithdrawNetworkInfo),
 		deposit:  make(map[string][]model.WithdrawNetworkInfo),
-		client:   &http.Client{Timeout: 15 * time.Second},
+		client:   &http.Client{Timeout: 20 * time.Second},
 	}
 }
 
@@ -37,74 +44,109 @@ func (a *APINetworkRegistry) cacheKey(exchange, asset string) string {
 }
 
 // Refresh 用价差中的 symbols 刷新充提网络（每 30s 探测前调用）
+// 5 所交易所全部请求，每个交易所内请求之间加间隔，铺满探测周期
 func (a *APINetworkRegistry) Refresh(ctx context.Context, symbols []string) {
 	assets := tokenregistry.ExtractAssetsFromSymbols(symbols)
 	if len(assets) == 0 {
 		return
 	}
-	exchanges := []string{"binance", "bybit", "bitget", "gate", "okex"}
-	type pair struct{ ex, asset string }
-	var pairs []pair
-	for _, ex := range exchanges {
-		for _, asset := range assets {
-			pairs = append(pairs, pair{ex, asset})
-		}
-	}
 
 	wd := make(map[string][]model.WithdrawNetworkInfo)
 	dep := make(map[string][]model.WithdrawNetworkInfo)
-	var buildMu sync.Mutex
+	var mergeMu sync.Mutex
+
+	// 5 所交易所并行，每所内串行 + 请求间隔
+	exchanges := []string{"bitget", "bybit", "gate", "binance", "okex"}
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, 5)
-	for _, p := range pairs {
-		select {
-		case <-ctx.Done():
-			goto done
-		default:
-		}
-		p := p
+	for _, ex := range exchanges {
+		ex := ex
 		wg.Add(1)
-		sem <- struct{}{}
 		go func() {
 			defer wg.Done()
-			defer func() { <-sem }()
-			w, d := a.fetchNetworks(ctx, p.ex, p.asset)
-			if len(w) > 0 || len(d) > 0 {
-				k := a.cacheKey(p.ex, p.asset)
-				buildMu.Lock()
-				if len(w) > 0 {
-					wd[k] = w
-				}
-				if len(d) > 0 {
-					dep[k] = d
-				}
-				buildMu.Unlock()
-			}
+			a.refreshOneExchange(ctx, ex, assets, &mergeMu, wd, dep)
 		}()
 	}
 	wg.Wait()
-done:
+
 	a.mu.Lock()
 	a.withdraw = wd
 	a.deposit = dep
 	a.mu.Unlock()
 }
 
-func (a *APINetworkRegistry) fetchNetworks(ctx context.Context, exchange, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
-	asset = strings.ToUpper(strings.TrimSpace(asset))
+// refreshOneExchange 单所串行请求，每次请求后等待，铺满间隔
+func (a *APINetworkRegistry) refreshOneExchange(ctx context.Context, exchange string, assets []string, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo) {
+	for i, asset := range assets {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		asset = strings.ToUpper(strings.TrimSpace(asset))
+		w, d := a.fetchNetworksWithRetry(ctx, exchange, asset)
+		if len(w) > 0 || len(d) > 0 {
+			mergeMu.Lock()
+			k := a.cacheKey(exchange, asset)
+			if len(w) > 0 {
+				wd[k] = w
+			}
+			if len(d) > 0 {
+				dep[k] = d
+			}
+			mergeMu.Unlock()
+		}
+		// 请求间隔，最后一次不等待
+		if i < len(assets)-1 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(delayBetweenRequests):
+			}
+		}
+	}
+}
+
+func (a *APINetworkRegistry) fetchNetworksWithRetry(ctx context.Context, exchange, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
 	switch exchange {
 	case "bitget":
-		return a.fetchBitget(ctx, asset)
+		return a.fetchBitgetWithRetry(ctx, asset)
 	case "bybit":
-		return a.fetchBybit(ctx, asset)
+		return a.fetchBybitWithRetry(ctx, asset)
 	case "gate":
-		return a.fetchGate(ctx, asset)
+		return a.fetchGateWithRetry(ctx, asset)
 	case "binance":
 		return a.fetchBinance(ctx, asset)
 	case "okex", "okx":
 		return a.fetchOkex(ctx, asset)
 	}
 	return nil, nil
+}
+
+// doGetWithRetry 带重试的 GET，对 429、超时进行退避重试
+func (a *APINetworkRegistry) doGetWithRetry(ctx context.Context, url string) ([]byte, error) {
+	var lastErr error
+	for i := 0; i < doGetMaxRetries; i++ {
+		body, err := a.doGet(ctx, url)
+		if err == nil {
+			return body, nil
+		}
+		lastErr = err
+		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, lastErr
+		}
+		// 429 或超时则重试
+		if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "timeout") ||
+			strings.Contains(err.Error(), "deadline") {
+			select {
+			case <-ctx.Done():
+				return nil, lastErr
+			case <-time.After(doGetRetryBackoff * time.Duration(i+1)):
+				continue
+			}
+		}
+		return nil, lastErr
+	}
+	return nil, lastErr
 }
 
 func (a *APINetworkRegistry) doGet(ctx context.Context, url string) ([]byte, error) {
@@ -123,10 +165,10 @@ func (a *APINetworkRegistry) doGet(ctx context.Context, url string) ([]byte, err
 	return io.ReadAll(resp.Body)
 }
 
-// fetchBitget GET /api/v2/spot/public/coins?coin=USDT 公开接口
-func (a *APINetworkRegistry) fetchBitget(ctx context.Context, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
+// fetchBitgetWithRetry GET /api/v2/spot/public/coins?coin=X 公开接口，带重试
+func (a *APINetworkRegistry) fetchBitgetWithRetry(ctx context.Context, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
 	url := fmt.Sprintf("%s/api/v2/spot/public/coins?coin=%s", constants.BitgetRestBaseUrl, asset)
-	body, err := a.doGet(ctx, url)
+	body, err := a.doGetWithRetry(ctx, url)
 	if err != nil {
 		return nil, nil
 	}
@@ -171,10 +213,10 @@ func (a *APINetworkRegistry) fetchBitget(ctx context.Context, asset string) (wit
 	return withdraw, deposit
 }
 
-// fetchBybit GET /v5/asset/coin/query-info?coin=USDT 公开接口
-func (a *APINetworkRegistry) fetchBybit(ctx context.Context, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
+// fetchBybitWithRetry GET /v5/asset/coin/query-info?coin=USDT 公开接口，带重试
+func (a *APINetworkRegistry) fetchBybitWithRetry(ctx context.Context, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
 	url := fmt.Sprintf("%s/v5/asset/coin/query-info?coin=%s", constants.BybitRestBaseUrl, asset)
-	body, err := a.doGet(ctx, url)
+	body, err := a.doGetWithRetry(ctx, url)
 	if err != nil {
 		return nil, nil
 	}
@@ -232,10 +274,10 @@ func (a *APINetworkRegistry) fetchBybit(ctx context.Context, asset string) (with
 	return withdraw, deposit
 }
 
-// fetchGate GET /api/v4/wallet/currency_chains?currency=USDT 公开接口
-func (a *APINetworkRegistry) fetchGate(ctx context.Context, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
+// fetchGateWithRetry GET /api/v4/wallet/currency_chains?currency=USDT 公开接口，带重试
+func (a *APINetworkRegistry) fetchGateWithRetry(ctx context.Context, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
 	url := fmt.Sprintf("%s/wallet/currency_chains?currency=%s", constants.GateRestBaseUrl, asset)
-	body, err := a.doGet(ctx, url)
+	body, err := a.doGetWithRetry(ctx, url)
 	if err != nil {
 		return nil, nil
 	}
