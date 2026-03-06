@@ -159,7 +159,7 @@ func main() {
 		log.Println("[Config] TokenSync 跳过（MockMode）")
 	}
 
-	// 流动性：从 registry 加载初始值，并定时从 CoinGecko onchain 全表同步（需 API Key）
+	// 流动性：从 registry 加载初始值，启动时立即同步一次，并定时全表同步（需 API Key）
 	if cfg.TokenRegistry.CoinGeckoAPIKey != "" {
 		store := tokenregistry.NewStorage(cfg.TokenRegistry.Path)
 		if rd, err := store.Load(); err == nil {
@@ -167,6 +167,22 @@ func main() {
 			log.Println("[Config] 已从 registry 加载流动性缓存")
 		}
 		go func() {
+			// 启动时立即执行一次流动性同步
+			log.Println("[LiquiditySync] 启动中...")
+			ctx0, cancel0 := context.WithTimeout(context.Background(), 2*time.Hour)
+			liquidity, err := tokenregistry.RunLiquiditySync(ctx0, tokenregistry.LiquiditySyncConfig{
+				RegistryPath:    cfg.TokenRegistry.Path,
+				CoinGeckoAPIKey: cfg.TokenRegistry.CoinGeckoAPIKey,
+				CoinGeckoPro:    cfg.TokenRegistry.CoinGeckoPro,
+				DelayPerRequest: 1 * time.Second,
+			})
+			cancel0()
+			if err == nil {
+				handler.UpdateLiquidity(liquidity)
+				log.Printf("[LiquiditySync] 启动同步完成，%d 条流动性", len(liquidity))
+			} else {
+				log.Printf("[LiquiditySync] 启动同步失败: %v", err)
+			}
 			ticker := time.NewTicker(cfg.LiquiditySyncInterval())
 			defer ticker.Stop()
 			for range ticker.C {

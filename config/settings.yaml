@@ -7,7 +7,7 @@ server:
 seeingstone:
   api_url: https://seeingstone.cloud
   api_token: ""
-  request_timeout: 30  # 数据量大时需更长超时，可设 REQUEST_TIMEOUT 环境变量
+  request_timeout: 60  # 数据量大(3万+)时需 60s，可设 REQUEST_TIMEOUT 环境变量
 
 threshold:
   spread: 0.5

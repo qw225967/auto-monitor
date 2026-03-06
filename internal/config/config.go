@@ -95,7 +95,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("threshold.spread", 0.5)
 	viper.SetDefault("intervals.fetch", 3)
 	viper.SetDefault("intervals.detect", 30)
-	viper.SetDefault("seeingstone.request_timeout", 30)
+	viper.SetDefault("seeingstone.request_timeout", 60)
 	viper.SetDefault("server.port", 8080)
 	viper.SetDefault("mock_mode", false)
 	viper.SetDefault("token_registry.path", "data/token_registry.json")
@@ -145,7 +145,7 @@ func Load() (*Config, error) {
 		cfg.Server.Port = 8080
 	}
 	if cfg.SeeingStone.RequestTimeout == 0 {
-		cfg.SeeingStone.RequestTimeout = 30
+		cfg.SeeingStone.RequestTimeout = 60
 	}
 	if cfg.Intervals.Fetch == 0 {
 		cfg.Intervals.Fetch = 3
