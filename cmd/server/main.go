@@ -17,6 +17,7 @@ import (
 	"github.com/qw225967/auto-monitor/internal/config"
 	"github.com/qw225967/auto-monitor/internal/detector"
 	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/constants"
 	"github.com/qw225967/auto-monitor/internal/onchain"
 	"github.com/qw225967/auto-monitor/internal/price"
 	"github.com/qw225967/auto-monitor/internal/runner"
@@ -169,7 +170,7 @@ func main() {
 					var pairs []price.AssetChainPair
 					for _, asset := range fetcher.GetAllAssets() {
 						for _, chainID := range fetcher.GetAllTokenChains(asset) {
-							if usdtChains[chainID] {
+							if usdtChains[chainID] && constants.OKXChainSupported(chainID) {
 								pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
 							}
 						}
@@ -190,7 +191,7 @@ func main() {
 						pairs = pairs[:0]
 						for _, asset := range fetcher.GetAllAssets() {
 							for _, chainID := range fetcher.GetAllTokenChains(asset) {
-								if usdtChains[chainID] {
+								if usdtChains[chainID] && constants.OKXChainSupported(chainID) {
 									pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
 								}
 							}

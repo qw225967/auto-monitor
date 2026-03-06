@@ -149,6 +149,24 @@ var ChainIDToChainIndex = map[string]string{
 	"5000":  "5000",  // Mantle
 	"59144": "59144", // Linea
 	"534352": "534352", // Scroll
+	"195":   "195",   // Tron
+	"1101":  "1101",  // Polygon zkEVM
+	"66":    "66",    // OKT Chain
+	"250":   "250",   // Fantom
+}
+
+// OkxSupportedChainIndex OKX DEX 聚合器支持的 chainIndex，不在此列表的链会报 51000
+var OkxSupportedChainIndex = map[string]bool{
+	"1": true, "10": true, "56": true, "137": true, "195": true,
+	"324": true, "250": true, "42161": true, "43114": true,
+	"5000": true, "8453": true, "59144": true, "534352": true,
+	"66": true, "1101": true, "169": true, "1088": true,
+}
+
+// OKXChainSupported 检查 chainID 是否被 OKX DEX 支持
+func OKXChainSupported(chainID string) bool {
+	idx := GetChainIndex(chainID)
+	return OkxSupportedChainIndex[idx]
 }
 
 // GetChainIndex 获取 OKEx DEX chainIndex，无映射时返回 chainID 本身
