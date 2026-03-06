@@ -56,12 +56,11 @@ func (rs *RestClient) DoGet(connectType, url, params, appKey, sign, passphrase, 
 		return "", err
 	}
 	rs.Headers(request, connectType, appKey, timestamp, sign, passphrase)
+	// OK-ACCESS-PROJECT 可选，web3 DEX API 部分接口需要
 	if connectType == constants.ConnectTypeOKEX {
-		projectID := "请添加"
 		if g := config.GetGlobalConfig(); g != nil && g.MyProjectId != "" {
-			projectID = g.MyProjectId
+			request.Header.Add(constants.OkexDexProject, g.MyProjectId)
 		}
-		request.Header.Add(constants.OkexDexProject, projectID)
 	}
 	response, err := rs.httpClient.Do(request)
 
@@ -90,10 +89,11 @@ func (rs *RestClient) Headers(request *http.Request, connectType, apikey string,
 	case constants.ConnectTypeOKEX:
 		{
 			request.Header.Add(constants.OkexDexContentType, constants.OkexDexApplicationJson)
-			request.Header.Add(constants.OkexDexBgAccessKey, apikey)
-			request.Header.Add(constants.OkexDexBgAccessSign, sign)
-			request.Header.Add(constants.OkexDexBgAccessTimestamp, timestamp)
-			request.Header.Add(constants.OkexDexBgAccessPassphrase, passphrase)
+			// web3.okx.com DEX API 使用 OK-ACCESS-* 标准 header
+			request.Header.Add(constants.OkexAccessKey, apikey)
+			request.Header.Add(constants.OkexAccessSign, sign)
+			request.Header.Add(constants.OkexAccessTimestamp, timestamp)
+			request.Header.Add(constants.OkexAccessPassphrase, passphrase)
 			break
 		}
 	}

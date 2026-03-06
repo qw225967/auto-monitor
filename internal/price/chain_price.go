@@ -3,6 +3,7 @@ package price
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -13,6 +14,17 @@ import (
 	"github.com/qw225967/auto-monitor/internal/onchain"
 	"github.com/qw225967/auto-monitor/internal/tokenregistry"
 )
+
+func ensure0x(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return addr
+	}
+	if !strings.HasPrefix(strings.ToLower(addr), "0x") {
+		return "0x" + addr
+	}
+	return addr
+}
 
 // ChainPriceFetcher 链上 DEX 价格获取
 type ChainPriceFetcher struct {
@@ -102,11 +114,13 @@ func (f *ChainPriceFetcher) queryDexPriceUncached(asset, chainID string) (float6
 	}
 
 	chainIndex := constants.GetChainIndex(chainID)
+	fromAddr := ensure0x(tokenInfo.Address)
+	toAddr := ensure0x(usdtInfo.Address)
 	// 1 单位 token 换 USDT：fromToken=目标token, toToken=USDT, amount=1
 	amount := "1"
 	resp, err := f.client.QueryDexQuotePrice(
-		tokenInfo.Address,
-		usdtInfo.Address,
+		fromAddr,
+		toAddr,
 		chainIndex,
 		amount,
 		strconv.Itoa(tokenInfo.Decimals),
@@ -161,6 +175,7 @@ func (f *ChainPriceFetcher) BatchQueryDexPrices(pairs []AssetChainPair, concurre
 		price float64
 	}
 	results := make(chan result, len(pairs))
+	errChan := make(chan error, len(pairs))
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 	for _, p := range pairs {
@@ -173,17 +188,28 @@ func (f *ChainPriceFetcher) BatchQueryDexPrices(pairs []AssetChainPair, concurre
 			price, err := f.QueryDexPrice(p.Asset, p.ChainID)
 			if err == nil {
 				results <- result{key: p.Asset + ":" + p.ChainID, price: price}
+			} else {
+				select {
+				case errChan <- err:
+				default:
+				}
 			}
 		}()
 	}
 	go func() {
 		wg.Wait()
 		close(results)
+		close(errChan)
 	}()
 
 	out := make(map[string]float64)
 	for r := range results {
 		out[r.key] = r.price
+	}
+	if len(out) == 0 && len(pairs) > 0 {
+		if e := <-errChan; e != nil {
+			log.Printf("[ChainPrice] 全部失败，示例错误: %v", e)
+		}
 	}
 	return out
 }

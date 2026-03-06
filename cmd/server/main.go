@@ -174,7 +174,9 @@ func main() {
 					if len(pairs) > 0 {
 						prices := fetcher.BatchQueryDexPrices(pairs, cfg.ChainPrice.Concurrency)
 						handler.UpdateChainPrices(prices)
-						log.Printf("[ChainPrice] 启动同步: 更新 %d 条", len(prices))
+						log.Printf("[ChainPrice] 启动同步: %d 对中成功 %d 条", len(pairs), len(prices))
+					} else {
+						log.Printf("[ChainPrice] 无可用 (asset,chain) 对，请先运行 tokensync 补全 token 信息")
 					}
 
 					ticker := time.NewTicker(cfg.ChainPriceInterval())
@@ -190,7 +192,7 @@ func main() {
 						if len(pairs) > 0 {
 							prices := fetcher.BatchQueryDexPrices(pairs, cfg.ChainPrice.Concurrency)
 							handler.UpdateChainPrices(prices)
-							log.Printf("[ChainPrice] 更新 %d 条", len(prices))
+							log.Printf("[ChainPrice] %d 对中成功 %d 条", len(pairs), len(prices))
 						}
 					}
 				}()

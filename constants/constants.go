@@ -92,6 +92,11 @@ const (
 	OkexDexContentType             = "Content-Type"
 	OkexDexApplicationJson         = "application/json"
 	OkexDexProject                 = "x-okex-dex-project"
+	// web3.okx.com DEX API 使用 OK-ACCESS-* 标准 header
+	OkexAccessKey       = "OK-ACCESS-KEY"
+	OkexAccessSign      = "OK-ACCESS-SIGN"
+	OkexAccessTimestamp = "OK-ACCESS-TIMESTAMP"
+	OkexAccessPassphrase = "OK-ACCESS-PASSPHRASE"
 )
 
 // Hyperliquid
