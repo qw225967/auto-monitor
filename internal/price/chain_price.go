@@ -15,6 +15,48 @@ import (
 	"github.com/qw225967/auto-monitor/internal/tokenregistry"
 )
 
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
+}
+
+// extractToTokenAmountFromRaw 从原始 JSON 中尝试多种路径提取 toTokenAmount
+func extractToTokenAmountFromRaw(resp string) string {
+	var raw map[string]interface{}
+	if err := json.Unmarshal([]byte(resp), &raw); err != nil {
+		return ""
+	}
+	data, ok := raw["data"].([]interface{})
+	if !ok || len(data) == 0 {
+		return ""
+	}
+	first, ok := data[0].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	rr, ok := first["routerResult"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	for _, key := range []string{"toTokenAmount", "toTokenAmountOut", "ToTokenAmount"} {
+		if v, ok := rr[key]; ok && v != nil {
+			switch val := v.(type) {
+			case string:
+				if val != "" {
+					return val
+				}
+			case float64:
+				return strconv.FormatFloat(val, 'f', -1, 64)
+			case json.Number:
+				return val.String()
+			}
+		}
+	}
+	return ""
+}
+
 func ensure0x(addr string) string {
 	addr = strings.TrimSpace(addr)
 	if addr == "" {
@@ -131,7 +173,8 @@ func (f *ChainPriceFetcher) queryDexPriceUncached(asset, chainID string) (float6
 		Msg  string `json:"msg"`
 		Data []struct {
 			RouterResult struct {
-				ToTokenAmount string `json:"toTokenAmount"`
+				ToTokenAmount    string `json:"toTokenAmount"`
+				ToTokenAmountOut string `json:"toTokenAmountOut"`
 			} `json:"routerResult"`
 		} `json:"data"`
 	}
@@ -146,6 +189,13 @@ func (f *ChainPriceFetcher) queryDexPriceUncached(asset, chainID string) (float6
 	}
 	toAmountStr := apiResp.Data[0].RouterResult.ToTokenAmount
 	if toAmountStr == "" {
+		toAmountStr = apiResp.Data[0].RouterResult.ToTokenAmountOut
+	}
+	if toAmountStr == "" {
+		toAmountStr = extractToTokenAmountFromRaw(resp)
+	}
+	if toAmountStr == "" {
+		log.Printf("[ChainPrice] empty toTokenAmount, resp sample: %s", truncate(resp, 500))
 		return 0, fmt.Errorf("empty toTokenAmount")
 	}
 	toAmount, err := strconv.ParseFloat(toAmountStr, 64)
