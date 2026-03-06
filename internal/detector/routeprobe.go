@@ -5,14 +5,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/qw225967/auto-monitor/internal/detector/registry"
 	"github.com/qw225967/auto-monitor/internal/model"
 	"github.com/qw225967/auto-monitor/internal/onchain/bridge"
 )
 
 const maxRouteProbeHops = 4
 
-// routeProbe 执行提币路由探测（从 pipeline 迁移的精简版）
-func routeProbe(req *model.RouteProbeRequest, bridgeManager *bridge.Manager) (*model.RouteProbeResult, error) {
+// routeProbe 执行提币路由探测：依次根据节点和边校验每条路径是否可达
+// reg 用于校验提现/充值段（交易所是否支持该链）
+func routeProbe(req *model.RouteProbeRequest, bridgeManager *bridge.Manager, reg registry.NetworkRegistry) (*model.RouteProbeResult, error) {
 	path := req.Path
 	if len(path) == 0 && req.Source != "" && req.Destination != "" {
 		path = []string{req.Source, req.Destination}
@@ -74,12 +76,22 @@ func routeProbe(req *model.RouteProbeRequest, bridgeManager *bridge.Manager) (*m
 		} else {
 			if fromChain == "" && toChain == "" {
 				seg.Type = model.SegmentTypeExchangeToExchange
+				seg.EstimatedTimeSec = 60
 			} else if fromChain == "" && toChain != "" {
 				seg.Type = model.SegmentTypeWithdraw
+				seg.EstimatedTimeSec = 60
+				// 校验：源交易所（fromID）是否支持向该链提现
+				if reg != nil && !canWithdrawToChain(reg, fromID, symbol, toChain) {
+					seg.Available = false
+				}
 			} else {
 				seg.Type = model.SegmentTypeDeposit
+				seg.EstimatedTimeSec = 60
+				// 校验：目标交易所（toID）是否支持从该链充值
+				if reg != nil && !canDepositFromChain(reg, toID, symbol, fromChain) {
+					seg.Available = false
+				}
 			}
-			seg.EstimatedTimeSec = 60
 		}
 		segments = append(segments, seg)
 	}
@@ -155,4 +167,34 @@ func mergeExchangeChainExchange(path []string, segments []model.SegmentProbeResu
 		}
 	}
 	return outPath, outSegs
+}
+
+// canWithdrawToChain 校验交易所是否支持向指定链提现
+func canWithdrawToChain(reg registry.NetworkRegistry, exchangeType, asset, chainID string) bool {
+	nets, err := reg.GetWithdrawNetworks(exchangeType, asset)
+	if err != nil || len(nets) == 0 {
+		return false
+	}
+	chainID = strings.TrimSpace(chainID)
+	for _, n := range nets {
+		if strings.TrimSpace(n.ChainID) == chainID && n.WithdrawEnable {
+			return true
+		}
+	}
+	return false
+}
+
+// canDepositFromChain 校验交易所是否支持从指定链充值（列表已过滤为可充币网络）
+func canDepositFromChain(reg registry.NetworkRegistry, exchangeType, asset, chainID string) bool {
+	nets, err := reg.GetDepositNetworks(exchangeType, asset)
+	if err != nil || len(nets) == 0 {
+		return false
+	}
+	chainID = strings.TrimSpace(chainID)
+	for _, n := range nets {
+		if strings.TrimSpace(n.ChainID) == chainID {
+			return true
+		}
+	}
+	return false
 }

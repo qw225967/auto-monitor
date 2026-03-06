@@ -72,6 +72,7 @@ func (a *ArbitrageAdapter) DetectRoutes(ctx context.Context, symbol, buyExchange
 		}
 	}
 
+	// 3. 依次对每条路径做可达性探测，4. 只输出可达路线
 	var result []model.PhysicalPath
 	for i, path := range paths {
 		req := &model.RouteProbeRequest{
@@ -79,30 +80,19 @@ func (a *ArbitrageAdapter) DetectRoutes(ctx context.Context, symbol, buyExchange
 			Path:        path,
 			ProbeAmount: "100",
 		}
-		probeResult, err := routeProbe(req, a.bridgeMgr)
+		probeResult, err := routeProbe(req, a.bridgeMgr, a.reg)
 		if err != nil {
 			continue
 		}
 		phys := a.convertToPhysicalPath(probeResult, i+1)
-		if len(phys.Hops) > 0 {
+		// 只输出可达路线：所有段 Available 才加入
+		if len(phys.Hops) > 0 && phys.OverallStatus == "ok" {
 			result = append(result, phys)
 		}
 	}
 
 	if len(result) == 0 {
-		// 回退：至少返回一条直连路径（基于探针的默认估算）
-		req := &model.RouteProbeRequest{
-			Symbol:      asset,
-			Path:        []string{buy, sell},
-			ProbeAmount: "100",
-		}
-		probeResult, _ := routeProbe(req, a.bridgeMgr)
-		if probeResult != nil {
-			result = append(result, a.convertToPhysicalPath(probeResult, 1))
-		}
-	}
-
-	if len(result) == 0 {
+		// 无可达路径时回退 Mock，供前端展示占位
 		return NewMock().DetectRoutes(ctx, symbol, buyExchange, sellExchange)
 	}
 	return result, nil

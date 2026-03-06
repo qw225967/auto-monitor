@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import type { OverviewRow } from '../types'
+import { OppTypeLabels } from '../types'
 import { DetailTable } from './DetailTable'
 
 interface Props {
@@ -40,6 +41,7 @@ export function OverviewTable({ rows }: Props) {
       <table className="overview-table">
         <thead>
           <tr>
+            <th>类型</th>
             <th>币种</th>
             <th>路径 (买入 → 卖出)</th>
             <th>原始价差</th>
@@ -48,28 +50,33 @@ export function OverviewTable({ rows }: Props) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <React.Fragment key={row.symbol}>
+          {rows.map((row, idx) => (
+            <React.Fragment key={`${row.symbol}-${row.path_display}-${idx}`}>
               <tr>
+                <td>{OppTypeLabels[row.type ?? 'cex_cex'] ?? row.type}</td>
                 <td>{row.symbol}</td>
                 <td>{row.path_display}</td>
                 <td>{row.spread_percent.toFixed(2)}%</td>
-                <td>{row.available_path_count}条</td>
+                <td>{(row.available_path_count ?? 0)}条</td>
                 <td>
-                  <button
-                    type="button"
-                    className="btn-detail"
-                    onClick={() => toggleExpand(row.symbol)}
-                  >
-                    {expandedSymbol === row.symbol ? '收起详情' : '查看详情'}
-                  </button>
+                  {(row.detail_paths?.length ?? 0) > 0 ? (
+                    <button
+                      type="button"
+                      className="btn-detail"
+                      onClick={() => toggleExpand(`${row.symbol}-${row.path_display}`)}
+                    >
+                      {expandedSymbol === `${row.symbol}-${row.path_display}` ? '收起详情' : '查看详情'}
+                    </button>
+                  ) : (
+                    <span className="no-detail">-</span>
+                  )}
                 </td>
               </tr>
-              {expandedSymbol === row.symbol && (
+              {expandedSymbol === `${row.symbol}-${row.path_display}` && (
                 <tr>
-                  <td colSpan={5} className="detail-cell">
+                  <td colSpan={6} className="detail-cell">
                     <DetailTable
-                      paths={row.detail_paths}
+                      paths={row.detail_paths ?? []}
                       renderStatus={(s) => <StatusBadge status={s} />}
                     />
                   </td>

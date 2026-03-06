@@ -5,13 +5,20 @@ export interface DetailPathRow {
 }
 
 export interface OverviewRow {
+  type?: string // cex_cex | cex_dex | dex_dex
   symbol: string
   path_display: string
   buy_exchange: string
   sell_exchange: string
   spread_percent: number
-  available_path_count: number
-  detail_paths: DetailPathRow[]
+  available_path_count?: number
+  detail_paths?: DetailPathRow[]
+}
+
+export const OppTypeLabels: Record<string, string> = {
+  cex_cex: '交易所-交易所',
+  cex_dex: '交易所-链',
+  dex_dex: '链-链',
 }
 
 export interface OverviewResponse {

@@ -6,6 +6,7 @@ const (
 	ConnectTypeBinance     = "binance"
 	ConnectTypeBybit       = "bybit"
 	ConnectTypeBitget      = "bitget"
+	ConnectTypeBitGet      = "bitget" // 别名，兼容 rest 等
 	ConnectTypeGate        = "gate"
 	ConnectTypeOKEX        = "okex"
 	ConnectTypeHyperliquid = "hyperliquid"
@@ -52,6 +53,11 @@ const (
 	BitgetFuturesOrderBookPath  = "/api/v2/mix/market/orderbook"
 )
 
+// Gate
+const (
+	GateRestBaseUrl = "https://api.gateio.ws/api/v4"
+)
+
 // Bybit
 const (
 	BybitRestBaseUrl           = "https://api.bybit.com"
@@ -71,7 +77,9 @@ const (
 	OkexPathTradeOrder             = "/api/v5/trade/order"
 	OkexPathMarketBooks            = "/api/v5/market/books"
 	OkexDexBaseUrl                 = "https://www.okx.com"
+	OkexDexV6BaseUrl               = "https://web3.okx.com" // DEX v6 API（quote/swap 等）
 	OkexDexSwap                    = "/api/v5/dex/swap"
+	OkexDexTradePrice              = "/api/v6/dex/aggregator/quote" // v6 询价接口
 	OkexDexAllTokenBalancesByAddress = "/api/v5/dex/balance"
 	OkexDexApproveTransaction      = "/api/v5/dex/approve-transaction"
 	OkexDexNonce                   = "/api/v5/dex/nonce"
@@ -83,6 +91,7 @@ const (
 	OkexDexBgAccessPassphrase      = "x-bg-access-passphrase"
 	OkexDexContentType             = "Content-Type"
 	OkexDexApplicationJson         = "application/json"
+	OkexDexProject                 = "x-okex-dex-project"
 )
 
 // Hyperliquid
@@ -120,6 +129,29 @@ var defaultRPCURLs = map[string]string{
 	"10":    "https://mainnet.optimism.io",
 	"43114": "https://api.avax.network/ext/bc/C/rpc",
 	"195":   "https://api.trongrid.io", // TRON
+}
+
+// ChainIDToChainIndex OKEx DEX 使用的 chainIndex，多数 EVM 链与 chainID 一致
+var ChainIDToChainIndex = map[string]string{
+	"1":     "1",     // Ethereum
+	"56":    "56",    // BSC
+	"137":   "137",   // Polygon
+	"42161": "42161", // Arbitrum
+	"10":    "10",    // Optimism
+	"43114": "43114", // Avalanche
+	"8453":  "8453",  // Base
+	"324":   "324",   // zkSync Era
+	"5000":  "5000",  // Mantle
+	"59144": "59144", // Linea
+	"534352": "534352", // Scroll
+}
+
+// GetChainIndex 获取 OKEx DEX chainIndex，无映射时返回 chainID 本身
+func GetChainIndex(chainID string) string {
+	if idx, ok := ChainIDToChainIndex[chainID]; ok {
+		return idx
+	}
+	return chainID
 }
 
 // GetDefaultRPCURL 获取链的默认 RPC URL

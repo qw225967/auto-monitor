@@ -442,4 +442,21 @@ type PhysicalPath struct {
 
 ---
 
-*文档版本：V2.2 | 更新日期：2026-03-05 | 技术栈：全栈 Go，Web 前端 React + TypeScript | 架构：多数据源 + 多表格可扩展*
+## 九、套利完整需求补全（阶段 7–12）
+
+> 详见 **[docs/PLAN_ARBITRAGE_FULL.md](docs/PLAN_ARBITRAGE_FULL.md)**
+
+| 阶段 | 目标 | 状态 |
+|------|------|------|
+| **阶段 7** | Token 信息集成到主流程（SeeingStone symbol → 增量补全 → token_registry） | ✅ 已实现 |
+| **阶段 8** | 链上价格获取（OKEx DEX Quote → 按 asset+chain 获取 DEX 价格） | ✅ 已实现 |
+| **阶段 9** | CEX 价格获取（SpreadItem 扩展 BuyPrice/SellPrice） | ✅ 已实现 |
+| **阶段 10** | CEX-DEX、DEX-DEX 价差计算与机会生成 | ✅ 已实现 |
+| **阶段 11** | 表格组装与 API 扩展（三类机会统一展示） | ✅ 已实现 |
+| **阶段 12** | 主流程编排与配置（多 Ticker 协调） | ✅ 已实现 |
+
+**三类套利机会**：CEX-CEX（已实现）、CEX-DEX（交易所 vs 链）、DEX-DEX（链 vs 链）。
+
+---
+
+*文档版本：V2.3 | 更新日期：2026-03-05 | 技术栈：全栈 Go，Web 前端 React + TypeScript | 架构：多数据源 + 多表格可扩展*

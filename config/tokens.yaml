@@ -1,0 +1,11 @@
+# 需要同步 token 信息的资产列表
+# 可从 SeeingStone 价差数据自动补充，此处为基准列表
+assets:
+  - USDT
+  - USDC
+  - ETH
+  - BNB
+  - MATIC
+  - ARB
+  - OP
+  - POWER   # 示例：价差中出现的币种

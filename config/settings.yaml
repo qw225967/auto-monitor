@@ -15,3 +15,12 @@ threshold:
 intervals:
   fetch: 10   # 价差拉取间隔 (秒)
   detect: 30  # 全 symbol 通路探测间隔 (秒)
+
+token_registry:
+  path: data/token_registry.json
+  sync_interval: 300  # Token 信息补全间隔 (秒)，全量 symbol 增量更新
+
+chain_price:
+  interval: 60     # 链上价格拉取间隔 (秒)
+  cache_ttl: 30    # 链上价格缓存时长 (秒)
+  concurrency: 3   # 并发查询数

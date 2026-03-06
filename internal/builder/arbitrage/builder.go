@@ -54,6 +54,7 @@ func (b *ArbitrageBuilder) Build(ctx context.Context, input *builder.AggregatedI
 		sort.Slice(detailPaths, func(i, j int) bool { return detailPaths[i].PathID < detailPaths[j].PathID })
 
 		rows = append(rows, model.OverviewRow{
+			Type:               model.OppTypeCexCex,
 			Symbol:             symbol,
 			PathDisplay:        best.BuyExchange + " → " + best.SellExchange,
 			BuyExchange:        best.BuyExchange,

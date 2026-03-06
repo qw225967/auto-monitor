@@ -10,6 +10,7 @@ import (
 	"github.com/qw225967/auto-monitor/internal/builder/arbitrage"
 	"github.com/qw225967/auto-monitor/internal/detector"
 	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/opportunities"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -28,10 +29,18 @@ func New(det detector.Detector, threshold float64) *Runner {
 }
 
 // RunDetect 执行一轮：聚合 + 全 symbol 通路探测 + 表格组装
-func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem) (*model.OverviewResponse, error) {
+// chainPrices 可选，key "asset:chainID"，用于 CEX-DEX、DEX-DEX 机会计算
+func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainPrices map[string]float64) (*model.OverviewResponse, error) {
 	agg := aggregator.Aggregate(items, r.threshold)
-	if len(agg) == 0 {
+	if len(agg) == 0 && len(chainPrices) == 0 {
 		return &model.OverviewResponse{Overview: []model.OverviewRow{}}, nil
+	}
+	if len(agg) == 0 {
+		cexDex := opportunities.ComputeCexDex(items, chainPrices, r.threshold)
+		dexDex := opportunities.ComputeDexDex(chainPrices, r.threshold)
+		return &model.OverviewResponse{
+			Overview: opportunities.MergeAndSort(nil, cexDex, dexDex),
+		}, nil
 	}
 
 	// 收集所有 (symbol, buyEx, sellEx) 用于探测
@@ -104,5 +113,13 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem) (*mode
 	if err != nil {
 		return nil, err
 	}
-	return out.(*model.OverviewResponse), nil
+	resp := out.(*model.OverviewResponse)
+
+	// 合并 CEX-DEX、DEX-DEX 机会
+	if len(chainPrices) > 0 {
+		cexDex := opportunities.ComputeCexDex(items, chainPrices, r.threshold)
+		dexDex := opportunities.ComputeDexDex(chainPrices, r.threshold)
+		resp.Overview = opportunities.MergeAndSort(resp.Overview, cexDex, dexDex)
+	}
+	return resp, nil
 }

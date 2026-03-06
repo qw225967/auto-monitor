@@ -13,6 +13,9 @@ type SpreadItem struct {
 	SellExchange  string  `json:"sell_exchange"`
 	SpreadPercent float64 `json:"spread_percent"`
 	UpdatedAt     string  `json:"updated_at"`
+	// 若 API 返回价格字段则解析，用于 CEX-DEX 对比
+	BuyPrice  float64 `json:"buy_price,omitempty"`
+	SellPrice float64 `json:"sell_price,omitempty"`
 }
 
 // SpreadAPIResponse SeeingStone API 响应
@@ -61,12 +64,20 @@ func (p *PhysicalPath) PhysicalFlow() string {
 // AggregatedPaths 按 symbol 分组的路径
 type AggregatedPaths map[string][]PathItem
 
-// OverviewRow 主表单行
+// 套利机会类型
+const (
+	OppTypeCexCex  = "cex_cex"  // 交易所-交易所
+	OppTypeCexDex  = "cex_dex"  // 交易所-链
+	OppTypeDexDex  = "dex_dex"  // 链-链
+)
+
+// OverviewRow 主表单行（支持三种套利类型）
 type OverviewRow struct {
+	Type               string          `json:"type"`                 // cex_cex | cex_dex | dex_dex
 	Symbol             string          `json:"symbol"`
 	PathDisplay        string          `json:"path_display"`
-	BuyExchange        string          `json:"buy_exchange"`
-	SellExchange       string          `json:"sell_exchange"`
+	BuyExchange        string          `json:"buy_exchange"`         // CEX 名或 Chain_56
+	SellExchange       string          `json:"sell_exchange"`        // CEX 名或 Chain_1
 	SpreadPercent      float64         `json:"spread_percent"`
 	AvailablePathCount int             `json:"available_path_count"`
 	DetailPaths        []DetailPathRow `json:"detail_paths"`
