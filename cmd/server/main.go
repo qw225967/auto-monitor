@@ -86,6 +86,7 @@ func main() {
 	router.Use(gin.Recovery(), corsMiddleware())
 	router.GET("/api/overview", handler.GetOverview)
 	router.POST("/api/config/exchange-keys", handler.PostExchangeKeys)
+	router.POST("/api/config/liquidity-threshold", handler.PostLiquidityThreshold)
 
 	// 缓存：最新价差数据
 	var cachedItems []model.SpreadItem
@@ -156,6 +157,37 @@ func main() {
 	}
 	if cfg.MockMode {
 		log.Println("[Config] TokenSync 跳过（MockMode）")
+	}
+
+	// 流动性：从 registry 加载初始值，并定时从 CoinGecko onchain 全表同步（需 API Key）
+	if cfg.TokenRegistry.CoinGeckoAPIKey != "" {
+		store := tokenregistry.NewStorage(cfg.TokenRegistry.Path)
+		if rd, err := store.Load(); err == nil {
+			handler.UpdateLiquidity(tokenregistry.LiquidityMapFromRegistry(rd))
+			log.Println("[Config] 已从 registry 加载流动性缓存")
+		}
+		go func() {
+			ticker := time.NewTicker(cfg.LiquiditySyncInterval())
+			defer ticker.Stop()
+			for range ticker.C {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+				liquidity, err := tokenregistry.RunLiquiditySync(ctx, tokenregistry.LiquiditySyncConfig{
+					RegistryPath:    cfg.TokenRegistry.Path,
+					CoinGeckoAPIKey: cfg.TokenRegistry.CoinGeckoAPIKey,
+					CoinGeckoPro:    cfg.TokenRegistry.CoinGeckoPro,
+					DelayPerRequest: 1 * time.Second,
+				})
+				cancel()
+				if err != nil {
+					log.Printf("[LiquiditySync] %v", err)
+					continue
+				}
+				handler.UpdateLiquidity(liquidity)
+			}
+		}()
+		log.Printf("[Config] LiquiditySync 已启动，间隔 %v", cfg.LiquiditySyncInterval())
+	} else {
+		log.Println("[Config] LiquiditySync 跳过: 未配置 COINGECKO_API_KEY")
 	}
 
 	// Ticker C: 链上价格（需 OKEx Key + token registry）
@@ -229,7 +261,8 @@ func main() {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			chainPrices := handler.GetAllChainPrices()
-			resp, err := r.RunDetect(ctx, items, chainPrices)
+			liquidity := handler.GetAllLiquidity()
+			resp, err := r.RunDetect(ctx, items, chainPrices, liquidity)
 			cancel()
 			if err != nil {
 				log.Printf("[Detect] %v", err)
@@ -249,7 +282,7 @@ func main() {
 		cachedItems = items
 		cacheMu.Unlock()
 		ctx2, cancel2 := context.WithTimeout(context.Background(), 60*time.Second)
-		resp, _ := r.RunDetect(ctx2, items, handler.GetAllChainPrices())
+		resp, _ := r.RunDetect(ctx2, items, handler.GetAllChainPrices(), handler.GetAllLiquidity())
 		cancel2()
 		if resp != nil {
 			handler.UpdateOverview(resp)

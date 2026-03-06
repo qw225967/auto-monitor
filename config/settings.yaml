@@ -18,7 +18,8 @@ intervals:
 
 token_registry:
   path: data/token_registry.json
-  sync_interval: 300  # Token 信息补全间隔 (秒)，全量 symbol 增量更新
+  sync_interval: 300   # Token 信息补全间隔 (秒)，全量 symbol 增量更新
+  liquidity_sync_interval: 14400  # 流动性全表同步间隔 (秒)，默认 4h，约 500 对×6 次/天≈9 万/月
   # coingecko_api_key: ""   # CoinGecko Demo/Pro Key，避免 429
   # coingecko_pro: false    # Pro 用户设为 true
 

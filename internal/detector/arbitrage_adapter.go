@@ -91,8 +91,7 @@ func (a *ArbitrageAdapter) DetectRoutes(ctx context.Context, symbol, buyExchange
 	// 使用 NetworkRegistry + PipelineBuilder 生成路径
 	paths, err := a.builder.BuildPaths(asset, buyExchange, sellExchange)
 	if err != nil || len(paths) == 0 {
-		// 回退：简单直连 + 经常见链
-		paths = [][]string{{buyNode, sellNode}}
+		// 回退：仅经链路径（不添加交易所直连，CEX 间无法直接转账）
 		for _, chain := range commonChains {
 			paths = append(paths, []string{buyNode, chain, sellNode})
 		}

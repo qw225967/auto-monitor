@@ -166,17 +166,20 @@ func chainIDsFromNetworks(nets []model.WithdrawNetworkInfo) map[string]bool {
 
 // buildAdjacency 构建邻接表
 // 节点：交易所（小写）、链（onchain:chainID）
-// 边：交易所->链（可提现）、链->交易所（可充值）、链->链（跨链桥）、交易所->交易所（直连）
+// 边：交易所->链（可提现）、链->交易所（可充值）、链->链（跨链桥）
+// 不添加交易所->交易所直连：CEX 间无法直接转账，必须经链提现+充值
 func (b *PipelineBuilder) buildAdjacency(buy, sell string, buyChains, sellChains map[string]bool) map[string][]string {
 	adj := make(map[string][]string)
 
-	// 买交易所 -> 卖交易所（直连，交易所间转账）
-	adj[buy] = append(adj[buy], sell)
-
 	// 买交易所 -> 可提现的链（按链优先级排序，ETH 优先）
+	// 跳过自环：当 buy 已是链节点（如 onchain:1）时，不再添加 buy->buy
 	buyChainList := sortedChainsByPreference(buyChains)
 	for _, cid := range buyChainList {
-		adj[buy] = append(adj[buy], onchainPrefix+cid)
+		next := onchainPrefix + cid
+		if next == buy {
+			continue
+		}
+		adj[buy] = append(adj[buy], next)
 	}
 
 	// 链 -> 卖交易所（若卖方可充值该链）；或 链 -> 目标链（跨链）

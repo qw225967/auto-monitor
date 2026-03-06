@@ -93,4 +93,6 @@ type DetailPathRow struct {
 // OverviewResponse API 返回结构
 type OverviewResponse struct {
 	Overview []OverviewRow `json:"overview"`
+	// LiquidityThreshold 当前生效的流动性阈值（USDT），0 表示不限制
+	LiquidityThreshold float64 `json:"liquidity_threshold,omitempty"`
 }

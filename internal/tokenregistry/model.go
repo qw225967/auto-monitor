@@ -2,10 +2,11 @@ package tokenregistry
 
 // TokenChainInfo 某资产在某链上的 token 信息
 type TokenChainInfo struct {
-	Address   string `json:"address"`   // 合约地址，原生币可为空
-	Decimals  int    `json:"decimals"`   // 精度
-	Symbol    string `json:"symbol"`    // 链上符号
-	UpdatedAt string `json:"updated_at"` // 更新时间，用于增量判断
+	Address   string  `json:"address"`    // 合约地址，原生币可为空
+	Decimals  int     `json:"decimals"`   // 精度
+	Symbol    string  `json:"symbol"`     // 链上符号
+	ReserveUSD float64 `json:"reserve_usd,omitempty"` // 流动性（USDT 计价），来自 CoinGecko onchain
+	UpdatedAt string  `json:"updated_at"`  // 更新时间，用于增量判断
 }
 
 // RegistryData 持久化存储结构：asset -> chainID -> TokenChainInfo

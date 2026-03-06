@@ -46,10 +46,11 @@ type IntervalsConfig struct {
 
 // TokenRegistryConfig Token 信息补全配置
 type TokenRegistryConfig struct {
-	Path            string
-	SyncInterval    int    // 秒
-	CoinGeckoAPIKey string // CoinGecko Demo/Pro API Key，避免 429 限流
-	CoinGeckoPro    bool   // true 时使用 Pro API (pro-api.coingecko.com)
+	Path                 string
+	SyncInterval         int    // 秒，token 地址增量同步间隔
+	LiquiditySyncInterval int    // 秒，全表流动性同步间隔，默认 4h，控制 10 万/月 请求量
+	CoinGeckoAPIKey      string // CoinGecko Demo/Pro API Key，避免 429 限流
+	CoinGeckoPro         bool   // true 时使用 Pro API (pro-api.coingecko.com)
 }
 
 // ChainPriceConfig 链上价格配置
@@ -78,6 +79,7 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("server.port", "SERVER_PORT")
 	_ = viper.BindEnv("token_registry.path", "TOKEN_REGISTRY_PATH")
 	_ = viper.BindEnv("token_registry.sync_interval", "TOKEN_SYNC_INTERVAL")
+	_ = viper.BindEnv("token_registry.liquidity_sync_interval", "LIQUIDITY_SYNC_INTERVAL")
 	_ = viper.BindEnv("token_registry.coingecko_api_key", "COINGECKO_API_KEY")
 	_ = viper.BindEnv("token_registry.coingecko_pro", "COINGECKO_PRO")
 	_ = viper.BindEnv("chain_price.interval", "CHAIN_PRICE_INTERVAL")
@@ -97,6 +99,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("mock_mode", false)
 	viper.SetDefault("token_registry.path", "data/token_registry.json")
 	viper.SetDefault("token_registry.sync_interval", 300)
+	viper.SetDefault("token_registry.liquidity_sync_interval", 14400) // 4h，约 500 对 × 6 次/天 ≈ 9 万/月
 	viper.SetDefault("chain_price.interval", 3)
 	viper.SetDefault("chain_price.cache_ttl", 30)
 	viper.SetDefault("chain_price.concurrency", 3)
@@ -120,6 +123,7 @@ func Load() (*Config, error) {
 		TokenRegistry: TokenRegistryConfig{
 			Path:            viper.GetString("token_registry.path"),
 			SyncInterval:    viper.GetInt("token_registry.sync_interval"),
+			LiquiditySyncInterval: viper.GetInt("token_registry.liquidity_sync_interval"),
 			CoinGeckoAPIKey: viper.GetString("token_registry.coingecko_api_key"),
 			CoinGeckoPro:    viper.GetBool("token_registry.coingecko_pro"),
 		},
@@ -154,6 +158,9 @@ func Load() (*Config, error) {
 	if cfg.TokenRegistry.SyncInterval == 0 {
 		cfg.TokenRegistry.SyncInterval = 300
 	}
+	if cfg.TokenRegistry.LiquiditySyncInterval == 0 {
+		cfg.TokenRegistry.LiquiditySyncInterval = 14400
+	}
 	if cfg.ChainPrice.Interval == 0 {
 		cfg.ChainPrice.Interval = 3
 	}
@@ -173,6 +180,10 @@ func (c *Config) ChainPriceInterval() time.Duration {
 
 func (c *Config) TokenSyncInterval() time.Duration {
 	return time.Duration(c.TokenRegistry.SyncInterval) * time.Second
+}
+
+func (c *Config) LiquiditySyncInterval() time.Duration {
+	return time.Duration(c.TokenRegistry.LiquiditySyncInterval) * time.Second
 }
 
 func (c *Config) FetchInterval() time.Duration {

@@ -35,10 +35,11 @@ func New(det detector.Detector, threshold float64) *Runner {
 
 // RunDetect 执行一轮：聚合 + 全 symbol 通路探测 + 表格组装
 // chainPrices 可选，key "asset:chainID"，用于 CEX-DEX、DEX-DEX 机会计算
-func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainPrices map[string]float64) (*model.OverviewResponse, error) {
+// liquidity 可选，key "asset:chainID" -> reserve_usd，用于流动性阈值过滤
+func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainPrices map[string]float64, liquidity map[string]float64) (*model.OverviewResponse, error) {
 	agg := aggregator.Aggregate(items, r.threshold)
-	cexDex := opportunities.ComputeCexDex(items, chainPrices, r.threshold)
-	dexDex := opportunities.ComputeDexDex(chainPrices, r.threshold)
+	cexDex := opportunities.ComputeCexDex(items, chainPrices, r.threshold, liquidity)
+	dexDex := opportunities.ComputeDexDex(chainPrices, r.threshold, liquidity)
 
 	if len(agg) == 0 && len(cexDex) == 0 && len(dexDex) == 0 {
 		return &model.OverviewResponse{Overview: []model.OverviewRow{}}, nil
@@ -285,6 +286,7 @@ func extractSymbolsForRefresh(items []model.SpreadItem, cexDex, dexDex []model.O
 }
 
 // attachPathsToRows 为 CEX-DEX/DEX-DEX 行附加探测路径
+// 按 PhysicalFlow 去重，避免展示重复的 pipeline
 func attachPathsToRows(rows []model.OverviewRow, resultMap map[pathKey][]builder.PhysicalPathRow) []model.OverviewRow {
 	var out []model.OverviewRow
 	for _, row := range rows {
@@ -294,19 +296,26 @@ func attachPathsToRows(rows []model.OverviewRow, resultMap map[pathKey][]builder
 			out = append(out, row)
 			continue
 		}
-		availableCount := 0
+		flowAvailable := make(map[string]bool)
+		seenFlow := make(map[string]bool)
 		var detailPaths []model.DetailPathRow
 		for _, pp := range physRows {
 			if pp.Status == "ok" {
-				availableCount++
+				flowAvailable[pp.PhysicalFlow] = true
 			}
+		}
+		for _, pp := range physRows {
+			if seenFlow[pp.PhysicalFlow] {
+				continue
+			}
+			seenFlow[pp.PhysicalFlow] = true
 			detailPaths = append(detailPaths, model.DetailPathRow{
 				PathID:       pp.PathID,
 				PhysicalFlow: pp.PhysicalFlow,
 				Status:       pp.Status,
 			})
 		}
-		row.AvailablePathCount = availableCount
+		row.AvailablePathCount = len(flowAvailable)
 		row.DetailPaths = detailPaths
 		out = append(out, row)
 	}

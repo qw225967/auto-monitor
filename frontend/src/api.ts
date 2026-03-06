@@ -23,3 +23,17 @@ export async function postExchangeKeys(keysJson: string): Promise<{ ok: boolean;
   }
   return data
 }
+
+/** 设置流动性阈值（USDT），低于该阈值的链上套利不展示 */
+export async function postLiquidityThreshold(threshold: number): Promise<{ ok: boolean; message?: string; threshold?: number }> {
+  const res = await fetch(`${API_BASE}/config/liquidity-threshold`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ threshold }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || data.message || '提交失败')
+  }
+  return data
+}

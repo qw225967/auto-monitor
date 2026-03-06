@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/qw225967/auto-monitor/internal/config"
 	"github.com/qw225967/auto-monitor/internal/model"
 	"github.com/qw225967/auto-monitor/internal/tokenregistry"
 )
@@ -14,10 +15,9 @@ const maxSpreadAnomaly = 50.0
 
 // ComputeCexDex 从价差数据和链上价格计算 CEX-DEX 套利机会
 // chainPrices: key "asset:chainID" -> price
-// 1) 若 SpreadItem 有 BuyPrice/SellPrice，直接计算
-// 2) 若无价格，用 DEX 价 + spread_percent 估算 CEX 价（假设 DEX≈mid，buy≈dex/(1+spread/200)）
-// 3) 价差 > maxCexDexSpread 视为异常数据（如单位不匹配），过滤
-func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, threshold float64) []model.OverviewRow {
+// liquidity: key "asset:chainID" -> reserve_usd，用于流动性阈值过滤（阈值>0 时）
+func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, threshold float64, liquidity map[string]float64) []model.OverviewRow {
+	liqThreshold := config.GetLiquidityThreshold()
 	var rows []model.OverviewRow
 	seen := make(map[string]bool)
 	for _, it := range items {
@@ -37,6 +37,12 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 			chainID := parts[1]
 			if dexPrice <= 0 {
 				continue
+			}
+			// 流动性阈值过滤：若设置了阈值且该链流动性低于阈值，跳过（无数据时也跳过）
+			if liqThreshold > 0 && liquidity != nil && len(liquidity) > 0 {
+				if r, ok := liquidity[base+":"+chainID]; !ok || r < liqThreshold {
+					continue
+				}
 			}
 			if hasExplicitPrice {
 				if it.BuyPrice > 0 {
@@ -98,7 +104,8 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 
 // ComputeDexDex 从链上价格计算 DEX-DEX 套利机会（同资产不同链）
 // 价差公式: |p1-p2|/min(p1,p2)*100，显示买低卖高方向
-func ComputeDexDex(chainPrices map[string]float64, threshold float64) []model.OverviewRow {
+func ComputeDexDex(chainPrices map[string]float64, threshold float64, liquidity map[string]float64) []model.OverviewRow {
+	liqThreshold := config.GetLiquidityThreshold()
 	type pair struct {
 		asset, buyChain, sellChain string // buyChain 价低，sellChain 价高
 		spread                     float64
@@ -119,6 +126,15 @@ func ComputeDexDex(chainPrices map[string]float64, threshold float64) []model.Ov
 			c2 := parts2[1]
 			if p2 <= 0 {
 				continue
+			}
+			// 流动性阈值过滤：两条链都需满足（无数据时不过滤）
+			if liqThreshold > 0 && liquidity != nil && len(liquidity) > 0 {
+				if r1, ok := liquidity[asset+":"+c1]; !ok || r1 < liqThreshold {
+					continue
+				}
+				if r2, ok := liquidity[asset+":"+c2]; !ok || r2 < liqThreshold {
+					continue
+				}
 			}
 			minP := math.Min(p1, p2)
 			spread := math.Abs(p1-p2) / minP * 100

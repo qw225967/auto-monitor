@@ -15,6 +15,8 @@ type Handler struct {
 	overview      *model.OverviewResponse
 	chainPriceMu  sync.RWMutex
 	chainPrices   map[string]float64 // key: "asset:chainID"
+	liquidityMu   sync.RWMutex
+	liquidity     map[string]float64 // key: "asset:chainID" -> reserve_usd
 }
 
 // New 创建 Handler
@@ -22,6 +24,7 @@ func New() *Handler {
 	return &Handler{
 		overview:    &model.OverviewResponse{Overview: []model.OverviewRow{}},
 		chainPrices: make(map[string]float64),
+		liquidity:   make(map[string]float64),
 	}
 }
 
@@ -58,11 +61,45 @@ func (h *Handler) GetAllChainPrices() map[string]float64 {
 	return out
 }
 
+// UpdateLiquidity 更新流动性缓存（由 LiquiditySync 调用）
+func (h *Handler) UpdateLiquidity(m map[string]float64) {
+	h.liquidityMu.Lock()
+	defer h.liquidityMu.Unlock()
+	if m == nil {
+		h.liquidity = make(map[string]float64)
+		return
+	}
+	h.liquidity = make(map[string]float64, len(m))
+	for k, v := range m {
+		h.liquidity[k] = v
+	}
+}
+
+// GetAllLiquidity 获取全部流动性（供 Runner 使用）
+func (h *Handler) GetAllLiquidity() map[string]float64 {
+	h.liquidityMu.RLock()
+	defer h.liquidityMu.RUnlock()
+	out := make(map[string]float64, len(h.liquidity))
+	for k, v := range h.liquidity {
+		out[k] = v
+	}
+	return out
+}
+
 // GetOverview 获取搬砖概览
 func (h *Handler) GetOverview(c *gin.Context) {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-	c.JSON(http.StatusOK, h.overview)
+	resp := h.overview
+	h.mu.RUnlock()
+	if resp == nil {
+		c.JSON(http.StatusOK, &model.OverviewResponse{Overview: []model.OverviewRow{}})
+		return
+	}
+	out := &model.OverviewResponse{
+		Overview:           resp.Overview,
+		LiquidityThreshold: config.GetLiquidityThreshold(),
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 // PostExchangeKeys 接收交易所密钥 JSON（仅存内存，不落盘，避免泄露）
@@ -83,4 +120,22 @@ func (h *Handler) PostExchangeKeys(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "已保存，仅存内存"})
+}
+
+// PostLiquidityThreshold 设置流动性阈值（USDT），仅存内存
+// 当某 symbol 在某链上流动性低于该阈值时，不展示该套利机会
+func (h *Handler) PostLiquidityThreshold(c *gin.Context) {
+	var body struct {
+		Threshold float64 `json:"threshold"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 JSON"})
+		return
+	}
+	if body.Threshold < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "阈值不能为负数"})
+		return
+	}
+	config.SetLiquidityThreshold(body.Threshold)
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "已保存", "threshold": body.Threshold})
 }

@@ -70,14 +70,16 @@ func (s *Storage) MergeIncremental(rd *RegistryData, newInfos []TokenInfo) int {
 			rd.Assets[asset] = make(map[string]TokenChainInfo)
 		}
 		existing := rd.Assets[asset][chainID]
-		// 增量：仅当地址或精度变化时更新
+		// 增量：仅当地址或精度变化时更新；ReserveUSD 由流动性同步单独更新
 		if existing.Address != ti.Address || existing.Decimals != ti.Decimals {
-			rd.Assets[asset][chainID] = TokenChainInfo{
-				Address:   ti.Address,
-				Decimals:  ti.Decimals,
-				Symbol:    ti.Symbol,
-				UpdatedAt: now,
+			info := TokenChainInfo{
+				Address:    ti.Address,
+				Decimals:   ti.Decimals,
+				Symbol:     ti.Symbol,
+				UpdatedAt:  now,
+				ReserveUSD: existing.ReserveUSD,
 			}
+			rd.Assets[asset][chainID] = info
 			updated++
 		}
 	}

@@ -42,6 +42,40 @@
   border-bottom: 1px solid #21262d;
 }
 
+.config-block {
+  margin-bottom: 1.5rem;
+}
+
+.config-block:last-child {
+  margin-bottom: 0;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.config-input {
+  width: 180px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+}
+
+.config-input::placeholder {
+  color: #484f58;
+}
+
+.config-current {
+  margin-top: 0.25rem;
+  color: #3fb950;
+}
+
 .config-hint {
   margin: 0 0 0.5rem;
   font-size: 0.8rem;

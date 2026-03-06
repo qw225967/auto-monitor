@@ -82,6 +82,8 @@ func routeProbe(req *model.RouteProbeRequest, bridgeManager *bridge.Manager, reg
 			if fromChain == "" && toChain == "" {
 				seg.Type = model.SegmentTypeExchangeToExchange
 				seg.EstimatedTimeSec = 60
+				// CEX 间无法直接转账，必须经链；此类段标记为不可用
+				seg.Available = false
 			} else if fromChain == "" && toChain != "" {
 				seg.Type = model.SegmentTypeWithdraw
 				seg.EstimatedTimeSec = 60

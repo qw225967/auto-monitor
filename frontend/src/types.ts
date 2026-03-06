@@ -23,4 +23,6 @@ export const OppTypeLabels: Record<string, string> = {
 
 export interface OverviewResponse {
   overview: OverviewRow[]
+  /** 当前生效的流动性阈值（USDT），0 表示不限制 */
+  liquidity_threshold?: number
 }

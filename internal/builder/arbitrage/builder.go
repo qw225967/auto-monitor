@@ -39,12 +39,17 @@ func (b *ArbitrageBuilder) Build(ctx context.Context, input *builder.AggregatedI
 			}
 		}
 
-		availableCount := 0
+		flowAvailable := make(map[string]bool)
+		seenFlow := make(map[string]bool)
 		var detailPaths []model.DetailPathRow
 		for _, pp := range best.PhysicalPaths {
 			if pp.Status == "ok" {
-				availableCount++
+				flowAvailable[pp.PhysicalFlow] = true
 			}
+			if seenFlow[pp.PhysicalFlow] {
+				continue
+			}
+			seenFlow[pp.PhysicalFlow] = true
 			detailPaths = append(detailPaths, model.DetailPathRow{
 				PathID:       pp.PathID,
 				PhysicalFlow: pp.PhysicalFlow,
@@ -60,7 +65,7 @@ func (b *ArbitrageBuilder) Build(ctx context.Context, input *builder.AggregatedI
 			BuyExchange:        best.BuyExchange,
 			SellExchange:       best.SellExchange,
 			SpreadPercent:      best.SpreadPercent,
-			AvailablePathCount: availableCount,
+			AvailablePathCount: len(flowAvailable),
 			DetailPaths:        detailPaths,
 		})
 	}
