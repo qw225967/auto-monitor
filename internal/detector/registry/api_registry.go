@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -48,8 +49,10 @@ func (a *APINetworkRegistry) cacheKey(exchange, asset string) string {
 func (a *APINetworkRegistry) Refresh(ctx context.Context, symbols []string) {
 	assets := tokenregistry.ExtractAssetsFromSymbols(symbols)
 	if len(assets) == 0 {
+		log.Printf("[Registry] Refresh: 无 assets，symbols=%v", symbols)
 		return
 	}
+	log.Printf("[Registry] Refresh: symbols=%d assets=%d 示例=%v", len(symbols), len(assets), truncateSlice(assets, 5))
 
 	wd := make(map[string][]model.WithdrawNetworkInfo)
 	dep := make(map[string][]model.WithdrawNetworkInfo)
@@ -68,23 +71,46 @@ func (a *APINetworkRegistry) Refresh(ctx context.Context, symbols []string) {
 	}
 	wg.Wait()
 
+	// 统计每所缓存数量
+	wdByEx := make(map[string]int)
+	depByEx := make(map[string]int)
+	for k := range wd {
+		ex := strings.SplitN(k, ":", 2)[0]
+		wdByEx[ex]++
+	}
+	for k := range dep {
+		ex := strings.SplitN(k, ":", 2)[0]
+		depByEx[ex]++
+	}
+	log.Printf("[Registry] Refresh 完成: wd=%v dep=%v", wdByEx, depByEx)
+
 	a.mu.Lock()
 	a.withdraw = wd
 	a.deposit = dep
 	a.mu.Unlock()
 }
 
+func truncateSlice(s []string, n int) []string {
+	if len(s) <= n {
+		return s
+	}
+	return append(append([]string{}, s[:n]...), "...")
+}
+
 // refreshOneExchange 单所串行请求，每次请求后等待，铺满间隔
 func (a *APINetworkRegistry) refreshOneExchange(ctx context.Context, exchange string, assets []string, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo) {
+	okCount := 0
 	for i, asset := range assets {
 		select {
 		case <-ctx.Done():
+			log.Printf("[Registry] %s 被取消，已缓存 %d/%d", exchange, okCount, len(assets))
 			return
 		default:
 		}
 		asset = strings.ToUpper(strings.TrimSpace(asset))
 		w, d := a.fetchNetworksWithRetry(ctx, exchange, asset)
 		if len(w) > 0 || len(d) > 0 {
+			okCount++
 			mergeMu.Lock()
 			k := a.cacheKey(exchange, asset)
 			if len(w) > 0 {
@@ -104,6 +130,7 @@ func (a *APINetworkRegistry) refreshOneExchange(ctx context.Context, exchange st
 			}
 		}
 	}
+	log.Printf("[Registry] %s 完成: %d/%d 有数据", exchange, okCount, len(assets))
 }
 
 func (a *APINetworkRegistry) fetchNetworksWithRetry(ctx context.Context, exchange, asset string) (withdraw, deposit []model.WithdrawNetworkInfo) {
@@ -337,9 +364,14 @@ func (a *APINetworkRegistry) GetWithdrawNetworks(exchangeType, asset string) ([]
 	}
 	k := a.cacheKey(ex, asset)
 	a.mu.RLock()
-	defer a.mu.RUnlock()
-	if v, ok := a.withdraw[k]; ok {
+	v, ok := a.withdraw[k]
+	a.mu.RUnlock()
+	if ok {
 		return v, nil
+	}
+	// 仅对有公开 API 的交易所记录未命中（binance/okex 需认证，预期为空）
+	if ex == "bitget" || ex == "gate" || ex == "bybit" {
+		log.Printf("[Registry] GetWithdrawNetworks 缓存未命中: %s", k)
 	}
 	return nil, nil
 }
@@ -352,9 +384,13 @@ func (a *APINetworkRegistry) GetDepositNetworks(exchangeType, asset string) ([]m
 	}
 	k := a.cacheKey(ex, asset)
 	a.mu.RLock()
-	defer a.mu.RUnlock()
-	if v, ok := a.deposit[k]; ok {
+	v, ok := a.deposit[k]
+	a.mu.RUnlock()
+	if ok {
 		return v, nil
+	}
+	if ex == "bitget" || ex == "gate" || ex == "bybit" {
+		log.Printf("[Registry] GetDepositNetworks 缓存未命中: %s", k)
 	}
 	return nil, nil
 }

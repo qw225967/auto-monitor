@@ -7,6 +7,7 @@
 package detector
 
 import (
+	"log"
 	"strconv"
 	"strings"
 
@@ -76,7 +77,9 @@ func routeProbe(req *model.RouteProbeRequest, bridgeManager *bridge.Manager, reg
 					}
 				}
 			} else {
-				seg.Available = false
+				// bridgeManager 为空时乐观标记跨链段可用，以便搜出所有含跨链的路径（协议待实际配置后校验）
+				seg.Available = true
+				seg.BridgeProtocol = "跨链"
 			}
 		} else {
 			if fromChain == "" && toChain == "" {
@@ -180,6 +183,7 @@ func mergeExchangeChainExchange(path []string, segments []model.SegmentProbeResu
 func canWithdrawToChain(reg registry.NetworkRegistry, exchangeType, asset, chainID string) bool {
 	nets, err := reg.GetWithdrawNetworks(exchangeType, asset)
 	if err != nil || len(nets) == 0 {
+		log.Printf("[RouteProbe] canWithdrawToChain 失败: %s %s->链%s err=%v nets=%d", exchangeType, asset, chainID, err, len(nets))
 		return false
 	}
 	chainID = strings.TrimSpace(chainID)
@@ -188,6 +192,7 @@ func canWithdrawToChain(reg registry.NetworkRegistry, exchangeType, asset, chain
 			return true
 		}
 	}
+	log.Printf("[RouteProbe] canWithdrawToChain 链不匹配: %s %s 需要链%s 实际有=%v", exchangeType, asset, chainID, chainIDsFromNets(nets))
 	return false
 }
 
@@ -195,6 +200,7 @@ func canWithdrawToChain(reg registry.NetworkRegistry, exchangeType, asset, chain
 func canDepositFromChain(reg registry.NetworkRegistry, exchangeType, asset, chainID string) bool {
 	nets, err := reg.GetDepositNetworks(exchangeType, asset)
 	if err != nil || len(nets) == 0 {
+		log.Printf("[RouteProbe] canDepositFromChain 失败: %s %s<-链%s err=%v nets=%d", exchangeType, asset, chainID, err, len(nets))
 		return false
 	}
 	chainID = strings.TrimSpace(chainID)
@@ -203,5 +209,14 @@ func canDepositFromChain(reg registry.NetworkRegistry, exchangeType, asset, chai
 			return true
 		}
 	}
+	log.Printf("[RouteProbe] canDepositFromChain 链不匹配: %s %s 需要链%s 实际有=%v", exchangeType, asset, chainID, chainIDsFromNets(nets))
 	return false
+}
+
+func chainIDsFromNets(nets []model.WithdrawNetworkInfo) []string {
+	var out []string
+	for _, n := range nets {
+		out = append(out, strings.TrimSpace(n.ChainID))
+	}
+	return out
 }

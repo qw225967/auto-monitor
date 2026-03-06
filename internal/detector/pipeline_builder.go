@@ -1,6 +1,7 @@
 package detector
 
 import (
+	"log"
 	"sort"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 )
 
 const (
-	maxRouteHops  = 4
+	maxRouteHops  = 3 // 3 跳 = 4 节点，如 exchange->chain1->chain2->exchange
 	onchainPrefix = "onchain:"
 	chainPrefix   = "chain_"
 )
@@ -52,6 +53,9 @@ func (b *PipelineBuilder) BuildPaths(asset, buyExchange, sellExchange string) ([
 		buy = exchangeToNodeID(buyExchange)
 		wd, _ := b.reg.GetWithdrawNetworks(buy, asset)
 		buyChains = chainIDsFromNetworks(wd)
+		if len(buyChains) == 0 {
+			log.Printf("[BuildPaths] %s %s 提现链为空: buy=%s", buyExchange, asset, buy)
+		}
 	}
 
 	if cid, ok := chainFromDisplay(sellExchange); ok {
@@ -61,10 +65,16 @@ func (b *PipelineBuilder) BuildPaths(asset, buyExchange, sellExchange string) ([
 		sell = exchangeToNodeID(sellExchange)
 		dep, _ := b.reg.GetDepositNetworks(sell, asset)
 		sellChains = chainIDsFromNetworks(dep)
+		if len(sellChains) == 0 {
+			log.Printf("[BuildPaths] %s %s 充值链为空: sell=%s", sellExchange, asset, sell)
+		}
 	}
 
 	adj := b.buildAdjacency(buy, sell, buyChains, sellChains)
 	paths := findAllRoutes(buy, sell, adj, maxRouteHops)
+	if len(paths) == 0 && len(buyChains) > 0 && len(sellChains) > 0 {
+		log.Printf("[BuildPaths] %s->%s %s 有链但无路径: buyChains=%v sellChains=%v", buyExchange, sellExchange, asset, mapKeys(buyChains), mapKeys(sellChains))
+	}
 
 	// 1) 优先短路径  2) 同长度时优先 ETH 等常用链（Bitget 支持 ETH 时不应显示 BSC）
 	sort.Slice(paths, func(i, j int) bool {
@@ -150,6 +160,15 @@ func sortedChainsByPreference(chains map[string]bool) []string {
 		}
 		return pi < pj
 	})
+	return out
+}
+
+func mapKeys(m map[string]bool) []string {
+	var out []string
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
 	return out
 }
 

@@ -3,6 +3,7 @@ package detector
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/qw225967/auto-monitor/internal/detector/registry"
@@ -116,6 +117,9 @@ func (a *ArbitrageAdapter) DetectRoutes(ctx context.Context, symbol, buyExchange
 		}
 	}
 
+	if len(result) == 0 && len(paths) > 0 {
+		log.Printf("[Detect] %s %s->%s 0条可达 path数=%d asset=%s", symbol, buyExchange, sellExchange, len(paths), asset)
+	}
 	// 无可达路径时返回空，由 Runner 过滤掉该标的（不展示 Mock 占位）
 	return result, nil
 }
