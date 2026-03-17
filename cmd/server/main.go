@@ -22,6 +22,7 @@ import (
 	"github.com/qw225967/auto-monitor/internal/model"
 	"github.com/qw225967/auto-monitor/constants"
 	"github.com/qw225967/auto-monitor/internal/onchain"
+	"github.com/qw225967/auto-monitor/internal/opportunities"
 	"github.com/qw225967/auto-monitor/internal/price"
 	"github.com/qw225967/auto-monitor/internal/runner"
 	"github.com/qw225967/auto-monitor/internal/source/seeingstone"
@@ -256,11 +257,16 @@ func main() {
 	// API
 	handler := api.New()
 
+	// 机会发现
+	oppFinder := opportunities.NewFinder()
+	oppHandler := opportunities.NewHandler(oppFinder)
+
 	// Gin
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery(), corsMiddleware())
 	router.GET("/api/overview", handler.GetOverview)
+	router.GET("/api/opportunities", oppHandler.GetOpportunities)
 	router.POST("/api/config/exchange-keys", handler.PostExchangeKeys)
 	router.POST("/api/config/liquidity-threshold", handler.PostLiquidityThreshold)
 
@@ -286,6 +292,12 @@ func main() {
 			cacheMu.Unlock()
 			priorityTracker.Observe(items, time.Now())
 			log.Printf("[Fetch] got %d items", len(items))
+
+			// 更新机会发现数据
+			if oppFinder != nil {
+				resp := oppFinder.Find(items)
+				oppHandler.UpdateResponse(resp)
+			}
 		}
 	}()
 

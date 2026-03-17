@@ -141,6 +141,28 @@
   color: #8b949e;
 }
 
+.nav-tabs {
+  display: flex;
+  gap: 1rem;
+}
+
+.nav-tabs a {
+  color: #8b949e;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+}
+
+.nav-tabs a:hover {
+  color: #e6edf3;
+  background: #21262d;
+}
+
+.nav-tabs a.active {
+  color: #e6edf3;
+  background: #238636;
+}
+
 .main {
   padding: 1.5rem 2rem;
   max-width: 1200px;
@@ -317,4 +339,87 @@
 
 .status-unavailable {
   color: #f85149;
+}
+
+.opportunities-page {
+  padding: 1rem 0;
+}
+
+.funnel-panel {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #161b22;
+  border-radius: 8px;
+}
+
+.funnel-panel h2 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: #8b949e;
+}
+
+.funnel-stats {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.funnel-stat {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem;
+  background: #0d1117;
+  border-radius: 6px;
+  min-width: 100px;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #8b949e;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.stat-value.highlight {
+  color: #3fb950;
+}
+
+.opportunities-list h2 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: #8b949e;
+}
+
+.opportunities-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.opportunities-table th,
+.opportunities-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #21262d;
+}
+
+.opportunities-table th {
+  background: #161b22;
+  font-weight: 600;
+  color: #8b949e;
+}
+
+.opportunities-table tbody tr:hover {
+  background: #161b22;
+}
+
+.negative {
+  color: #f85149;
+}
+
+.positive {
+  color: #3fb950;
 }

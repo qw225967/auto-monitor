@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { fetchOverview, postExchangeKeys, postLiquidityThreshold } from './api'
-import { OverviewTable } from './components/OverviewTable'
-import type { OverviewResponse } from './types'
-import './App.css'
+import { fetchOverview, postExchangeKeys, postLiquidityThreshold } from '../api'
+import { OverviewTable } from '../components/OverviewTable'
+import type { OverviewResponse } from '../types'
 
 const POLL_INTERVAL_MS = 30000 // 30s 与后端通路探测同步
 
@@ -44,7 +43,7 @@ function warnByPreset(preset: FreshnessPreset) {
   return { overview: 90, chain: 30, liquidity: 600 }
 }
 
-function App() {
+export function ArbitrageMonitor() {
   const [data, setData] = useState<OverviewResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -90,7 +89,7 @@ function App() {
     try {
       await postExchangeKeys(keysInput.trim())
       setConfigMsg('已保存')
-      setKeysInput('') // 提交后立即清空，不保留在页面
+      setKeysInput('')
     } catch (e) {
       setConfigMsg(e instanceof Error ? e.message : '提交失败')
     } finally {
@@ -114,22 +113,7 @@ function App() {
   }
 
   return (
-    <div className="app">
-      <header className="header">
-        <div className="header-row">
-          <div>
-            <h1>加密货币搬砖监控</h1>
-            <p className="subtitle">价差 10s 更新 · 通路 30s 更新</p>
-          </div>
-          <button
-            type="button"
-            className="btn-config"
-            onClick={() => setConfigOpen((o) => !o)}
-          >
-            {configOpen ? '收起配置' : '配置'}
-          </button>
-        </div>
-      </header>
+    <>
       {configOpen && (
         <section className="config-section">
           <div className="config-block">
@@ -178,53 +162,58 @@ function App() {
           </div>
         </section>
       )}
-      <main className="main">
-        {loading && !data && <div className="loading">加载中...</div>}
-        {error && <div className="error">{error}</div>}
-        {data && (
-          <>
-            <section className="view-controls">
-              <div className="view-control-item">
-                <label htmlFor="sortMode">排序</label>
-                <select id="sortMode" value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}>
-                  <option value="net">按净价差</option>
-                  <option value="confidence">按置信度</option>
-                  <option value="spread">按原始价差</option>
-                </select>
-              </div>
-              <div className="view-control-item">
-                <label htmlFor="freshnessPreset">新鲜度策略</label>
-                <select
-                  id="freshnessPreset"
-                  value={freshnessPreset}
-                  onChange={(e) => setFreshnessPreset(e.target.value as FreshnessPreset)}
-                >
-                  <option value="strict">严格</option>
-                  <option value="normal">标准</option>
-                  <option value="relaxed">宽松</option>
-                </select>
-              </div>
-            </section>
-            <section className="freshness-panel">
-              <div className="freshness-item">
-                <span className="freshness-label">概览</span>
-                <span className={`freshness-value ${freshnessClass(data.overview_age_sec, warnByPreset(freshnessPreset).overview)}`}>{formatAge(data.overview_age_sec)}</span>
-              </div>
-              <div className="freshness-item">
-                <span className="freshness-label">链价</span>
-                <span className={`freshness-value ${freshnessClass(data.chain_prices_age_sec, warnByPreset(freshnessPreset).chain)}`}>{formatAge(data.chain_prices_age_sec)}</span>
-              </div>
-              <div className="freshness-item">
-                <span className="freshness-label">流动性</span>
-                <span className={`freshness-value ${freshnessClass(data.liquidity_age_sec, warnByPreset(freshnessPreset).liquidity)}`}>{formatAge(data.liquidity_age_sec)}</span>
-              </div>
-            </section>
-            <OverviewTable rows={data.overview ?? []} sortMode={sortMode} />
-          </>
-        )}
-      </main>
-    </div>
+      {loading && !data && <div className="loading">加载中...</div>}
+      {error && <div className="error">{error}</div>}
+      {data && (
+        <>
+          <section className="view-controls">
+            <div className="view-control-item">
+              <label htmlFor="sortMode">排序</label>
+              <select id="sortMode" value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}>
+                <option value="net">按净价差</option>
+                <option value="confidence">按置信度</option>
+                <option value="spread">按原始价差</option>
+              </select>
+            </div>
+            <div className="view-control-item">
+              <label htmlFor="freshnessPreset">新鲜度策略</label>
+              <select
+                id="freshnessPreset"
+                value={freshnessPreset}
+                onChange={(e) => setFreshnessPreset(e.target.value as FreshnessPreset)}
+              >
+                <option value="strict">严格</option>
+                <option value="normal">标准</option>
+                <option value="relaxed">宽松</option>
+              </select>
+            </div>
+            <div className="view-control-item" style={{ marginLeft: 'auto' }}>
+              <button
+                type="button"
+                className="btn-config"
+                onClick={() => setConfigOpen((o) => !o)}
+              >
+                {configOpen ? '收起配置' : '配置'}
+              </button>
+            </div>
+          </section>
+          <section className="freshness-panel">
+            <div className="freshness-item">
+              <span className="freshness-label">概览</span>
+              <span className={`freshness-value ${freshnessClass(data.overview_age_sec, warnByPreset(freshnessPreset).overview)}`}>{formatAge(data.overview_age_sec)}</span>
+            </div>
+            <div className="freshness-item">
+              <span className="freshness-label">链价</span>
+              <span className={`freshness-value ${freshnessClass(data.chain_prices_age_sec, warnByPreset(freshnessPreset).chain)}`}>{formatAge(data.chain_prices_age_sec)}</span>
+            </div>
+            <div className="freshness-item">
+              <span className="freshness-label">流动性</span>
+              <span className={`freshness-value ${freshnessClass(data.liquidity_age_sec, warnByPreset(freshnessPreset).liquidity)}`}>{formatAge(data.liquidity_age_sec)}</span>
+            </div>
+          </section>
+          <OverviewTable rows={data.overview ?? []} sortMode={sortMode} />
+        </>
+      )}
+    </>
   )
 }
-
-export default App

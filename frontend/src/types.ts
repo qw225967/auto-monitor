@@ -37,3 +37,31 @@ export interface OverviewResponse {
   chain_prices_age_sec?: number
   liquidity_age_sec?: number
 }
+
+export interface OpportunityItem {
+  symbol: string
+  spot_exchange: string
+  futures_exchange: string
+  spread_percent: number
+  spot_orderbook_depth: number
+  futures_orderbook_depth: number
+  price_slope_5m: number
+  volume_spike: boolean
+  confidence: number
+  updated_at: string
+}
+
+export interface FunnelStats {
+  total_symbols: number
+  after_negative_spread: number
+  after_spot_depth: number
+  after_price_slope: number
+  after_volume: number
+  after_both_depth: number
+}
+
+export interface OpportunitiesResponse {
+  opportunities: OpportunityItem[]
+  funnel_stats: FunnelStats
+  updated_at: string
+}

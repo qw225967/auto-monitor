@@ -1,9 +1,17 @@
-import type { OverviewResponse } from './types'
+import type { OverviewResponse, OpportunitiesResponse } from './types'
 
 const API_BASE = '/api'
 
 export async function fetchOverview(): Promise<OverviewResponse> {
   const res = await fetch(`${API_BASE}/overview`)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function fetchOpportunities(): Promise<OpportunitiesResponse> {
+  const res = await fetch(`${API_BASE}/opportunities`)
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`)
   }

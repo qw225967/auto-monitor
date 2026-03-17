@@ -1,5 +1,9 @@
 package model
 
+import (
+	"time"
+)
+
 // 数据源输出类型
 const (
 	DataTypeSpread     = "spread"
@@ -106,4 +110,42 @@ type OverviewResponse struct {
 	OverviewAgeSec     int64   `json:"overview_age_sec,omitempty"`
 	ChainPricesAgeSec  int64   `json:"chain_prices_age_sec,omitempty"`
 	LiquidityAgeSec    int64   `json:"liquidity_age_sec,omitempty"`
+}
+
+// OpportunityItem 机会发现页面返回的单条记录
+type OpportunityItem struct {
+	Symbol                string  `json:"symbol"`
+	SpotExchange          string  `json:"spot_exchange"`
+	FuturesExchange       string  `json:"futures_exchange"`
+	SpreadPercent         float64 `json:"spread_percent"`
+	SpotOrderbookDepth    float64 `json:"spot_orderbook_depth"`
+	FuturesOrderbookDepth float64 `json:"futures_orderbook_depth"`
+	PriceSlope5m          float64 `json:"price_slope_5m"`
+	VolumeSpike           bool    `json:"volume_spike"`
+	Confidence            int     `json:"confidence"`
+	UpdatedAt             string  `json:"updated_at"`
+}
+
+// FunnelStats 漏斗筛选统计
+type FunnelStats struct {
+	TotalSymbols        int `json:"total_symbols"`
+	AfterNegativeSpread int `json:"after_negative_spread"`
+	AfterSpotDepth     int `json:"after_spot_depth"`
+	AfterPriceSlope    int `json:"after_price_slope"`
+	AfterVolume        int `json:"after_volume"`
+	AfterBothDepth     int `json:"after_both_depth"`
+}
+
+// OpportunitiesResponse 机会发现 API 响应
+type OpportunitiesResponse struct {
+	Opportunities []OpportunityItem `json:"opportunities"`
+	FunnelStats   FunnelStats       `json:"funnel_stats"`
+	UpdatedAt     string           `json:"updated_at"`
+}
+
+// PricePoint 价格历史点（用于斜率计算）
+type PricePoint struct {
+	Price     float64   `json:"price"`
+	Timestamp time.Time `json:"timestamp"`
+	Volume    float64   `json:"volume"`
 }
