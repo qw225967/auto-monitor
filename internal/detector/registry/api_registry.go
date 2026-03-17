@@ -29,22 +29,37 @@ const (
 	doGetMaxRetries      = 3
 	doGetRetryBackoff    = 500 * time.Millisecond
 	delayBetweenRequests = 250 * time.Millisecond // 交易所间请求间隔，铺满探测周期
+	defaultCacheTTL      = 10 * time.Minute
 )
 
 // APINetworkRegistry 从交易所公开 API 实时获取充提网络，按价差 symbol 刷新（跟随 30s 探测周期）
 type APINetworkRegistry struct {
-	mu       sync.RWMutex
-	withdraw map[string][]model.WithdrawNetworkInfo // key: "exchange:asset"
-	deposit  map[string][]model.WithdrawNetworkInfo
-	client   *http.Client
+	mu                 sync.RWMutex
+	withdraw           map[string][]model.WithdrawNetworkInfo // key: "exchange:asset"
+	deposit            map[string][]model.WithdrawNetworkInfo
+	withdrawUpdatedAt  map[string]time.Time
+	depositUpdatedAt   map[string]time.Time
+	cacheTTL           time.Duration
+	client             *http.Client
 }
 
 // NewAPINetworkRegistry 创建 API 注册表
 func NewAPINetworkRegistry() *APINetworkRegistry {
+	return NewAPINetworkRegistryWithTTL(defaultCacheTTL)
+}
+
+// NewAPINetworkRegistryWithTTL 创建带缓存 TTL 的 API 注册表
+func NewAPINetworkRegistryWithTTL(ttl time.Duration) *APINetworkRegistry {
+	if ttl <= 0 {
+		ttl = defaultCacheTTL
+	}
 	return &APINetworkRegistry{
-		withdraw: make(map[string][]model.WithdrawNetworkInfo),
-		deposit:  make(map[string][]model.WithdrawNetworkInfo),
-		client:   &http.Client{Timeout: 20 * time.Second},
+		withdraw:          make(map[string][]model.WithdrawNetworkInfo),
+		deposit:           make(map[string][]model.WithdrawNetworkInfo),
+		withdrawUpdatedAt: make(map[string]time.Time),
+		depositUpdatedAt:  make(map[string]time.Time),
+		cacheTTL:          ttl,
+		client:            &http.Client{Timeout: 20 * time.Second},
 	}
 }
 
@@ -61,6 +76,8 @@ func (a *APINetworkRegistry) Refresh(ctx context.Context, symbols []string) {
 	}
 	wd := make(map[string][]model.WithdrawNetworkInfo)
 	dep := make(map[string][]model.WithdrawNetworkInfo)
+	wdTouched := make(map[string]bool)
+	depTouched := make(map[string]bool)
 	var mergeMu sync.Mutex
 
 	// 5 所交易所并行，每所内串行 + 请求间隔
@@ -71,20 +88,34 @@ func (a *APINetworkRegistry) Refresh(ctx context.Context, symbols []string) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			a.refreshOneExchange(ctx, ex, assets, &mergeMu, wd, dep)
+			a.refreshOneExchange(ctx, ex, assets, &mergeMu, wd, dep, wdTouched, depTouched)
 		}()
 	}
 	wg.Wait()
 
+	now := time.Now()
 	a.mu.Lock()
-	a.withdraw = wd
-	a.deposit = dep
+	// 增量合并：仅更新本轮成功获取到的 key，失败时保留旧缓存，避免全表抖空
+	for k, v := range wd {
+		if wdTouched[k] {
+			a.withdraw[k] = v
+			a.withdrawUpdatedAt[k] = now
+		}
+	}
+	for k, v := range dep {
+		if depTouched[k] {
+			a.deposit[k] = v
+			a.depositUpdatedAt[k] = now
+		}
+	}
+	// 清理过期缓存，防止长期残留
+	a.cleanupStaleLocked(now)
 	a.mu.Unlock()
 }
 
 // refreshOneExchange 单所串行请求，每次请求后等待，铺满间隔
 // Binance/OKX 需认证，一次请求获取全部，按 asset 过滤
-func (a *APINetworkRegistry) refreshOneExchange(ctx context.Context, exchange string, assets []string, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo) {
+func (a *APINetworkRegistry) refreshOneExchange(ctx context.Context, exchange string, assets []string, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo, wdTouched, depTouched map[string]bool) {
 	assetSet := make(map[string]bool)
 	for _, s := range assets {
 		assetSet[strings.ToUpper(strings.TrimSpace(s))] = true
@@ -92,11 +123,11 @@ func (a *APINetworkRegistry) refreshOneExchange(ctx context.Context, exchange st
 
 	// Binance/OKX：一次请求获取全部，需 key
 	if exchange == "binance" {
-		a.refreshBinanceAll(ctx, assetSet, mergeMu, wd, dep)
+		a.refreshBinanceAll(ctx, assetSet, mergeMu, wd, dep, wdTouched, depTouched)
 		return
 	}
 	if exchange == "okex" || exchange == "okx" {
-		a.refreshOkexAll(ctx, assetSet, mergeMu, wd, dep)
+		a.refreshOkexAll(ctx, assetSet, mergeMu, wd, dep, wdTouched, depTouched)
 		return
 	}
 
@@ -115,9 +146,11 @@ func (a *APINetworkRegistry) refreshOneExchange(ctx context.Context, exchange st
 			k := a.cacheKey(exchange, asset)
 			if len(w) > 0 {
 				wd[k] = w
+				wdTouched[k] = true
 			}
 			if len(d) > 0 {
 				dep[k] = d
+				depTouched[k] = true
 			}
 			mergeMu.Unlock()
 		}
@@ -343,7 +376,7 @@ func (a *APINetworkRegistry) fetchGateWithRetry(ctx context.Context, asset strin
 }
 
 // refreshBinanceAll 一次请求获取 Binance 全部充提网络，需 config.GetExchangeKeys()
-func (a *APINetworkRegistry) refreshBinanceAll(ctx context.Context, assetSet map[string]bool, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo) {
+func (a *APINetworkRegistry) refreshBinanceAll(ctx context.Context, assetSet map[string]bool, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo, wdTouched, depTouched map[string]bool) {
 	keys := config.GetExchangeKeys()
 	if keys == nil || !keys.HasKeys("binance") {
 		return
@@ -421,9 +454,11 @@ func (a *APINetworkRegistry) refreshBinanceAll(ctx context.Context, assetSet map
 			k := a.cacheKey("binance", asset)
 			if len(wdNets) > 0 {
 				wd[k] = wdNets
+				wdTouched[k] = true
 			}
 			if len(depNets) > 0 {
 				dep[k] = depNets
+				depTouched[k] = true
 			}
 			mergeMu.Unlock()
 		}
@@ -431,7 +466,7 @@ func (a *APINetworkRegistry) refreshBinanceAll(ctx context.Context, assetSet map
 }
 
 // refreshOkexAll 一次请求获取 OKX 全部充提网络，需 config.GetExchangeKeys()
-func (a *APINetworkRegistry) refreshOkexAll(ctx context.Context, assetSet map[string]bool, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo) {
+func (a *APINetworkRegistry) refreshOkexAll(ctx context.Context, assetSet map[string]bool, mergeMu *sync.Mutex, wd, dep map[string][]model.WithdrawNetworkInfo, wdTouched, depTouched map[string]bool) {
 	keys := config.GetExchangeKeys()
 	if keys == nil || !keys.HasKeys("okx") {
 		return
@@ -505,11 +540,35 @@ func (a *APINetworkRegistry) refreshOkexAll(ctx context.Context, assetSet map[st
 			k := a.cacheKey("okex", asset)
 			if len(wdNets) > 0 {
 				wd[k] = wdNets
+				wdTouched[k] = true
 			}
 			if len(depNets) > 0 {
 				dep[k] = depNets
+				depTouched[k] = true
 			}
 			mergeMu.Unlock()
+		}
+	}
+}
+
+func (a *APINetworkRegistry) isFreshLocked(ts time.Time, now time.Time) bool {
+	if ts.IsZero() {
+		return false
+	}
+	return now.Sub(ts) <= a.cacheTTL
+}
+
+func (a *APINetworkRegistry) cleanupStaleLocked(now time.Time) {
+	for k, ts := range a.withdrawUpdatedAt {
+		if !a.isFreshLocked(ts, now) {
+			delete(a.withdrawUpdatedAt, k)
+			delete(a.withdraw, k)
+		}
+	}
+	for k, ts := range a.depositUpdatedAt {
+		if !a.isFreshLocked(ts, now) {
+			delete(a.depositUpdatedAt, k)
+			delete(a.deposit, k)
 		}
 	}
 }
@@ -622,8 +681,9 @@ func (a *APINetworkRegistry) GetWithdrawNetworks(exchangeType, asset string) ([]
 	k := a.cacheKey(ex, asset)
 	a.mu.RLock()
 	v, ok := a.withdraw[k]
+	ts := a.withdrawUpdatedAt[k]
 	a.mu.RUnlock()
-	if ok {
+	if ok && time.Since(ts) <= a.cacheTTL {
 		return v, nil
 	}
 	return nil, nil
@@ -638,8 +698,9 @@ func (a *APINetworkRegistry) GetDepositNetworks(exchangeType, asset string) ([]m
 	k := a.cacheKey(ex, asset)
 	a.mu.RLock()
 	v, ok := a.deposit[k]
+	ts := a.depositUpdatedAt[k]
 	a.mu.RUnlock()
-	if ok {
+	if ok && time.Since(ts) <= a.cacheTTL {
 		return v, nil
 	}
 	return nil, nil

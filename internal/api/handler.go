@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/qw225967/auto-monitor/internal/config"
@@ -13,10 +14,13 @@ import (
 type Handler struct {
 	mu            sync.RWMutex
 	overview      *model.OverviewResponse
+	overviewUpdatedAt time.Time
 	chainPriceMu  sync.RWMutex
 	chainPrices   map[string]float64 // key: "asset:chainID"
+	chainPricesUpdatedAt time.Time
 	liquidityMu   sync.RWMutex
 	liquidity     map[string]float64 // key: "asset:chainID" -> reserve_usd
+	liquidityUpdatedAt time.Time
 }
 
 // New 创建 Handler
@@ -33,6 +37,7 @@ func (h *Handler) UpdateOverview(resp *model.OverviewResponse) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.overview = resp
+	h.overviewUpdatedAt = time.Now()
 }
 
 // UpdateChainPrices 更新链上价格缓存（由 ChainPrice Ticker 调用）
@@ -40,6 +45,7 @@ func (h *Handler) UpdateChainPrices(prices map[string]float64) {
 	h.chainPriceMu.Lock()
 	defer h.chainPriceMu.Unlock()
 	h.chainPrices = prices
+	h.chainPricesUpdatedAt = time.Now()
 }
 
 // GetChainPrice 获取某资产在某链上的价格（供 Phase 10 使用）
@@ -65,6 +71,7 @@ func (h *Handler) GetAllChainPrices() map[string]float64 {
 func (h *Handler) UpdateLiquidity(m map[string]float64) {
 	h.liquidityMu.Lock()
 	defer h.liquidityMu.Unlock()
+	h.liquidityUpdatedAt = time.Now()
 	if m == nil {
 		h.liquidity = make(map[string]float64)
 		return
@@ -90,14 +97,46 @@ func (h *Handler) GetAllLiquidity() map[string]float64 {
 func (h *Handler) GetOverview(c *gin.Context) {
 	h.mu.RLock()
 	resp := h.overview
+	overviewAt := h.overviewUpdatedAt
 	h.mu.RUnlock()
+	h.chainPriceMu.RLock()
+	chainAt := h.chainPricesUpdatedAt
+	h.chainPriceMu.RUnlock()
+	h.liquidityMu.RLock()
+	liquidityAt := h.liquidityUpdatedAt
+	h.liquidityMu.RUnlock()
 	if resp == nil {
 		c.JSON(http.StatusOK, &model.OverviewResponse{Overview: []model.OverviewRow{}})
 		return
 	}
+	now := time.Now()
+	overviewAge := int64(0)
+	chainAge := int64(0)
+	liquidityAge := int64(0)
+	overviewAtStr := ""
+	chainAtStr := ""
+	liquidityAtStr := ""
+	if !overviewAt.IsZero() {
+		overviewAge = int64(now.Sub(overviewAt).Seconds())
+		overviewAtStr = overviewAt.UTC().Format(time.RFC3339)
+	}
+	if !chainAt.IsZero() {
+		chainAge = int64(now.Sub(chainAt).Seconds())
+		chainAtStr = chainAt.UTC().Format(time.RFC3339)
+	}
+	if !liquidityAt.IsZero() {
+		liquidityAge = int64(now.Sub(liquidityAt).Seconds())
+		liquidityAtStr = liquidityAt.UTC().Format(time.RFC3339)
+	}
 	out := &model.OverviewResponse{
-		Overview:           resp.Overview,
-		LiquidityThreshold: config.GetLiquidityThreshold(),
+		Overview:             resp.Overview,
+		LiquidityThreshold:   config.GetLiquidityThreshold(),
+		OverviewUpdatedAt:    overviewAtStr,
+		ChainPricesUpdatedAt: chainAtStr,
+		LiquidityUpdatedAt:   liquidityAtStr,
+		OverviewAgeSec:       overviewAge,
+		ChainPricesAgeSec:    chainAge,
+		LiquidityAgeSec:      liquidityAge,
 	}
 	c.JSON(http.StatusOK, out)
 }

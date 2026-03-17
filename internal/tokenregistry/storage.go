@@ -70,15 +70,20 @@ func (s *Storage) MergeIncremental(rd *RegistryData, newInfos []TokenInfo) int {
 			rd.Assets[asset] = make(map[string]TokenChainInfo)
 		}
 		existing := rd.Assets[asset][chainID]
-		// 增量：仅当地址或精度变化时更新；ReserveUSD 由流动性同步单独更新
-		if existing.Address != ti.Address || existing.Decimals != ti.Decimals {
-			info := TokenChainInfo{
-				Address:    ti.Address,
-				Decimals:   ti.Decimals,
-				Symbol:     ti.Symbol,
-				UpdatedAt:  now,
-				ReserveUSD: existing.ReserveUSD,
-			}
+		// 链级增量：地址/精度变化时更新；即使未变化也刷新 UpdatedAt，避免 TTL 到期后重复全量请求
+		info := TokenChainInfo{
+			Address:                ti.Address,
+			Decimals:               ti.Decimals,
+			Symbol:                 ti.Symbol,
+			UpdatedAt:              now,
+			ReserveUSD:             existing.ReserveUSD,
+			LiquidityNegativeUntil: existing.LiquidityNegativeUntil,
+			LiquidityNegativeReason: existing.LiquidityNegativeReason,
+		}
+		if existing.Address != info.Address ||
+			existing.Decimals != info.Decimals ||
+			existing.Symbol != info.Symbol ||
+			existing.UpdatedAt != info.UpdatedAt {
 			rd.Assets[asset][chainID] = info
 			updated++
 		}
@@ -93,6 +98,35 @@ func HasAsset(rd *RegistryData, asset string) bool {
 		return false
 	}
 	return len(rd.Assets[asset]) > 0
+}
+
+// NeedRefreshAssetByTTL 资产级刷新判断：
+// - 本地不存在该资产：需要刷新
+// - 任一链记录缺失/过期：需要刷新
+// - 全部链都在 TTL 内：不刷新
+func NeedRefreshAssetByTTL(rd *RegistryData, asset string, ttl time.Duration, now time.Time) bool {
+	asset = strings.ToUpper(strings.TrimSpace(asset))
+	chains := rd.Assets[asset]
+	if len(chains) == 0 {
+		return true
+	}
+	if ttl <= 0 {
+		return true
+	}
+	for _, info := range chains {
+		ts := strings.TrimSpace(info.UpdatedAt)
+		if ts == "" {
+			return true
+		}
+		t, err := time.Parse(time.RFC3339, ts)
+		if err != nil {
+			return true
+		}
+		if now.Sub(t) >= ttl {
+			return true
+		}
+	}
+	return false
 }
 
 // GetTokenInfo 查询某资产在某链上的信息

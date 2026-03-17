@@ -16,6 +16,10 @@ type SyncConfig struct {
 	UseAllSymbols    bool
 	SpreadThreshold  float64
 	CoingeckoDelay   time.Duration
+	TokenRefreshTTL  time.Duration // 资产 token 信息刷新 TTL，过期后重新请求 CoinGecko 以补全新链
+	BudgetPath       string
+	BudgetEnabled    bool
+	BudgetMonthlyLimit int
 	CoinGeckoAPIKey  string
 	CoinGeckoPro     bool
 }
@@ -47,14 +51,33 @@ func RunSync(ctx context.Context, cfg SyncConfig) (updated int, err error) {
 	if delay == 0 {
 		delay = 10 * time.Second
 	}
+	refreshTTL := cfg.TokenRefreshTTL
+	if refreshTTL == 0 {
+		refreshTTL = 7 * 24 * time.Hour
+	}
 	delay429 := 65 * time.Second
+	now := time.Now()
+	budget := GetCoinGeckoBudget(cfg.BudgetPath, cfg.BudgetEnabled, cfg.BudgetMonthlyLimit)
+	budgetDenied := 0
 
 	for _, asset := range assets {
 		asset = strings.ToUpper(strings.TrimSpace(asset))
 		if asset == "" {
 			continue
 		}
-		if HasAsset(rd, asset) {
+		if !NeedRefreshAssetByTTL(rd, asset, refreshTTL, now) {
+			continue
+		}
+		allowed, reason, snap, bErr := budget.TryConsume(1, time.Now())
+		if bErr != nil {
+			log.Printf("[TokenSync] budget error: %v", bErr)
+		}
+		if !allowed {
+			budgetDenied++
+			if budgetDenied <= 3 {
+				log.Printf("[TokenSync] budget deny(%s): used=%d/%d remaining=%d today=%d/%d",
+					reason, snap.Used, snap.MonthlyLimit, snap.Remaining, snap.TodayUsed, snap.TodayCap)
+			}
 			continue
 		}
 		infos, err := fetcher.FetchTokenInfos(ctx, asset)
@@ -76,6 +99,9 @@ func RunSync(ctx context.Context, cfg SyncConfig) (updated int, err error) {
 			return updated, ctx.Err()
 		case <-time.After(delay):
 		}
+	}
+	if budgetDenied > 0 {
+		log.Printf("[TokenSync] 因预算跳过 %d 次 CoinGecko 请求", budgetDenied)
 	}
 
 	if updated > 0 {

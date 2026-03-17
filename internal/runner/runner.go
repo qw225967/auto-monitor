@@ -2,8 +2,10 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/qw225967/auto-monitor/internal/aggregator"
 	"github.com/qw225967/auto-monitor/internal/builder"
@@ -21,15 +23,36 @@ type pathKey struct {
 
 // Runner 主流程编排：聚合 → 探测 → 表格组装
 type Runner struct {
-	det       detector.Detector
-	threshold float64
+	det               detector.Detector
+	threshold         float64
+	detectConcurrency int
+	detectTimeout     time.Duration
+}
+
+// Options Runner 运行参数
+type Options struct {
+	DetectConcurrency int
+	DetectTimeout     time.Duration
 }
 
 // New 创建 Runner
 func New(det detector.Detector, threshold float64) *Runner {
+	return NewWithOptions(det, threshold, Options{})
+}
+
+// NewWithOptions 创建带运行参数的 Runner
+func NewWithOptions(det detector.Detector, threshold float64, opt Options) *Runner {
+	if opt.DetectConcurrency <= 0 {
+		opt.DetectConcurrency = 64
+	}
+	if opt.DetectTimeout <= 0 {
+		opt.DetectTimeout = 10 * time.Second
+	}
 	return &Runner{
-		det:       det,
-		threshold: threshold,
+		det:               det,
+		threshold:         threshold,
+		detectConcurrency: opt.DetectConcurrency,
+		detectTimeout:     opt.DetectTimeout,
 	}
 }
 
@@ -96,12 +119,31 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 	results := make([]result, 0, len(pathSet))
 
 	g, gctx := errgroup.WithContext(ctx)
+	sem := make(chan struct{}, r.detectConcurrency)
 	for k, item := range pathSet {
 		k, item := k, item
 		g.Go(func() error {
-			paths, err := r.det.DetectRoutes(gctx, k.symbol, k.buy, k.sell)
+			select {
+			case sem <- struct{}{}:
+			case <-gctx.Done():
+				return nil
+			}
+			defer func() { <-sem }()
+
+			detectCtx := gctx
+			cancel := func() {}
+			if r.detectTimeout > 0 {
+				detectCtx, cancel = context.WithTimeout(gctx, r.detectTimeout)
+			}
+			defer cancel()
+
+			paths, err := r.det.DetectRoutes(detectCtx, k.symbol, k.buy, k.sell)
 			if err != nil {
-				log.Printf("[Runner] detect %s %s->%s: %v", k.symbol, k.buy, k.sell, err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					log.Printf("[Runner] detect timeout %s %s->%s after %v", k.symbol, k.buy, k.sell, r.detectTimeout)
+				} else {
+					log.Printf("[Runner] detect %s %s->%s: %v", k.symbol, k.buy, k.sell, err)
+				}
 				return nil // 单路失败不中断
 			}
 			mu.Lock()
@@ -154,6 +196,17 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 		return nil, err
 	}
 	resp := out.(*model.OverviewResponse)
+	// CEX-CEX 行补充静态成本估算，过滤净价差<=0
+	if len(resp.Overview) > 0 {
+		var filtered []model.OverviewRow
+		for _, row := range resp.Overview {
+			erow := opportunities.EnrichEconomics(row)
+			if erow.NetSpreadPercent > 0 {
+				filtered = append(filtered, erow)
+			}
+		}
+		resp.Overview = filtered
+	}
 
 	// 合并 CEX-DEX、DEX-DEX，并附加探测路径
 	resultMap := make(map[pathKey][]builder.PhysicalPathRow)
@@ -173,6 +226,9 @@ func (r *Runner) RunDetect(ctx context.Context, items []model.SpreadItem, chainP
 	merged := opportunities.MergeAndSort(resp.Overview, cexDexWithPaths, dexDexWithPaths)
 	// 过滤掉完全没有可用通路的标的
 	resp.Overview = filterNoAvailablePaths(merged)
+	for i := range resp.Overview {
+		resp.Overview[i] = opportunities.EnrichConfidence(resp.Overview[i])
+	}
 	return resp, nil
 }
 
@@ -211,12 +267,31 @@ func (r *Runner) runDetectCexDexDexOnly(ctx context.Context, cexDex, dexDex []mo
 	var mu sync.Mutex
 	var results []result
 	g, gctx := errgroup.WithContext(ctx)
+	sem := make(chan struct{}, r.detectConcurrency)
 	for k := range pathSet {
 		k := k
 		g.Go(func() error {
-			paths, err := r.det.DetectRoutes(gctx, k.symbol, k.buy, k.sell)
+			select {
+			case sem <- struct{}{}:
+			case <-gctx.Done():
+				return nil
+			}
+			defer func() { <-sem }()
+
+			detectCtx := gctx
+			cancel := func() {}
+			if r.detectTimeout > 0 {
+				detectCtx, cancel = context.WithTimeout(gctx, r.detectTimeout)
+			}
+			defer cancel()
+
+			paths, err := r.det.DetectRoutes(detectCtx, k.symbol, k.buy, k.sell)
 			if err != nil {
-				log.Printf("[Runner] detect %s %s->%s: %v", k.symbol, k.buy, k.sell, err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					log.Printf("[Runner] detect timeout %s %s->%s after %v", k.symbol, k.buy, k.sell, r.detectTimeout)
+				} else {
+					log.Printf("[Runner] detect %s %s->%s: %v", k.symbol, k.buy, k.sell, err)
+				}
 				return nil
 			}
 			mu.Lock()
@@ -244,6 +319,9 @@ func (r *Runner) runDetectCexDexDexOnly(ctx context.Context, cexDex, dexDex []mo
 	cexDexWithPaths := attachPathsToRows(cexDex, resultMap)
 	dexDexWithPaths := attachPathsToRows(dexDex, resultMap)
 	merged := opportunities.MergeAndSort(nil, cexDexWithPaths, dexDexWithPaths)
+	for i := range merged {
+		merged[i] = opportunities.EnrichConfidence(merged[i])
+	}
 	return &model.OverviewResponse{
 		Overview: filterNoAvailablePaths(merged),
 	}, nil

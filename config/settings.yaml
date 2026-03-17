@@ -2,7 +2,7 @@
 # 可通过环境变量覆盖
 
 server:
-  port: 8080
+  port: 8088
 
 seeingstone:
   api_url: https://seeingstone.cloud
@@ -16,10 +16,27 @@ intervals:
   fetch: 3    # 价差拉取间隔 (秒)
   detect: 30  # 全 symbol 通路探测间隔 (秒)
 
+runner:
+  detect_max_concurrency: 64 # 通路探测并发上限
+  detect_route_timeout: 10    # 单路探测超时 (秒)
+
 token_registry:
   path: data/token_registry.json
   sync_interval: 300   # Token 信息补全间隔 (秒)，全量 symbol 增量更新
+  token_refresh_ttl: 604800 # Token 信息刷新 TTL (秒)，默认 7d，过期后重新请求以补全新增链
   liquidity_sync_interval: 14400  # 流动性全表同步间隔 (秒)，默认 4h，约 500 对×6 次/天≈9 万/月
+  priority_sync_enabled: true     # 启用候选优先流动性同步（高频）
+  priority_sync_interval: 300     # 候选优先流动性同步间隔 (秒)
+  priority_top_assets: 30         # 每轮按 spread 选取的候选资产数
+  priority_max_requests: 80       # 每轮优先同步最大请求数（配额保护）
+  liquidity_retry_max: 3          # 每次流动性请求最大重试次数（不含首次）
+  liquidity_backoff_base_ms: 500  # 重试退避基础毫秒
+  liquidity_backoff_max_ms: 5000  # 重试退避最大毫秒
+  liquidity_backoff_jitter: 20    # 重试抖动百分比（±20%）
+  liquidity_negative_ttl: 86400   # 负缓存 TTL (秒)，404/无池命中后默认 24h 不重复请求
+  coingecko_budget_enabled: true  # 启用 CoinGecko 预算管理（日节奏 + 月上限）
+  coingecko_budget_path: data/coingecko_budget.json # 预算状态持久化文件
+  coingecko_monthly_limit: 100000 # 月总请求上限（Demo/Pro按实际套餐配置）
   # coingecko_api_key: ""   # CoinGecko Demo/Pro Key，避免 429
   # coingecko_pro: false    # Pro 用户设为 true
 

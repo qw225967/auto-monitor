@@ -80,6 +80,10 @@ type OverviewRow struct {
 	BuyExchange        string          `json:"buy_exchange"`         // CEX 名或 Chain_56
 	SellExchange       string          `json:"sell_exchange"`        // CEX 名或 Chain_1
 	SpreadPercent      float64         `json:"spread_percent"`
+	GrossSpreadPercent float64         `json:"gross_spread_percent,omitempty"`  // 估算前毛价差（%）
+	EstimatedCostPercent float64       `json:"estimated_cost_percent,omitempty"` // 静态成本估算（%）
+	NetSpreadPercent   float64         `json:"net_spread_percent,omitempty"`    // 估算后净价差（%）
+	ConfidenceScore    float64         `json:"confidence_score,omitempty"`       // 置信度评分 [0,1]
 	AvailablePathCount int             `json:"available_path_count"`
 	DetailPaths        []DetailPathRow `json:"detail_paths"`
 }
@@ -96,4 +100,10 @@ type OverviewResponse struct {
 	Overview []OverviewRow `json:"overview"`
 	// LiquidityThreshold 当前生效的流动性阈值（USDT），0 表示不限制
 	LiquidityThreshold float64 `json:"liquidity_threshold,omitempty"`
+	OverviewUpdatedAt  string  `json:"overview_updated_at,omitempty"`
+	ChainPricesUpdatedAt string `json:"chain_prices_updated_at,omitempty"`
+	LiquidityUpdatedAt string  `json:"liquidity_updated_at,omitempty"`
+	OverviewAgeSec     int64   `json:"overview_age_sec,omitempty"`
+	ChainPricesAgeSec  int64   `json:"chain_prices_age_sec,omitempty"`
+	LiquidityAgeSec    int64   `json:"liquidity_age_sec,omitempty"`
 }

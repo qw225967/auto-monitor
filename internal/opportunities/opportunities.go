@@ -90,6 +90,10 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 								SellExchange:   "Chain_" + chainID,
 								SpreadPercent:  spread,
 							})
+							rows[len(rows)-1] = EnrichEconomics(rows[len(rows)-1])
+							if rows[len(rows)-1].NetSpreadPercent <= 0 {
+								rows = rows[:len(rows)-1]
+							}
 						}
 					}
 				}
@@ -118,6 +122,10 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 								SellExchange:  it.SellExchange,
 								SpreadPercent: spread,
 							})
+							rows[len(rows)-1] = EnrichEconomics(rows[len(rows)-1])
+							if rows[len(rows)-1].NetSpreadPercent <= 0 {
+								rows = rows[:len(rows)-1]
+							}
 						}
 					}
 				}
@@ -136,6 +144,10 @@ func ComputeCexDex(items []model.SpreadItem, chainPrices map[string]float64, thr
 							SellExchange:  "Chain",
 							SpreadPercent: estSpread,
 						})
+						rows[len(rows)-1] = EnrichEconomics(rows[len(rows)-1])
+						if rows[len(rows)-1].NetSpreadPercent <= 0 {
+							rows = rows[:len(rows)-1]
+						}
 					}
 				}
 			}
@@ -228,6 +240,10 @@ func ComputeDexDex(chainPrices map[string]float64, threshold float64, liquidity 
 			SellExchange:  "Chain_" + p.sellChain,
 			SpreadPercent: p.spread,
 		})
+		rows[len(rows)-1] = EnrichEconomics(rows[len(rows)-1])
+		if rows[len(rows)-1].NetSpreadPercent <= 0 {
+			rows = rows[:len(rows)-1]
+		}
 	}
 	return rows
 }
@@ -252,7 +268,7 @@ func MergeAndSort(cexCex, cexDex, dexDex []model.OverviewRow) []model.OverviewRo
 			a, b = b, a
 		}
 		k := pairKey{row.Symbol, a, b}
-		if cur, ok := best[k]; !ok || row.SpreadPercent > cur.SpreadPercent {
+		if cur, ok := best[k]; !ok || EffectiveSpreadForSort(row) > EffectiveSpreadForSort(cur) {
 			best[k] = row
 		}
 	}
@@ -260,6 +276,12 @@ func MergeAndSort(cexCex, cexDex, dexDex []model.OverviewRow) []model.OverviewRo
 	for _, row := range best {
 		out = append(out, row)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].SpreadPercent > out[j].SpreadPercent })
+	sort.Slice(out, func(i, j int) bool {
+		si, sj := EffectiveSpreadForSort(out[i]), EffectiveSpreadForSort(out[j])
+		if si == sj {
+			return EffectiveConfidenceForSort(out[i]) > EffectiveConfidenceForSort(out[j])
+		}
+		return si > sj
+	})
 	return out
 }
