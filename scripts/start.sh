@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 ROOT=$(pwd)
 
 # 端口
-BACKEND_PORT=8080
+BACKEND_PORT=8088
 FRONTEND_PORT=5173
 
 # PID 文件
