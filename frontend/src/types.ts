@@ -12,6 +12,10 @@ export interface OverviewRow {
   buy_exchange: string
   sell_exchange: string
   spread_percent: number
+  gross_spread_percent?: number
+  estimated_cost_percent?: number
+  net_spread_percent?: number
+  confidence_score?: number
   available_path_count?: number
   detail_paths?: DetailPathRow[]
 }
@@ -26,4 +30,10 @@ export interface OverviewResponse {
   overview: OverviewRow[]
   /** 当前生效的流动性阈值（USDT），0 表示不限制 */
   liquidity_threshold?: number
+  overview_updated_at?: string
+  chain_prices_updated_at?: string
+  liquidity_updated_at?: string
+  overview_age_sec?: number
+  chain_prices_age_sec?: number
+  liquidity_age_sec?: number
 }

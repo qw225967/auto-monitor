@@ -5,6 +5,7 @@ import { DetailTable } from './DetailTable'
 
 interface Props {
   rows: OverviewRow[]
+  sortMode?: 'net' | 'confidence' | 'spread'
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -21,14 +22,31 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-export function OverviewTable({ rows }: Props) {
+function spreadForSort(row: OverviewRow): number {
+  if (row.net_spread_percent != null) return row.net_spread_percent
+  if (row.gross_spread_percent != null) return row.gross_spread_percent
+  return row.spread_percent ?? 0
+}
+
+export function OverviewTable({ rows, sortMode = 'net' }: Props) {
   const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null)
 
   const toggleExpand = (symbol: string) => {
     setExpandedSymbol((prev) => (prev === symbol ? null : symbol))
   }
 
-  const list = rows ?? []
+  const list = [...(rows ?? [])].sort((a, b) => {
+    if (sortMode === 'confidence') {
+      const ai = a.confidence_score ?? 0
+      const bi = b.confidence_score ?? 0
+      if (bi !== ai) return bi - ai
+      return spreadForSort(b) - spreadForSort(a)
+    }
+    if (sortMode === 'spread') {
+      return (b.spread_percent ?? 0) - (a.spread_percent ?? 0)
+    }
+    return spreadForSort(b) - spreadForSort(a)
+  })
   if (list.length === 0) {
     return (
       <div className="empty-state">
@@ -46,6 +64,8 @@ export function OverviewTable({ rows }: Props) {
             <th>币种</th>
             <th>路径 (买入 → 卖出)</th>
             <th>原始价差</th>
+            <th>净价差</th>
+            <th>置信度</th>
             <th>可用通路数</th>
             <th>操作</th>
           </tr>
@@ -63,6 +83,18 @@ export function OverviewTable({ rows }: Props) {
                   )}
                 </td>
                 <td>{row.spread_percent.toFixed(2)}%</td>
+                <td>
+                  {row.net_spread_percent != null
+                    ? `${row.net_spread_percent.toFixed(2)}%`
+                    : row.gross_spread_percent != null
+                      ? `${row.gross_spread_percent.toFixed(2)}%`
+                      : '-'}
+                </td>
+                <td>
+                  {row.confidence_score != null
+                    ? `${(row.confidence_score * 100).toFixed(0)}%`
+                    : '-'}
+                </td>
                 <td>{(row.available_path_count ?? 0)}条</td>
                 <td>
                   {(row.detail_paths?.length ?? 0) > 0 ? (
@@ -80,7 +112,7 @@ export function OverviewTable({ rows }: Props) {
               </tr>
               {expandedSymbol === `${row.symbol}-${row.path_display}` && (
                 <tr>
-                  <td colSpan={6} className="detail-cell">
+                  <td colSpan={8} className="detail-cell">
                     <DetailTable
                       paths={row.detail_paths ?? []}
                       renderStatus={(s) => <StatusBadge status={s} />}
