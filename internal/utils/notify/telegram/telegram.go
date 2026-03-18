@@ -97,7 +97,7 @@ func NewTelegramClient(botToken, chatID string, opts ...Option) *TelegramClient 
 	if options.useProxyConfig {
 		proxyConfig := config.GetProxyConfig()
 		if options.customProxyURL != "" {
-			_ = proxyConfig.SetProxyURL(options.customProxyURL)
+			proxyConfig.SetProxyURL(options.customProxyURL)
 		}
 		httpClient = proxyConfig.CreateClient(timeout)
 		longPollClient = proxyConfig.CreateClient(longPollTimeout)
@@ -397,7 +397,11 @@ func UpdateFromGlobalConfig() {
 	if GlobalTgBotClient == nil {
 		return
 	}
-	tgConfig := config.GetGlobalConfig().Telegram
+	g := config.GetGlobalConfig()
+	if g == nil || g.Telegram == nil {
+		return
+	}
+	tgConfig := g.Telegram
 	GlobalTgBotClient.SetChatID(tgConfig.ChatID)
 	GlobalTgBotClient.SetBotToken(tgConfig.BotToken)
 	notifyMsg := "【自动套利系统】🔄 Global Telegram 客户端配置已更新为当前对话"

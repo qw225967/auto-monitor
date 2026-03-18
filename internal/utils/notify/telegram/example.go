@@ -10,7 +10,7 @@ import (
 func ExampleUsage() {
 	// 方式一：从 GlobalConfig 读取（推荐）
 	globalCfg := config.GetGlobalConfig()
-	if globalCfg == nil {
+	if globalCfg == nil || globalCfg.Telegram == nil {
 		return
 	}
 	client := NewTelegramClient(
@@ -44,7 +44,7 @@ func ExampleUsageWithDirectConfig() {
 func ExampleUsageWithErrorHandling() {
 	// 检查配置是否已设置
 	globalCfg := config.GetGlobalConfig()
-	if globalCfg == nil || globalCfg.Telegram.BotToken == "" || globalCfg.Telegram.ChatID == "" {
+	if globalCfg == nil || globalCfg.Telegram == nil || globalCfg.Telegram.BotToken == "" || globalCfg.Telegram.ChatID == "" {
 		// Telegram 未配置，跳过通知
 		return
 	}
@@ -64,7 +64,7 @@ func ExampleUsageWithErrorHandling() {
 // ExampleUsageChangeChatID 展示如何动态更改 Chat ID
 func ExampleUsageChangeChatID() {
 	globalCfg := config.GetGlobalConfig()
-	if globalCfg == nil {
+	if globalCfg == nil || globalCfg.Telegram == nil {
 		return
 	}
 	client := NewTelegramClient(
@@ -85,7 +85,7 @@ func ExampleUsageChangeChatID() {
 // ExampleUsageWithOptions 展示使用配置选项的方式
 func ExampleUsageWithOptions() {
 	globalCfg := config.GetGlobalConfig()
-	if globalCfg == nil {
+	if globalCfg == nil || globalCfg.Telegram == nil {
 		return
 	}
 	botToken := globalCfg.Telegram.BotToken

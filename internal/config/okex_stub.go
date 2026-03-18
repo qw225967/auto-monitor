@@ -3,8 +3,10 @@ package config
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/qw225967/auto-monitor/internal/model"
 )
@@ -119,7 +121,21 @@ func (p *ProxyConfig) IsProxyEnabled() bool {
 
 // CreateTransport 创建 HTTP Transport
 func (p *ProxyConfig) CreateTransport() *http.Transport {
-	return &http.Transport{}
+	t := &http.Transport{}
+	if p.URL != "" {
+		if u, err := url.Parse(p.URL); err == nil {
+			t.Proxy = http.ProxyURL(u)
+		}
+	}
+	return t
+}
+
+// CreateClient 创建带超时的 HTTP Client（供 telegram 等使用）
+func (p *ProxyConfig) CreateClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: p.CreateTransport(),
+	}
 }
 
 var proxyConfig = &ProxyConfig{}
