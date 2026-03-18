@@ -54,10 +54,10 @@ func (f *Finder) RegisterExchange(name string, adapter ExchangeAdapter) {
 	f.exchanges[name] = adapter
 }
 
-// FeedKline 将 K 线数据喂入 PriceHistory，仅填量（价格从原始价差数据获取）
+// FeedKline 将 K 线数据喂入 PriceHistory：量用 K 线，价格优先用原始价差（无则用 K 线 close 供斜率计算）
 func (f *Finder) FeedKline(symbol, exchange string, bars []kline.KlinePoint) {
 	for _, b := range bars {
-		f.priceHistory.RecordAt(symbol, exchange, 0, b.Volume, b.Timestamp)
+		f.priceHistory.RecordAt(symbol, exchange, b.Close, b.Volume, b.Timestamp)
 	}
 }
 
@@ -77,13 +77,19 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	log.Printf("[Funnel] 1.负价差筛选后: %d 个 %s", len(negativeSpread), symbolsFromSpreadItems(negativeSpread))
 
 	// 用价差数据喂入价格历史（用于价格斜率与量能）
+	var withPrice int
 	for _, it := range negativeSpread {
 		if it.BuyPrice > 0 {
 			f.priceHistory.Record(it.Symbol, it.BuyExchange, it.BuyPrice, 0)
+			withPrice++
 		}
 		if it.SellPrice > 0 {
 			f.priceHistory.Record(it.Symbol, it.SellExchange, it.SellPrice, 0)
+			withPrice++
 		}
+	}
+	if len(negativeSpread) > 0 {
+		log.Printf("[Funnel] 价差含价格: %d/%d 条有 BuyPrice/SellPrice>0", withPrice, len(negativeSpread)*2)
 	}
 
 	// 漏斗减负 1：价差阈值（只保留 spread < -0.5% 等更有价值的）
@@ -95,9 +101,12 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	log.Printf("[Funnel] 1c.按symbol去重后: %d 个 %s", len(deduped), symbolsFromSpreadItems(deduped))
 
 	// 漏斗减负 3：价格斜率提前（有历史时要求上涨，无数据放行）
-	withPriceSlope := f.filterPriceSlope(deduped)
+	withPriceSlope, slopeDebug := f.filterPriceSlopeWithDebug(deduped)
 	stats.AfterPriceSlope = len(withPriceSlope)
 	log.Printf("[Funnel] 1d.价格斜率(上涨/无数据)后: %d 个 %s", len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
+	if slopeDebug != "" {
+		log.Printf("[Funnel] 1d.斜率诊断: %s", slopeDebug)
+	}
 
 	// 漏斗减负 4：进入深度筛前限量，避免数万次 API 调用
 	capped := f.limitTopBySpread(withPriceSlope, MaxTokensBeforeDepth)
@@ -355,15 +364,25 @@ func determineSpotAndFutures(buyEx, sellEx string) (spotEx, futuresEx string) {
 }
 
 func (f *Finder) filterPriceSlope(items []model.SpreadItem) []model.SpreadItem {
+	r, _ := f.filterPriceSlopeWithDebug(items)
+	return r
+}
+
+func (f *Finder) filterPriceSlopeWithDebug(items []model.SpreadItem) ([]model.SpreadItem, string) {
 	var result []model.SpreadItem
-	for _, item := range items {
+	var debugSample []string
+	for i, item := range items {
 		slope := f.priceHistory.GetSlope(item.Symbol, item.BuyExchange)
-		// 无价格斜率数据(slope=0)直接过滤；有数据时要求斜率 > MinPriceSlope
 		if slope > MinPriceSlope {
 			result = append(result, item)
 		}
+		if i < 5 && len(debugSample) < 3 {
+			pts, withPrice := f.priceHistory.CountPoints(item.Symbol, item.BuyExchange)
+			debugSample = append(debugSample, fmt.Sprintf("%s:%s slope=%.4f pts=%d priceOk=%d",
+				item.Symbol, item.BuyExchange, slope, pts, withPrice))
+		}
 	}
-	return result
+	return result, strings.Join(debugSample, "; ")
 }
 
 func (f *Finder) filterVolumeSpike(items []model.SpreadItem) []model.SpreadItem {

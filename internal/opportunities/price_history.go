@@ -63,6 +63,25 @@ func (p *PriceHistory) RecordAt(symbol, exchange string, price, volume float64, 
 	}
 }
 
+// CountPoints 返回总点数及 Price>0 的点数（用于诊断）
+func (p *PriceHistory) CountPoints(symbol, exchange string) (total, withPrice int) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	key := priceHistoryKey(symbol, exchange)
+	points := p.histories[key]
+	now := time.Now()
+	cutoff := now.Add(-5 * time.Minute)
+	for _, pt := range points {
+		if pt.Timestamp.After(cutoff) {
+			total++
+			if pt.Price > 0 {
+				withPrice++
+			}
+		}
+	}
+	return total, withPrice
+}
+
 func (p *PriceHistory) GetSlope(symbol, exchange string) float64 {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
