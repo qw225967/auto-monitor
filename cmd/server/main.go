@@ -264,15 +264,22 @@ func main() {
 	opportunities.RegisterExchangeAdapters(oppFinder) // 注册 Binance/Bybit/OKX/Gate/Bitget 公共订单簿
 	oppHandler := opportunities.NewHandler(oppFinder)
 
-	// Telegram 通知器（如果配置了 Telegram Bot）
+	// Telegram 通知器：优先从 exchange_keys.json 读取，其次 GlobalConfig
 	var oppNotifier *opportunities.OpportunityNotifier
-	tgConfig := config.GetGlobalConfig()
-	if tgConfig != nil && tgConfig.Telegram != nil && tgConfig.Telegram.BotToken != "" && tgConfig.Telegram.ChatID != "" {
-		tgClient := tg.NewTelegramClient(tgConfig.Telegram.BotToken, tgConfig.Telegram.ChatID)
+	var tgBotToken, tgChatID string
+	if keys := config.GetExchangeKeys(); keys != nil && keys.Telegram != nil && keys.Telegram.BotToken != "" && keys.Telegram.ChatID != "" {
+		tgBotToken = keys.Telegram.BotToken
+		tgChatID = keys.Telegram.ChatID
+	} else if g := config.GetGlobalConfig(); g != nil && g.Telegram != nil && g.Telegram.BotToken != "" && g.Telegram.ChatID != "" {
+		tgBotToken = g.Telegram.BotToken
+		tgChatID = g.Telegram.ChatID
+	}
+	if tgBotToken != "" && tgChatID != "" {
+		tgClient := tg.NewTelegramClient(tgBotToken, tgChatID)
 		oppNotifier = opportunities.NewOpportunityNotifier(tgClient)
-		log.Printf("[Telegram] 机会通知器已启动，ChatID: %s", tgConfig.Telegram.ChatID)
+		log.Printf("[Telegram] 机会通知器已启动，ChatID: %s", tgChatID)
 	} else {
-		log.Printf("[Telegram] 未配置 Telegram Bot，跳过通知功能")
+		log.Printf("[Telegram] 未配置 Telegram Bot（exchange_keys.json 或 GlobalConfig），跳过通知功能")
 	}
 
 	// K 线拉取：每 3s 分批查询多交易所，存储用于量能/斜率
