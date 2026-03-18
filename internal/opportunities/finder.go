@@ -14,10 +14,10 @@ import (
 
 const (
 	MinNegativeSpread   = -1.0
-	MinSpotDepthUSDT   = 200   // 现货深度阈值（USDT），小币流动性有限
+	MinSpotDepthUSDT   = 10000 // 现货深度阈值（USDT），低于 1w 过滤
 	MinPriceSlope      = 0.002 // 价格斜率阈值，需 > 0.002 才通过（约 1% 涨幅/5 分钟）
 	VolumeSpikeThreshold = 2.0
-	MinBothDepthUSDT   = 200   // 双深度阈值
+	MinBothDepthUSDT   = 10000 // 双深度阈值，低于 1w 过滤
 
 	MaxPricePoints     = 1000
 	PriceHistoryWindow = 10 * time.Minute
