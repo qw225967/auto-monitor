@@ -1,11 +1,16 @@
 package opportunities
 
 import (
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/qw225967/auto-monitor/internal/model"
 )
+
+func priceHistoryKey(symbol, exchange string) string {
+	return symbol + ":" + strings.ToLower(exchange)
+}
 
 // PriceHistory 维护价格历史，用于斜率计算和交易量统计
 type PriceHistory struct {
@@ -27,7 +32,7 @@ func (p *PriceHistory) Record(symbol, exchange string, price, volume float64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	key := symbol + ":" + exchange
+	key := priceHistoryKey(symbol, exchange)
 	now := time.Now()
 
 	p.histories[key] = append(p.histories[key], model.PricePoint{
@@ -57,7 +62,7 @@ func (p *PriceHistory) GetSlope(symbol, exchange string) float64 {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	key := symbol + ":" + exchange
+	key := priceHistoryKey(symbol, exchange)
 	points := p.histories[key]
 	if len(points) < 2 {
 		return 0
@@ -92,7 +97,7 @@ func (p *PriceHistory) GetVolumeSpike(symbol, exchange string, threshold float64
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	key := symbol + ":" + exchange
+	key := priceHistoryKey(symbol, exchange)
 	points := p.histories[key]
 	if len(points) < 2 {
 		return false
