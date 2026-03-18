@@ -251,7 +251,7 @@ func main() {
 		det := detector.NewArbitrageAdapter(bridgeMgr)
 
 	// Runner
-	r := runner.NewWithOptions(det, cfg.Threshold.Spread, runner.Options{
+	runner.NewWithOptions(det, cfg.Threshold.Spread, runner.Options{
 		DetectConcurrency: cfg.Runner.DetectMaxConcurrency,
 		DetectTimeout:     time.Duration(cfg.Runner.DetectRouteTimeout) * time.Second,
 	})
@@ -326,7 +326,7 @@ func main() {
 			}
 			// 更新 K 线拉取 symbol 列表（负价差去重，最多 500 个）
 			if klineFetcher != nil {
-				symbols := opportunities.SymbolsForKline(items, 500)
+				symbols := opportunities.GetSymbolsForKline(items, 500)
 				klineFetcher.SetSymbols(symbols)
 			}
 		}
@@ -595,12 +595,30 @@ func main() {
 		cachedItems = items
 		cacheMu.Unlock()
 		priorityTracker.Observe(items, time.Now())
-		ctx2, cancel2 := context.WithTimeout(context.Background(), 60*time.Second)
-		resp, _ := r.RunDetect(ctx2, items, handler.GetAllChainPrices(), handler.GetAllLiquidity())
-		cancel2()
-		if resp != nil {
-			handler.UpdateOverview(resp)
+
+		// 更新机会发现数据（启动时）
+		if oppFinder != nil {
+			resp := oppFinder.Find(items)
+			oppHandler.UpdateResponse(resp)
+			// 通知 Telegram
+			if oppNotifier != nil {
+				oppNotifier.Notify(resp.Opportunities)
+			}
 		}
+
+		// 更新 K 线 symbol 列表
+		if klineFetcher != nil {
+			symbols := opportunities.GetSymbolsForKline(items, 500)
+			klineFetcher.SetSymbols(symbols)
+		}
+
+		// 搬砖监控（暂时禁用）
+		// ctx2, cancel2 := context.WithTimeout(context.Background(), 60*time.Second)
+		// resp, _ := r.RunDetect(ctx2, items, handler.GetAllChainPrices(), handler.GetAllLiquidity())
+		// cancel2()
+		// if resp != nil {
+		// 	handler.UpdateOverview(resp)
+		// }
 	}
 
 	// HTTP 服务

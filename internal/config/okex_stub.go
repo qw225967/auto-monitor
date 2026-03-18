@@ -102,6 +102,21 @@ type ProxyConfig struct {
 	URL string
 }
 
+// SetProxyURL 设置代理 URL
+func (p *ProxyConfig) SetProxyURL(url string) {
+	p.URL = url
+}
+
+// GetProxyURLString 获取代理 URL 字符串
+func (p *ProxyConfig) GetProxyURLString() string {
+	return p.URL
+}
+
+// IsProxyEnabled 检查是否启用了代理
+func (p *ProxyConfig) IsProxyEnabled() bool {
+	return p.URL != ""
+}
+
 // CreateTransport 创建 HTTP Transport
 func (p *ProxyConfig) CreateTransport() *http.Transport {
 	return &http.Transport{}
@@ -117,6 +132,7 @@ func GetProxyConfig() *ProxyConfig {
 // GlobalConfig 全局配置（供 bridge、rest 等使用）
 type GlobalConfig struct {
 	MyProjectId string
+	Telegram    *TelegramEntry // Telegram Bot 配置
 	Bridge      struct {
 		CCIP struct {
 			RPCURLs map[string]string

@@ -315,7 +315,7 @@ func (f *Finder) dedupeBySymbol(items []model.SpreadItem) []model.SpreadItem {
 
 // limitTopBySpread 按价差排序，只保留前 n 个（最负的优先）
 // SymbolsForKline 从价差数据中提取需拉取 K 线的 symbol 列表（负价差+已知交易所，去重，最多 maxSymbols 个）
-func SymbolsForKline(items []model.SpreadItem, maxSymbols int) []string {
+func GetSymbolsForKline(items []model.SpreadItem, maxSymbols int) []string {
 	best := make(map[string]float64)
 	for _, it := range items {
 		if isSpotFuturesPair(it.BuyExchange, it.SellExchange) && it.SpreadPercent < 0 {
