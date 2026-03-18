@@ -547,6 +547,7 @@ func main() {
 			cancel()
 			if err != nil {
 				log.Printf("[Detect] %v", err)
+				handler.SetLastDetectError(err.Error())
 				continue
 			}
 			handler.UpdateOverview(resp)
