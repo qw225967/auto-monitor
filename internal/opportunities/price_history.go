@@ -1,11 +1,16 @@
 package opportunities
 
 import (
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/qw225967/auto-monitor/internal/model"
 )
+
+func priceHistoryKey(symbol, exchange string) string {
+	return symbol + ":" + strings.ToLower(exchange)
+}
 
 // PriceHistory 维护价格历史，用于斜率计算和交易量统计
 type PriceHistory struct {
@@ -24,18 +29,23 @@ func NewPriceHistory(maxPoints int, windowSize time.Duration) *PriceHistory {
 }
 
 func (p *PriceHistory) Record(symbol, exchange string, price, volume float64) {
+	p.RecordAt(symbol, exchange, price, volume, time.Now())
+}
+
+// RecordAt 在指定时间戳记录（K 线用此接口只填 volume，price 填 0）
+func (p *PriceHistory) RecordAt(symbol, exchange string, price, volume float64, ts time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	key := symbol + ":" + exchange
-	now := time.Now()
+	key := priceHistoryKey(symbol, exchange)
 
 	p.histories[key] = append(p.histories[key], model.PricePoint{
 		Price:     price,
-		Timestamp: now,
+		Timestamp: ts,
 		Volume:    volume,
 	})
 
+	now := time.Now()
 	cutoff := now.Add(-p.windowSize)
 	points := p.histories[key]
 	i := 0
@@ -53,11 +63,52 @@ func (p *PriceHistory) Record(symbol, exchange string, price, volume float64) {
 	}
 }
 
+// StatsCount 返回全局统计：总 key 数、5 分钟内有 Price>0 的 key 数（用于诊断）
+func (p *PriceHistory) StatsCount() (totalKeys, keysWithPriceIn5m int) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	now := time.Now()
+	cutoff := now.Add(-5 * time.Minute)
+	for _, points := range p.histories {
+		totalKeys++
+		hasPrice := false
+		for _, pt := range points {
+			if pt.Timestamp.After(cutoff) && pt.Price > 0 {
+				hasPrice = true
+				break
+			}
+		}
+		if hasPrice {
+			keysWithPriceIn5m++
+		}
+	}
+	return totalKeys, keysWithPriceIn5m
+}
+
+// CountPoints 返回总点数及 Price>0 的点数（用于诊断）
+func (p *PriceHistory) CountPoints(symbol, exchange string) (total, withPrice int) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	key := priceHistoryKey(symbol, exchange)
+	points := p.histories[key]
+	now := time.Now()
+	cutoff := now.Add(-5 * time.Minute)
+	for _, pt := range points {
+		if pt.Timestamp.After(cutoff) {
+			total++
+			if pt.Price > 0 {
+				withPrice++
+			}
+		}
+	}
+	return total, withPrice
+}
+
 func (p *PriceHistory) GetSlope(symbol, exchange string) float64 {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	key := symbol + ":" + exchange
+	key := priceHistoryKey(symbol, exchange)
 	points := p.histories[key]
 	if len(points) < 2 {
 		return 0
@@ -68,7 +119,7 @@ func (p *PriceHistory) GetSlope(symbol, exchange string) float64 {
 
 	var recentPoints []model.PricePoint
 	for i := len(points) - 1; i >= 0; i-- {
-		if points[i].Timestamp.After(cutoff) {
+		if points[i].Timestamp.After(cutoff) && points[i].Price > 0 {
 			recentPoints = append([]model.PricePoint{points[i]}, recentPoints...)
 		}
 	}
@@ -92,7 +143,7 @@ func (p *PriceHistory) GetVolumeSpike(symbol, exchange string, threshold float64
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	key := symbol + ":" + exchange
+	key := priceHistoryKey(symbol, exchange)
 	points := p.histories[key]
 	if len(points) < 2 {
 		return false

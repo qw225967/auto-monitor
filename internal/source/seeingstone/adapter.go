@@ -87,5 +87,8 @@ func (a *Adapter) Fetch(ctx context.Context) (interface{}, error) {
 		return nil, fmt.Errorf("api returned success=false")
 	}
 
+	// SeeingStone /api/spreads 仅返回 symbol, buy_exchange, sell_exchange, spread_percent 等，
+	// 不包含 buy_price/sell_price/aBid/aAsk 等价格字段，价格需从 K 线等其它数据源获取
+
 	return apiResp.Data, nil
 }

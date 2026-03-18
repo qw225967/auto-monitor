@@ -1,0 +1,25 @@
+# Env
+.env
+
+# 交易所 API 密钥（含敏感信息）
+config/exchange_keys.json
+exchange_keys.json
+
+# Build
+bin/
+server
+
+# Scripts
+logs/
+.pid.*
+
+# Go
+*.exe
+*.test
+*.out
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo

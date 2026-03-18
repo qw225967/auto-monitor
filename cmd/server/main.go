@@ -23,6 +23,7 @@ import (
 	"github.com/qw225967/auto-monitor/constants"
 	"github.com/qw225967/auto-monitor/internal/onchain"
 	"github.com/qw225967/auto-monitor/internal/opportunities"
+	"github.com/qw225967/auto-monitor/internal/opportunities/kline"
 	"github.com/qw225967/auto-monitor/internal/price"
 	"github.com/qw225967/auto-monitor/internal/runner"
 	"github.com/qw225967/auto-monitor/internal/source/seeingstone"
@@ -262,6 +263,14 @@ func main() {
 	opportunities.RegisterExchangeAdapters(oppFinder) // 注册 Binance/Bybit/OKX/Gate/Bitget 公共订单簿
 	oppHandler := opportunities.NewHandler(oppFinder)
 
+	// K 线拉取：每 3s 分批查询多交易所，存储用于量能/斜率
+	klineStore := kline.NewStore(600)
+	klineFetcher := kline.NewFetcher(klineStore, nil, []string{"binance", "bybit", "okx", "gate", "bitget"})
+	// 全部 1m K 线，每 3s 一轮，请求在 3s 内均衡摊开
+	klineFetcher.SetOnAppend(oppFinder.FeedKline)
+	klineCtx := context.Background()
+	go klineFetcher.RunLoop(klineCtx)
+
 	// Gin
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -298,6 +307,11 @@ func main() {
 			if oppFinder != nil {
 				resp := oppFinder.Find(items)
 				oppHandler.UpdateResponse(resp)
+			}
+			// 更新 K 线拉取 symbol 列表（负价差去重，最多 500 个）
+			if klineFetcher != nil {
+				symbols := opportunities.SymbolsForKline(items, 500)
+				klineFetcher.SetSymbols(symbols)
 			}
 		}
 	}()

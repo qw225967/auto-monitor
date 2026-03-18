@@ -9,25 +9,31 @@ import (
 	"time"
 
 	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/opportunities/kline"
 )
 
 const (
 	MinNegativeSpread   = -1.0
-	MinSpotDepthUSDT   = 10000
-	MinPriceSlope      = 0.0001
+	MinSpotDepthUSDT   = 10000 // 现货深度阈值（USDT），低于 1w 过滤
+	MinPriceSlope      = 0.002 // 价格斜率阈值，需 > 0.002 才通过（约 1% 涨幅/5 分钟）
 	VolumeSpikeThreshold = 2.0
-	MinBothDepthUSDT   = 10000
+	MinBothDepthUSDT   = 10000 // 双深度阈值，低于 1w 过滤
 
 	MaxPricePoints     = 1000
 	PriceHistoryWindow = 10 * time.Minute
-	// 每个币现货价保留最近 10 个数据点用于斜率计算
-	SlopePricePoints = 10
+	// 每个币现货价保留最近 600 个数据点用于斜率计算
+	SlopePricePoints = 600
 
 	// 漏斗减负：价差阈值（只保留更负的，如 -0.2 表示 <-0.2%）
 	SpreadThresholdStrict = -0.2
+	// 漏斗减负：symbol 至少出现次数才进入去重（重复数>3 即至少 4 条）
+	SymbolMinCount = 4
 	// 漏斗减负：进入深度筛前最多保留条数（避免 3 万次 API 调用）
 	MaxTokensBeforeDepth = 2000
 )
+
+// 有 K 线数据的交易所（用于斜率回退：BuyExchange 无数据时用这些所的价格趋势）
+var klineExchanges = []string{"binance", "bybit", "okx", "gate", "bitget"}
 
 type ExchangeAdapter interface {
 	GetSpotOrderBook(symbol string) (bids, asks [][]string, err error)
@@ -53,6 +59,20 @@ func (f *Finder) RegisterExchange(name string, adapter ExchangeAdapter) {
 	f.exchanges[name] = adapter
 }
 
+// FeedKline 将 K 线数据喂入 PriceHistory：量用 K 线，价格用 close
+// 最新一根 bar 用 time.Now() 作为记录时间，确保「当前时间获取」；历史 bar 用 bar 自身时间戳
+func (f *Finder) FeedKline(symbol, exchange string, bars []kline.KlinePoint) {
+	now := time.Now()
+	for i, b := range bars {
+		ts := b.Timestamp
+		// 最新一根用当前时间，表示「此刻获取到的价格」
+		if i == len(bars)-1 && now.Sub(b.Timestamp) < 2*time.Minute {
+			ts = now
+		}
+		f.priceHistory.RecordAt(symbol, exchange, b.Close, b.Volume, ts)
+	}
+}
+
 func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesResponse {
 	f.mu.RLock()
 	exchanges := f.exchanges
@@ -69,31 +89,67 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	log.Printf("[Funnel] 1.负价差筛选后: %d 个 %s", len(negativeSpread), symbolsFromSpreadItems(negativeSpread))
 
 	// 用价差数据喂入价格历史（用于价格斜率与量能）
+	var withPrice int
 	for _, it := range negativeSpread {
 		if it.BuyPrice > 0 {
 			f.priceHistory.Record(it.Symbol, it.BuyExchange, it.BuyPrice, 0)
+			withPrice++
 		}
 		if it.SellPrice > 0 {
 			f.priceHistory.Record(it.Symbol, it.SellExchange, it.SellPrice, 0)
+			withPrice++
 		}
 	}
+	if len(negativeSpread) > 0 {
+		log.Printf("[Funnel] 价差含价格: %d/%d 条有 BuyPrice/SellPrice>0", withPrice, len(negativeSpread)*2)
+	}
 
-	// 漏斗减负 1：价差阈值（只保留 spread < -0.5% 等更有价值的）
+	// 漏斗减负 1：价差阈值（只保留 spread < -0.2%）
 	afterSpreadThreshold := f.filterSpreadThreshold(negativeSpread)
 	log.Printf("[Funnel] 1b.价差阈值(<-%.1f%%)后: %d 个", -SpreadThresholdStrict, len(afterSpreadThreshold))
 
-	// 漏斗减负 2：按 symbol 去重，每 symbol 保留价差最负的 1 条
-	deduped := f.dedupeBySymbol(afterSpreadThreshold)
-	log.Printf("[Funnel] 1c.按symbol去重后: %d 个 %s", len(deduped), symbolsFromSpreadItems(deduped))
+	// 漏斗减负 2：symbol 重复数 > 3 才进入（至少 4 条不同路径）
+	afterSymbolCount := f.filterSymbolMinCount(afterSpreadThreshold, SymbolMinCount)
+	log.Printf("[Funnel] 1c.symbol重复>%d后: %d 个", SymbolMinCount-1, len(afterSymbolCount))
 
-	// 漏斗减负 3：价格斜率提前（有历史时要求上涨，无数据放行）
-	withPriceSlope := f.filterPriceSlope(deduped)
+	// 漏斗减负 3：按 symbol 去重，每 symbol 保留价差最负的 1 条
+	deduped := f.dedupeBySymbol(afterSymbolCount)
+	log.Printf("[Funnel] 1d.按symbol去重后: %d 个 %s", len(deduped), symbolsFromSpreadItems(deduped))
+
+	// 价格获取诊断：PriceHistory 统计 + 去重后各币是否有价格
+	totalKeys, keysWithPrice := f.priceHistory.StatsCount()
+	dedupedWithPrice := 0
+	for _, it := range deduped {
+		total, withPrice := f.priceHistory.CountPoints(it.Symbol, it.BuyExchange)
+		if total >= 2 && withPrice >= 2 {
+			dedupedWithPrice++
+		} else {
+			// 尝试回退交易所
+			for _, ex := range klineExchanges {
+				if strings.EqualFold(ex, it.BuyExchange) {
+					continue
+				}
+				t, wp := f.priceHistory.CountPoints(it.Symbol, ex)
+				if t >= 2 && wp >= 2 {
+					dedupedWithPrice++
+					break
+				}
+			}
+		}
+	}
+	log.Printf("[Funnel] 价格诊断: PriceHistory keys=%d 有价(5m)=%d, 去重%d币中有价=%d", totalKeys, keysWithPrice, len(deduped), dedupedWithPrice)
+
+	// 漏斗减负 4：价格斜率提前（有历史时要求上涨，无数据放行）
+	withPriceSlope, slopeDebug := f.filterPriceSlopeWithDebug(deduped)
 	stats.AfterPriceSlope = len(withPriceSlope)
-	log.Printf("[Funnel] 1d.价格斜率(上涨/无数据)后: %d 个 %s", len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
+	log.Printf("[Funnel] 1e.价格斜率(上涨/无数据)后: %d 个 %s", len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
+	if slopeDebug != "" {
+		log.Printf("[Funnel] 1e.斜率诊断: %s", slopeDebug)
+	}
 
-	// 漏斗减负 4：进入深度筛前限量，避免数万次 API 调用
+	// 漏斗减负 5：进入深度筛前限量，避免数万次 API 调用
 	capped := f.limitTopBySpread(withPriceSlope, MaxTokensBeforeDepth)
-	log.Printf("[Funnel] 1e.限量(top%d)后: %d 个", MaxTokensBeforeDepth, len(capped))
+	log.Printf("[Funnel] 1f.限量(top%d)后: %d 个", MaxTokensBeforeDepth, len(capped))
 
 	// 如果没有注册交易所，跳过需要订单簿的漏斗步骤
 	hasExchanges := len(exchanges) > 0
@@ -118,7 +174,7 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 
 	withVolume := f.filterVolumeSpike(withSpotDepth)
 	stats.AfterVolume = len(withVolume)
-	log.Printf("[Funnel] 3.量能放大筛选后: %d 个 %s", len(withVolume), symbolsFromSpreadItems(withVolume))
+	log.Printf("[Funnel] 3.量能放大筛选后: %d 个 %s", len(withVolume), symbolsFromSpreadItemsWithSlope(withVolume, f.priceHistory.GetSlope))
 
 	finalOpportunities := f.filterBothDepth(withVolume, exchanges)
 	stats.AfterBothDepth = len(finalOpportunities)
@@ -132,6 +188,10 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 }
 
 func symbolsFromSpreadItems(items []model.SpreadItem) string {
+	return symbolsFromSpreadItemsWithSlope(items, nil)
+}
+
+func symbolsFromSpreadItemsWithSlope(items []model.SpreadItem, getSlope func(string, string) float64) string {
 	if len(items) == 0 {
 		return "[]"
 	}
@@ -141,7 +201,12 @@ func symbolsFromSpreadItems(items []model.SpreadItem) string {
 		key := it.Symbol + ":" + it.BuyExchange + "->" + it.SellExchange
 		if !seen[key] {
 			seen[key] = true
-			symbols = append(symbols, key)
+			if getSlope != nil {
+				slope := getSlope(it.Symbol, it.BuyExchange)
+				symbols = append(symbols, fmt.Sprintf("%s(slope=%.4f)", key, slope))
+			} else {
+				symbols = append(symbols, key)
+			}
 		}
 	}
 	if len(symbols) > 20 {
@@ -206,11 +271,26 @@ func (f *Finder) filterNegativeSpread(items []model.SpreadItem) []model.SpreadIt
 	return result
 }
 
-// filterSpreadThreshold 只保留价差更负的（如 <-0.5%）
+// filterSpreadThreshold 只保留价差更负的（如 <-0.2%）
 func (f *Finder) filterSpreadThreshold(items []model.SpreadItem) []model.SpreadItem {
 	var result []model.SpreadItem
 	for _, item := range items {
 		if item.SpreadPercent < SpreadThresholdStrict {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// filterSymbolMinCount 只保留 symbol 出现次数 >= minCount 的（重复数>minCount-1）
+func (f *Finder) filterSymbolMinCount(items []model.SpreadItem, minCount int) []model.SpreadItem {
+	count := make(map[string]int)
+	for _, item := range items {
+		count[item.Symbol]++
+	}
+	var result []model.SpreadItem
+	for _, item := range items {
+		if count[item.Symbol] >= minCount {
 			result = append(result, item)
 		}
 	}
@@ -234,6 +314,35 @@ func (f *Finder) dedupeBySymbol(items []model.SpreadItem) []model.SpreadItem {
 }
 
 // limitTopBySpread 按价差排序，只保留前 n 个（最负的优先）
+// SymbolsForKline 从价差数据中提取需拉取 K 线的 symbol 列表（负价差+已知交易所，去重，最多 maxSymbols 个）
+func SymbolsForKline(items []model.SpreadItem, maxSymbols int) []string {
+	best := make(map[string]float64)
+	for _, it := range items {
+		if isSpotFuturesPair(it.BuyExchange, it.SellExchange) && it.SpreadPercent < 0 {
+			if cur, ok := best[it.Symbol]; !ok || it.SpreadPercent < cur {
+				best[it.Symbol] = it.SpreadPercent
+			}
+		}
+	}
+	type pair struct {
+		symbol string
+		spread float64
+	}
+	var list []pair
+	for s, sp := range best {
+		list = append(list, pair{s, sp})
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].spread < list[j].spread })
+	if maxSymbols > 0 && len(list) > maxSymbols {
+		list = list[:maxSymbols]
+	}
+	out := make([]string, len(list))
+	for i := range list {
+		out[i] = list[i].symbol
+	}
+	return out
+}
+
 func (f *Finder) limitTopBySpread(items []model.SpreadItem, n int) []model.SpreadItem {
 	if n <= 0 || len(items) <= n {
 		return items
@@ -255,16 +364,33 @@ func isSpotFuturesPair(buyEx, sellEx string) bool {
 
 func (f *Finder) filterSpotDepth(items []model.SpreadItem, exchanges map[string]ExchangeAdapter) []model.SpreadItem {
 	var result []model.SpreadItem
+	var depthSample []string
+	var depthZeroErrs []string
 	for _, item := range items {
 		spotEx, _ := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
 		adapter, ok := exchanges[strings.ToLower(spotEx)]
 		if !ok {
+			if len(depthSample) < 5 {
+				depthSample = append(depthSample, fmt.Sprintf("%s:%s noAdapter", item.Symbol, spotEx))
+			}
 			continue
 		}
 
-		depth := f.getSpotDepth(adapter, item.Symbol)
+		depth, err := f.getSpotDepthWithErr(adapter, item.Symbol)
 		if depth >= MinSpotDepthUSDT {
 			result = append(result, item)
+		}
+		if len(depthSample) < 5 {
+			depthSample = append(depthSample, fmt.Sprintf("%s:%s depth=%.0f", item.Symbol, spotEx, depth))
+		}
+		if depth == 0 && err != nil && len(depthZeroErrs) < 3 {
+			depthZeroErrs = append(depthZeroErrs, fmt.Sprintf("%s:%s err=%v", item.Symbol, spotEx, err))
+		}
+	}
+	if len(items) > 0 && len(depthSample) > 0 {
+		log.Printf("[Funnel] 2.现货深度诊断: %s (阈值=%d)", strings.Join(depthSample, "; "), MinSpotDepthUSDT)
+		if len(depthZeroErrs) > 0 {
+			log.Printf("[Funnel] 2.深度为0的API错误样例: %s", strings.Join(depthZeroErrs, "; "))
 		}
 	}
 	return result
@@ -276,6 +402,14 @@ func (f *Finder) getSpotDepth(adapter ExchangeAdapter, symbol string) float64 {
 		return 0
 	}
 	return calculateDepth(bids, 10)
+}
+
+func (f *Finder) getSpotDepthWithErr(adapter ExchangeAdapter, symbol string) (float64, error) {
+	bids, _, err := adapter.GetSpotOrderBook(symbol)
+	if err != nil {
+		return 0, err
+	}
+	return calculateDepth(bids, 10), nil
 }
 
 func calculateDepth(orders [][]string, topN int) float64 {
@@ -309,15 +443,46 @@ func determineSpotAndFutures(buyEx, sellEx string) (spotEx, futuresEx string) {
 }
 
 func (f *Finder) filterPriceSlope(items []model.SpreadItem) []model.SpreadItem {
+	r, _ := f.filterPriceSlopeWithDebug(items)
+	return r
+}
+
+func (f *Finder) filterPriceSlopeWithDebug(items []model.SpreadItem) ([]model.SpreadItem, string) {
 	var result []model.SpreadItem
-	for _, item := range items {
-		slope := f.priceHistory.GetSlope(item.Symbol, item.BuyExchange)
-		// 无足够价格历史时 slope=0，放行；有历史时要求价格持续上涨（slope>0）
-		if slope == 0 || slope > 0 {
+	var debugSample []string
+	for i, item := range items {
+		slope := f.getSlopeForItem(item.Symbol, item.BuyExchange)
+		if slope > MinPriceSlope {
 			result = append(result, item)
 		}
+		if i < 5 && len(debugSample) < 3 {
+			pts, withPrice := f.priceHistory.CountPoints(item.Symbol, item.BuyExchange)
+			debugSample = append(debugSample, fmt.Sprintf("%s:%s slope=%.4f pts=%d priceOk=%d",
+				item.Symbol, item.BuyExchange, slope, pts, withPrice))
+		}
 	}
-	return result
+	return result, strings.Join(debugSample, "; ")
+}
+
+// getSlopeForItem 获取价格斜率，BuyExchange 无 K 线时用参考交易所（binance/bybit 等）回退
+func (f *Finder) getSlopeForItem(symbol, buyExchange string) float64 {
+	slope := f.priceHistory.GetSlope(symbol, buyExchange)
+	if slope > MinPriceSlope {
+		return slope
+	}
+	for _, ex := range klineExchanges {
+		if strings.EqualFold(ex, buyExchange) {
+			continue
+		}
+		s := f.priceHistory.GetSlope(symbol, ex)
+		if s > MinPriceSlope {
+			return s
+		}
+		if s > slope {
+			slope = s
+		}
+	}
+	return slope
 }
 
 func (f *Finder) filterVolumeSpike(items []model.SpreadItem) []model.SpreadItem {
