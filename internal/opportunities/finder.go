@@ -14,10 +14,10 @@ import (
 
 const (
 	MinNegativeSpread   = -1.0
-	MinSpotDepthUSDT   = 10000
+	MinSpotDepthUSDT   = 5000  // 现货深度阈值（USDT），降低以容纳更多小币
 	MinPriceSlope      = 0.002 // 价格斜率阈值，需 > 0.002 才通过（约 1% 涨幅/5 分钟）
 	VolumeSpikeThreshold = 2.0
-	MinBothDepthUSDT   = 10000
+	MinBothDepthUSDT   = 5000  // 双深度阈值
 
 	MaxPricePoints     = 1000
 	PriceHistoryWindow = 10 * time.Minute
@@ -313,10 +313,14 @@ func isSpotFuturesPair(buyEx, sellEx string) bool {
 
 func (f *Finder) filterSpotDepth(items []model.SpreadItem, exchanges map[string]ExchangeAdapter) []model.SpreadItem {
 	var result []model.SpreadItem
+	var depthSample []string
 	for _, item := range items {
 		spotEx, _ := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
 		adapter, ok := exchanges[strings.ToLower(spotEx)]
 		if !ok {
+			if len(depthSample) < 5 {
+				depthSample = append(depthSample, fmt.Sprintf("%s:%s noAdapter", item.Symbol, spotEx))
+			}
 			continue
 		}
 
@@ -324,6 +328,12 @@ func (f *Finder) filterSpotDepth(items []model.SpreadItem, exchanges map[string]
 		if depth >= MinSpotDepthUSDT {
 			result = append(result, item)
 		}
+		if len(depthSample) < 5 {
+			depthSample = append(depthSample, fmt.Sprintf("%s:%s depth=%.0f", item.Symbol, spotEx, depth))
+		}
+	}
+	if len(items) > 0 && len(depthSample) > 0 {
+		log.Printf("[Funnel] 2.现货深度诊断: %s (阈值=%d)", strings.Join(depthSample, "; "), MinSpotDepthUSDT)
 	}
 	return result
 }
