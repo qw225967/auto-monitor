@@ -28,7 +28,11 @@ export function Opportunities() {
 
   if (loading && !data) return <div className="loading">加载中...</div>
   if (error) return <div className="error">{error}</div>
-  if (!data || !data.opportunities) return <div className="empty-state">暂无数据</div>
+
+  const opportunities = data?.opportunities ?? []
+  const funnelStats = data?.funnel_stats
+
+  if (!funnelStats) return <div className="empty-state">暂无数据</div>
 
   return (
     <div className="opportunities-page">
@@ -37,34 +41,34 @@ export function Opportunities() {
         <div className="funnel-stats">
           <div className="funnel-stat">
             <span className="stat-label">总币种数</span>
-            <span className="stat-value">{data.funnel_stats.total_symbols}</span>
+            <span className="stat-value">{funnelStats.total_symbols}</span>
           </div>
           <div className="funnel-stat">
             <span className="stat-label">负价差筛选后</span>
-            <span className="stat-value">{data.funnel_stats.after_negative_spread}</span>
+            <span className="stat-value">{funnelStats.after_negative_spread}</span>
           </div>
           <div className="funnel-stat">
             <span className="stat-label">现货深度筛选后</span>
-            <span className="stat-value">{data.funnel_stats.after_spot_depth}</span>
+            <span className="stat-value">{funnelStats.after_spot_depth}</span>
           </div>
           <div className="funnel-stat">
             <span className="stat-label">价格斜率筛选后</span>
-            <span className="stat-value">{data.funnel_stats.after_price_slope}</span>
+            <span className="stat-value">{funnelStats.after_price_slope}</span>
           </div>
           <div className="funnel-stat">
             <span className="stat-label">交易量筛选后</span>
-            <span className="stat-value">{data.funnel_stats.after_volume}</span>
+            <span className="stat-value">{funnelStats.after_volume}</span>
           </div>
           <div className="funnel-stat">
             <span className="stat-label">最终机会数</span>
-            <span className="stat-value highlight">{data.funnel_stats.after_both_depth}</span>
+            <span className="stat-value highlight">{funnelStats.after_both_depth}</span>
           </div>
         </div>
       </section>
 
       <section className="opportunities-list">
         <h2>筛选后的机会</h2>
-        {(!data.opportunities || data.opportunities.length === 0) ? (
+        {opportunities.length === 0 ? (
           <div className="empty-state">暂无满足条件的套利机会</div>
         ) : (
           <div className="table-container">
@@ -83,7 +87,7 @@ export function Opportunities() {
                 </tr>
               </thead>
               <tbody>
-                {data.opportunities.map((opp) => (
+                {opportunities.map((opp) => (
                   <tr key={`${opp.symbol}-${opp.spot_exchange}-${opp.futures_exchange}`}>
                     <td>{opp.symbol}</td>
                     <td>{opp.spot_exchange}</td>
