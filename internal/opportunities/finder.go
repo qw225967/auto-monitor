@@ -57,10 +57,17 @@ func (f *Finder) RegisterExchange(name string, adapter ExchangeAdapter) {
 	f.exchanges[name] = adapter
 }
 
-// FeedKline 将 K 线数据喂入 PriceHistory：量用 K 线，价格优先用原始价差（无则用 K 线 close 供斜率计算）
+// FeedKline 将 K 线数据喂入 PriceHistory：量用 K 线，价格用 close
+// 最新一根 bar 用 time.Now() 作为记录时间，确保「当前时间获取」；历史 bar 用 bar 自身时间戳
 func (f *Finder) FeedKline(symbol, exchange string, bars []kline.KlinePoint) {
-	for _, b := range bars {
-		f.priceHistory.RecordAt(symbol, exchange, b.Close, b.Volume, b.Timestamp)
+	now := time.Now()
+	for i, b := range bars {
+		ts := b.Timestamp
+		// 最新一根用当前时间，表示「此刻获取到的价格」
+		if i == len(bars)-1 && now.Sub(b.Timestamp) < 2*time.Minute {
+			ts = now
+		}
+		f.priceHistory.RecordAt(symbol, exchange, b.Close, b.Volume, ts)
 	}
 }
 
@@ -102,6 +109,29 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	// 漏斗减负 2：按 symbol 去重，每 symbol 保留价差最负的 1 条
 	deduped := f.dedupeBySymbol(afterSpreadThreshold)
 	log.Printf("[Funnel] 1c.按symbol去重后: %d 个 %s", len(deduped), symbolsFromSpreadItems(deduped))
+
+	// 价格获取诊断：PriceHistory 统计 + 去重后各币是否有价格
+	totalKeys, keysWithPrice := f.priceHistory.StatsCount()
+	dedupedWithPrice := 0
+	for _, it := range deduped {
+		total, withPrice := f.priceHistory.CountPoints(it.Symbol, it.BuyExchange)
+		if total >= 2 && withPrice >= 2 {
+			dedupedWithPrice++
+		} else {
+			// 尝试回退交易所
+			for _, ex := range klineExchanges {
+				if strings.EqualFold(ex, it.BuyExchange) {
+					continue
+				}
+				t, wp := f.priceHistory.CountPoints(it.Symbol, ex)
+				if t >= 2 && wp >= 2 {
+					dedupedWithPrice++
+					break
+				}
+			}
+		}
+	}
+	log.Printf("[Funnel] 价格诊断: PriceHistory keys=%d 有价(5m)=%d, 去重%d币中有价=%d", totalKeys, keysWithPrice, len(deduped), dedupedWithPrice)
 
 	// 漏斗减负 3：价格斜率提前（有历史时要求上涨，无数据放行）
 	withPriceSlope, slopeDebug := f.filterPriceSlopeWithDebug(deduped)

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -36,6 +37,7 @@ type Fetcher struct {
 	symbols  []string
 	exchs    []string
 	onAppend OnAppendFunc
+	fedPairs int64 // 本轮成功喂入的 (symbol,exchange) 对数，用于诊断
 }
 
 // NewFetcher 创建拉取器
@@ -113,11 +115,16 @@ func (f *Fetcher) RunBatch(ctx context.Context) {
 				f.store.Append(symbol, exchange, bars)
 				if f.onAppend != nil {
 					f.onAppend(symbol, exchange, bars)
+					atomic.AddInt64(&f.fedPairs, 1)
 				}
 			}
 		}(t.symbol, t.exchange)
 	}
 	wg.Wait()
+	fed := atomic.SwapInt64(&f.fedPairs, 0)
+	if len(tasks) > 0 {
+		log.Printf("[Kline] 本轮回传: %d/%d 对 (symbol,exchange) 有 bar 且已喂入 PriceHistory", fed, len(tasks))
+	}
 }
 
 func (f *Fetcher) fetchOne(ctx context.Context, symbol, exchange string) ([]KlinePoint, error) {

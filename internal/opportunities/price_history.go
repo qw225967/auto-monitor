@@ -63,6 +63,28 @@ func (p *PriceHistory) RecordAt(symbol, exchange string, price, volume float64, 
 	}
 }
 
+// StatsCount 返回全局统计：总 key 数、5 分钟内有 Price>0 的 key 数（用于诊断）
+func (p *PriceHistory) StatsCount() (totalKeys, keysWithPriceIn5m int) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	now := time.Now()
+	cutoff := now.Add(-5 * time.Minute)
+	for _, points := range p.histories {
+		totalKeys++
+		hasPrice := false
+		for _, pt := range points {
+			if pt.Timestamp.After(cutoff) && pt.Price > 0 {
+				hasPrice = true
+				break
+			}
+		}
+		if hasPrice {
+			keysWithPriceIn5m++
+		}
+	}
+	return totalKeys, keysWithPriceIn5m
+}
+
 // CountPoints 返回总点数及 Price>0 的点数（用于诊断）
 func (p *PriceHistory) CountPoints(symbol, exchange string) (total, withPrice int) {
 	p.mu.RLock()
