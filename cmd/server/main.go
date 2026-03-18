@@ -266,7 +266,7 @@ func main() {
 	// K 线拉取：每 3s 分批查询多交易所，存储用于量能/斜率
 	klineStore := kline.NewStore(600)
 	klineFetcher := kline.NewFetcher(klineStore, nil, []string{"binance", "bybit", "okx", "gate", "bitget"})
-	klineFetcher.SetUseSecondLevel(true) // Binance 1s, Gate 10s，其它 1m
+	// 全部 1m K 线，每 3s 一轮，请求在 3s 内均衡摊开
 	klineFetcher.SetOnAppend(oppFinder.FeedKline)
 	klineCtx := context.Background()
 	go klineFetcher.RunLoop(klineCtx)
