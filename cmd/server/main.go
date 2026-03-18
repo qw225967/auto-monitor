@@ -259,6 +259,7 @@ func main() {
 
 	// 机会发现
 	oppFinder := opportunities.NewFinder()
+	opportunities.RegisterExchangeAdapters(oppFinder) // 注册 Binance/Bybit/OKX/Gate/Bitget 公共订单簿
 	oppHandler := opportunities.NewHandler(oppFinder)
 
 	// Gin

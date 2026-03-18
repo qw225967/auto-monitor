@@ -61,6 +61,16 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	stats.AfterNegativeSpread = len(negativeSpread)
 	log.Printf("[Funnel] 1.负价差筛选后: %d 个 %s", len(negativeSpread), symbolsFromSpreadItems(negativeSpread))
 
+	// 用价差数据喂入价格历史（用于漏斗3、4的斜率与量能）
+	for _, it := range negativeSpread {
+		if it.BuyPrice > 0 {
+			f.priceHistory.Record(it.Symbol, it.BuyExchange, it.BuyPrice, 0)
+		}
+		if it.SellPrice > 0 {
+			f.priceHistory.Record(it.Symbol, it.SellExchange, it.SellPrice, 0)
+		}
+	}
+
 	// 如果没有注册交易所，跳过需要订单簿的漏斗步骤
 	hasExchanges := len(exchanges) > 0
 
@@ -191,8 +201,7 @@ func (f *Finder) filterSpotDepth(items []model.SpreadItem, exchanges map[string]
 	var result []model.SpreadItem
 	for _, item := range items {
 		spotEx, _ := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
-
-		adapter, ok := exchanges[spotEx]
+		adapter, ok := exchanges[strings.ToLower(spotEx)]
 		if !ok {
 			continue
 		}
@@ -247,7 +256,8 @@ func (f *Finder) filterPriceSlope(items []model.SpreadItem) []model.SpreadItem {
 	var result []model.SpreadItem
 	for _, item := range items {
 		slope := f.priceHistory.GetSlope(item.Symbol, item.BuyExchange)
-		if slope >= MinPriceSlope {
+		// 无足够价格历史时 slope=0，放行不过滤；有历史且斜率不足时过滤
+		if slope >= MinPriceSlope || slope == 0 {
 			result = append(result, item)
 		}
 	}
@@ -269,9 +279,8 @@ func (f *Finder) filterBothDepth(items []model.SpreadItem, exchanges map[string]
 	var result []model.OpportunityItem
 	for _, item := range items {
 		spotEx, futuresEx := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
-
-		spotAdapter, spotOk := exchanges[spotEx]
-		futuresAdapter, futuresOk := exchanges[futuresEx]
+		spotAdapter, spotOk := exchanges[strings.ToLower(spotEx)]
+		futuresAdapter, futuresOk := exchanges[strings.ToLower(futuresEx)]
 
 		if !spotOk || !futuresOk {
 			continue
