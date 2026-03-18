@@ -14,10 +14,10 @@ import (
 
 const (
 	MinNegativeSpread   = -1.0
-	MinSpotDepthUSDT   = 5000  // 现货深度阈值（USDT），降低以容纳更多小币
+	MinSpotDepthUSDT   = 200   // 现货深度阈值（USDT），小币流动性有限
 	MinPriceSlope      = 0.002 // 价格斜率阈值，需 > 0.002 才通过（约 1% 涨幅/5 分钟）
 	VolumeSpikeThreshold = 2.0
-	MinBothDepthUSDT   = 5000  // 双深度阈值
+	MinBothDepthUSDT   = 200   // 双深度阈值
 
 	MaxPricePoints     = 1000
 	PriceHistoryWindow = 10 * time.Minute
@@ -344,6 +344,7 @@ func isSpotFuturesPair(buyEx, sellEx string) bool {
 func (f *Finder) filterSpotDepth(items []model.SpreadItem, exchanges map[string]ExchangeAdapter) []model.SpreadItem {
 	var result []model.SpreadItem
 	var depthSample []string
+	var depthZeroErrs []string
 	for _, item := range items {
 		spotEx, _ := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
 		adapter, ok := exchanges[strings.ToLower(spotEx)]
@@ -354,16 +355,22 @@ func (f *Finder) filterSpotDepth(items []model.SpreadItem, exchanges map[string]
 			continue
 		}
 
-		depth := f.getSpotDepth(adapter, item.Symbol)
+		depth, err := f.getSpotDepthWithErr(adapter, item.Symbol)
 		if depth >= MinSpotDepthUSDT {
 			result = append(result, item)
 		}
 		if len(depthSample) < 5 {
 			depthSample = append(depthSample, fmt.Sprintf("%s:%s depth=%.0f", item.Symbol, spotEx, depth))
 		}
+		if depth == 0 && err != nil && len(depthZeroErrs) < 3 {
+			depthZeroErrs = append(depthZeroErrs, fmt.Sprintf("%s:%s err=%v", item.Symbol, spotEx, err))
+		}
 	}
 	if len(items) > 0 && len(depthSample) > 0 {
 		log.Printf("[Funnel] 2.现货深度诊断: %s (阈值=%d)", strings.Join(depthSample, "; "), MinSpotDepthUSDT)
+		if len(depthZeroErrs) > 0 {
+			log.Printf("[Funnel] 2.深度为0的API错误样例: %s", strings.Join(depthZeroErrs, "; "))
+		}
 	}
 	return result
 }
@@ -374,6 +381,14 @@ func (f *Finder) getSpotDepth(adapter ExchangeAdapter, symbol string) float64 {
 		return 0
 	}
 	return calculateDepth(bids, 10)
+}
+
+func (f *Finder) getSpotDepthWithErr(adapter ExchangeAdapter, symbol string) (float64, error) {
+	bids, _, err := adapter.GetSpotOrderBook(symbol)
+	if err != nil {
+		return 0, err
+	}
+	return calculateDepth(bids, 10), nil
 }
 
 func calculateDepth(orders [][]string, topN int) float64 {
