@@ -28,6 +28,7 @@ import (
 	"github.com/qw225967/auto-monitor/internal/runner"
 	"github.com/qw225967/auto-monitor/internal/source/seeingstone"
 	"github.com/qw225967/auto-monitor/internal/tokenregistry"
+	tg "github.com/qw225967/auto-monitor/internal/utils/notify/telegram"
 )
 
 type assetPriorityMetric struct {
@@ -263,6 +264,17 @@ func main() {
 	opportunities.RegisterExchangeAdapters(oppFinder) // 注册 Binance/Bybit/OKX/Gate/Bitget 公共订单簿
 	oppHandler := opportunities.NewHandler(oppFinder)
 
+	// Telegram 通知器（如果配置了 Telegram Bot）
+	var oppNotifier *opportunities.OpportunityNotifier
+	tgConfig := config.GetGlobalConfig()
+	if tgConfig != nil && tgConfig.Telegram != nil && tgConfig.Telegram.BotToken != "" && tgConfig.Telegram.ChatID != "" {
+		tgClient := tg.NewTelegramClient(tgConfig.Telegram.BotToken, tgConfig.Telegram.ChatID)
+		oppNotifier = opportunities.NewOpportunityNotifier(tgClient)
+		log.Printf("[Telegram] 机会通知器已启动，ChatID: %s", tgConfig.Telegram.ChatID)
+	} else {
+		log.Printf("[Telegram] 未配置 Telegram Bot，跳过通知功能")
+	}
+
 	// K 线拉取：每 3s 分批查询多交易所，存储用于量能/斜率
 	klineStore := kline.NewStore(600)
 	klineFetcher := kline.NewFetcher(klineStore, nil, []string{"binance", "bybit", "okx", "gate", "bitget"})
@@ -307,6 +319,10 @@ func main() {
 			if oppFinder != nil {
 				resp := oppFinder.Find(items)
 				oppHandler.UpdateResponse(resp)
+				// 通知 Telegram
+				if oppNotifier != nil {
+					oppNotifier.Notify(resp.Opportunities)
+				}
 			}
 			// 更新 K 线拉取 symbol 列表（负价差去重，最多 500 个）
 			if klineFetcher != nil {
@@ -545,30 +561,30 @@ func main() {
 	}
 	_ = chainPriceFetcher
 
-	// Ticker B: 30s 全量探测 + 表格组装
-	go func() {
-		ticker := time.NewTicker(cfg.DetectInterval())
-		defer ticker.Stop()
-		for range ticker.C {
-			cacheMu.RLock()
-			items := make([]model.SpreadItem, len(cachedItems))
-			copy(items, cachedItems)
-			cacheMu.RUnlock()
+	// Ticker B: 30s 全量探测 + 表格组装 (暂时禁用)
+	// go func() {
+	// 	ticker := time.NewTicker(cfg.DetectInterval())
+	// 	defer ticker.Stop()
+	// 	for range ticker.C {
+	// 		cacheMu.RLock()
+	// 		items := make([]model.SpreadItem, len(cachedItems))
+	// 		copy(items, cachedItems)
+	// 		cacheMu.RUnlock()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-			chainPrices := handler.GetAllChainPrices()
-			liquidity := handler.GetAllLiquidity()
-			resp, err := r.RunDetect(ctx, items, chainPrices, liquidity)
-			cancel()
-			if err != nil {
-				log.Printf("[Detect] %v", err)
-				handler.SetLastDetectError(err.Error())
-				continue
-			}
-			handler.UpdateOverview(resp)
-			log.Printf("[Detect] overview updated, %d rows", len(resp.Overview))
-		}
-	}()
+	// 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	// 		chainPrices := handler.GetAllChainPrices()
+	// 		liquidity := handler.GetAllLiquidity()
+	// 		resp, err := r.RunDetect(ctx, items, chainPrices, liquidity)
+	// 		cancel()
+	// 		if err != nil {
+	// 			log.Printf("[Detect] %v", err)
+	// 			handler.SetLastDetectError(err.Error())
+	// 			continue
+	// 		}
+	// 		handler.UpdateOverview(resp)
+	// 		log.Printf("[Detect] overview updated, %d rows", len(resp.Overview))
+	// 	}
+	// }()
 
 	// 启动时立即拉取一次
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.RequestTimeout())
