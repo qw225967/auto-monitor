@@ -312,8 +312,8 @@ func (f *Finder) filterPriceSlope(items []model.SpreadItem) []model.SpreadItem {
 	var result []model.SpreadItem
 	for _, item := range items {
 		slope := f.priceHistory.GetSlope(item.Symbol, item.BuyExchange)
-		// 无足够价格历史时 slope=0，放行；有历史时要求斜率 > MinPriceSlope
-		if slope == 0 || slope > MinPriceSlope {
+		// 无价格斜率数据(slope=0)直接过滤；有数据时要求斜率 > MinPriceSlope
+		if slope > MinPriceSlope {
 			result = append(result, item)
 		}
 	}
