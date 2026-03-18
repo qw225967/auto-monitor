@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/opportunities/kline"
 )
 
 const (
 	MinNegativeSpread   = -1.0
 	MinSpotDepthUSDT   = 10000
-	MinPriceSlope      = 0.01 // 价格斜率阈值，需 > 0.01 才通过
+	MinPriceSlope      = 0.002 // 价格斜率阈值，需 > 0.002 才通过（约 1% 涨幅/5 分钟）
 	VolumeSpikeThreshold = 2.0
 	MinBothDepthUSDT   = 10000
 
@@ -51,6 +52,13 @@ func (f *Finder) RegisterExchange(name string, adapter ExchangeAdapter) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.exchanges[name] = adapter
+}
+
+// FeedKline 将 K 线数据喂入 PriceHistory（用于量能放大、斜率计算）
+func (f *Finder) FeedKline(symbol, exchange string, bars []kline.KlinePoint) {
+	for _, b := range bars {
+		f.priceHistory.Record(symbol, exchange, b.Close, b.Volume)
+	}
 }
 
 func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesResponse {
@@ -234,6 +242,35 @@ func (f *Finder) dedupeBySymbol(items []model.SpreadItem) []model.SpreadItem {
 }
 
 // limitTopBySpread 按价差排序，只保留前 n 个（最负的优先）
+// SymbolsForKline 从价差数据中提取需拉取 K 线的 symbol 列表（负价差+已知交易所，去重，最多 maxSymbols 个）
+func SymbolsForKline(items []model.SpreadItem, maxSymbols int) []string {
+	best := make(map[string]float64)
+	for _, it := range items {
+		if isSpotFuturesPair(it.BuyExchange, it.SellExchange) && it.SpreadPercent < 0 {
+			if cur, ok := best[it.Symbol]; !ok || it.SpreadPercent < cur {
+				best[it.Symbol] = it.SpreadPercent
+			}
+		}
+	}
+	type pair struct {
+		symbol string
+		spread float64
+	}
+	var list []pair
+	for s, sp := range best {
+		list = append(list, pair{s, sp})
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].spread < list[j].spread })
+	if maxSymbols > 0 && len(list) > maxSymbols {
+		list = list[:maxSymbols]
+	}
+	out := make([]string, len(list))
+	for i := range list {
+		out[i] = list[i].symbol
+	}
+	return out
+}
+
 func (f *Finder) limitTopBySpread(items []model.SpreadItem, n int) []model.SpreadItem {
 	if n <= 0 || len(items) <= n {
 		return items
