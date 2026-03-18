@@ -22,6 +22,11 @@ const (
 	MaxConcurrent = 8
 	// KlineLimit 每次拉取 K 线根数
 	KlineLimit = 100
+
+	// 秒级间隔（各交易所支持情况：Binance 1s, Gate 10s, Bybit/OKX/Bitget 最低 1m）
+	Interval1s  = "1s"
+	Interval10s = "10s"
+	Interval1m  = "1m"
 )
 
 // OnAppendFunc 追加 K 线后的回调，用于同步到 PriceHistory 等
@@ -34,6 +39,8 @@ type Fetcher struct {
 	symbols  []string
 	exchs    []string
 	onAppend OnAppendFunc
+	// useSecondLevel 为 true 时：Binance 用 1s，Gate 用 10s，其它用 1m
+	useSecondLevel bool
 }
 
 // NewFetcher 创建拉取器
@@ -43,6 +50,25 @@ func NewFetcher(store *Store, symbols []string, exchanges []string) *Fetcher {
 		store:   store,
 		symbols: symbols,
 		exchs:   exchanges,
+	}
+}
+
+// SetUseSecondLevel 启用秒级 K 线（Binance 1s, Gate 10s, 其它 1m）
+func (f *Fetcher) SetUseSecondLevel(use bool) {
+	f.useSecondLevel = use
+}
+
+func (f *Fetcher) intervalFor(exchange string) string {
+	if !f.useSecondLevel {
+		return Interval1m
+	}
+	switch strings.ToLower(exchange) {
+	case "binance":
+		return Interval1s
+	case "gate":
+		return Interval10s
+	default:
+		return Interval1m
 	}
 }
 
@@ -109,23 +135,23 @@ func (f *Fetcher) fetchOne(ctx context.Context, symbol, exchange string) ([]Klin
 	ex := strings.ToLower(exchange)
 	switch ex {
 	case "binance":
-		return f.fetchBinance(ctx, symbol)
+		return f.fetchBinance(ctx, symbol, f.intervalFor(ex))
 	case "bybit":
-		return f.fetchBybit(ctx, symbol)
+		return f.fetchBybit(ctx, symbol, f.intervalFor(ex))
 	case "okx":
-		return f.fetchOKX(ctx, symbol)
+		return f.fetchOKX(ctx, symbol, f.intervalFor(ex))
 	case "gate":
-		return f.fetchGate(ctx, symbol)
+		return f.fetchGate(ctx, symbol, f.intervalFor(ex))
 	case "bitget":
-		return f.fetchBitget(ctx, symbol)
+		return f.fetchBitget(ctx, symbol, f.intervalFor(ex))
 	default:
 		return nil, fmt.Errorf("unsupported exchange: %s", exchange)
 	}
 }
 
-// Binance: GET /api/v3/klines?symbol=X&interval=1m&limit=100
-func (f *Fetcher) fetchBinance(ctx context.Context, symbol string) ([]KlinePoint, error) {
-	u := "https://api.binance.com/api/v3/klines?symbol=" + url.QueryEscape(symbol) + "&interval=1m&limit=" + strconv.Itoa(KlineLimit)
+// Binance: GET /api/v3/klines?symbol=X&interval=1m|1s&limit=100
+func (f *Fetcher) fetchBinance(ctx context.Context, symbol, interval string) ([]KlinePoint, error) {
+	u := "https://api.binance.com/api/v3/klines?symbol=" + url.QueryEscape(symbol) + "&interval=" + interval + "&limit=" + strconv.Itoa(KlineLimit)
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	resp, err := f.client.Do(req)
 	if err != nil {
@@ -156,9 +182,10 @@ func (f *Fetcher) fetchBinance(ctx context.Context, symbol string) ([]KlinePoint
 	return bars, nil
 }
 
-// Bybit: GET /v5/market/kline?category=spot&symbol=X&interval=1&limit=100
-func (f *Fetcher) fetchBybit(ctx context.Context, symbol string) ([]KlinePoint, error) {
-	u := "https://api.bybit.com/v5/market/kline?category=spot&symbol=" + url.QueryEscape(symbol) + "&interval=1&limit=" + strconv.Itoa(KlineLimit)
+// Bybit: GET /v5/market/kline?category=spot&symbol=X&interval=1&limit=100 (interval=1 表示 1 分钟，无秒级)
+func (f *Fetcher) fetchBybit(ctx context.Context, symbol, _ string) ([]KlinePoint, error) {
+	iv := "1" // Bybit 最小 1 分钟
+	u := "https://api.bybit.com/v5/market/kline?category=spot&symbol=" + url.QueryEscape(symbol) + "&interval=" + iv + "&limit=" + strconv.Itoa(KlineLimit)
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	resp, err := f.client.Do(req)
 	if err != nil {
@@ -194,10 +221,11 @@ func (f *Fetcher) fetchBybit(ctx context.Context, symbol string) ([]KlinePoint, 
 	return bars, nil
 }
 
-// OKX: GET /api/v5/market/candles?instId=X-USDT&bar=1m&limit=100
-func (f *Fetcher) fetchOKX(ctx context.Context, symbol string) ([]KlinePoint, error) {
+// OKX: GET /api/v5/market/candles?instId=X-USDT&bar=1m&limit=100 (现货最小 1m)
+func (f *Fetcher) fetchOKX(ctx context.Context, symbol, _ string) ([]KlinePoint, error) {
 	instId := strings.ReplaceAll(symbol, "USDT", "-USDT")
-	u := "https://www.okx.com/api/v5/market/candles?instId=" + url.QueryEscape(instId) + "&bar=1m&limit=" + strconv.Itoa(KlineLimit)
+	bar := "1m"
+	u := "https://www.okx.com/api/v5/market/candles?instId=" + url.QueryEscape(instId) + "&bar=" + bar + "&limit=" + strconv.Itoa(KlineLimit)
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	resp, err := f.client.Do(req)
 	if err != nil {
@@ -233,11 +261,15 @@ func (f *Fetcher) fetchOKX(ctx context.Context, symbol string) ([]KlinePoint, er
 	return bars, nil
 }
 
-// Gate: GET /api/v4/spot/candlesticks?currency_pair=X_USDT&interval=1m&limit=100
+// Gate: GET /api/v4/spot/candlesticks?currency_pair=X_USDT&interval=1m|10s&limit=100
 // 返回 [[timestamp, volume, close, high, low, open], ...]，timestamp 为秒
-func (f *Fetcher) fetchGate(ctx context.Context, symbol string) ([]KlinePoint, error) {
+func (f *Fetcher) fetchGate(ctx context.Context, symbol, interval string) ([]KlinePoint, error) {
 	cp := strings.ReplaceAll(symbol, "USDT", "_USDT")
-	u := "https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=" + url.QueryEscape(cp) + "&interval=1m&limit=" + strconv.Itoa(KlineLimit)
+	iv := interval
+	if iv == Interval1s {
+		iv = Interval10s // Gate 最小 10s
+	}
+	u := "https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=" + url.QueryEscape(cp) + "&interval=" + iv + "&limit=" + strconv.Itoa(KlineLimit)
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	resp, err := f.client.Do(req)
 	if err != nil {
@@ -269,9 +301,10 @@ func (f *Fetcher) fetchGate(ctx context.Context, symbol string) ([]KlinePoint, e
 	return bars, nil
 }
 
-// Bitget: GET /api/v2/spot/market/candles?symbol=X&period=1m&limit=100
-func (f *Fetcher) fetchBitget(ctx context.Context, symbol string) ([]KlinePoint, error) {
-	u := "https://api.bitget.com/api/v2/spot/market/candles?symbol=" + url.QueryEscape(symbol) + "&period=1m&limit=" + strconv.Itoa(KlineLimit)
+// Bitget: GET /api/v2/spot/market/candles?symbol=X&period=1m&limit=100 (无秒级)
+func (f *Fetcher) fetchBitget(ctx context.Context, symbol, _ string) ([]KlinePoint, error) {
+	period := "1m"
+	u := "https://api.bitget.com/api/v2/spot/market/candles?symbol=" + url.QueryEscape(symbol) + "&period=" + period + "&limit=" + strconv.Itoa(KlineLimit)
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	resp, err := f.client.Do(req)
 	if err != nil {
