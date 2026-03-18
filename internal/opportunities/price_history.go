@@ -29,18 +29,23 @@ func NewPriceHistory(maxPoints int, windowSize time.Duration) *PriceHistory {
 }
 
 func (p *PriceHistory) Record(symbol, exchange string, price, volume float64) {
+	p.RecordAt(symbol, exchange, price, volume, time.Now())
+}
+
+// RecordAt 在指定时间戳记录（K 线用此接口只填 volume，price 填 0）
+func (p *PriceHistory) RecordAt(symbol, exchange string, price, volume float64, ts time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	key := priceHistoryKey(symbol, exchange)
-	now := time.Now()
 
 	p.histories[key] = append(p.histories[key], model.PricePoint{
 		Price:     price,
-		Timestamp: now,
+		Timestamp: ts,
 		Volume:    volume,
 	})
 
+	now := time.Now()
 	cutoff := now.Add(-p.windowSize)
 	points := p.histories[key]
 	i := 0
@@ -73,7 +78,7 @@ func (p *PriceHistory) GetSlope(symbol, exchange string) float64 {
 
 	var recentPoints []model.PricePoint
 	for i := len(points) - 1; i >= 0; i-- {
-		if points[i].Timestamp.After(cutoff) {
+		if points[i].Timestamp.After(cutoff) && points[i].Price > 0 {
 			recentPoints = append([]model.PricePoint{points[i]}, recentPoints...)
 		}
 	}

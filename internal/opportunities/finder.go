@@ -54,10 +54,10 @@ func (f *Finder) RegisterExchange(name string, adapter ExchangeAdapter) {
 	f.exchanges[name] = adapter
 }
 
-// FeedKline 将 K 线数据喂入 PriceHistory（用于量能放大、斜率计算）
+// FeedKline 将 K 线数据喂入 PriceHistory，仅填量（价格从原始价差数据获取）
 func (f *Finder) FeedKline(symbol, exchange string, bars []kline.KlinePoint) {
 	for _, b := range bars {
-		f.priceHistory.Record(symbol, exchange, b.Close, b.Volume)
+		f.priceHistory.RecordAt(symbol, exchange, 0, b.Volume, b.Timestamp)
 	}
 }
 
@@ -126,7 +126,7 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 
 	withVolume := f.filterVolumeSpike(withSpotDepth)
 	stats.AfterVolume = len(withVolume)
-	log.Printf("[Funnel] 3.量能放大筛选后: %d 个 %s", len(withVolume), symbolsFromSpreadItems(withVolume))
+	log.Printf("[Funnel] 3.量能放大筛选后: %d 个 %s", len(withVolume), symbolsFromSpreadItemsWithSlope(withVolume, f.priceHistory.GetSlope))
 
 	finalOpportunities := f.filterBothDepth(withVolume, exchanges)
 	stats.AfterBothDepth = len(finalOpportunities)
@@ -140,6 +140,10 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 }
 
 func symbolsFromSpreadItems(items []model.SpreadItem) string {
+	return symbolsFromSpreadItemsWithSlope(items, nil)
+}
+
+func symbolsFromSpreadItemsWithSlope(items []model.SpreadItem, getSlope func(string, string) float64) string {
 	if len(items) == 0 {
 		return "[]"
 	}
@@ -149,7 +153,12 @@ func symbolsFromSpreadItems(items []model.SpreadItem) string {
 		key := it.Symbol + ":" + it.BuyExchange + "->" + it.SellExchange
 		if !seen[key] {
 			seen[key] = true
-			symbols = append(symbols, key)
+			if getSlope != nil {
+				slope := getSlope(it.Symbol, it.BuyExchange)
+				symbols = append(symbols, fmt.Sprintf("%s(slope=%.4f)", key, slope))
+			} else {
+				symbols = append(symbols, key)
+			}
 		}
 	}
 	if len(symbols) > 20 {
