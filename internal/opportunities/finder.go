@@ -24,8 +24,8 @@ const (
 	// 每个币现货价保留最近 600 个数据点用于斜率计算
 	SlopePricePoints = 600
 
-	// 漏斗减负：价差阈值（只保留更负的，如 -0.2 表示 <-0.2%）
-	SpreadThresholdStrict = -0.2
+	// 漏斗减负：价差阈值（只保留更负的，如 -0.5 表示 <-0.5%）
+	SpreadThresholdStrict = -0.5
 	// 漏斗减负：进入深度筛前最多保留条数（避免 3 万次 API 调用）
 	MaxTokensBeforeDepth = 2000
 )
