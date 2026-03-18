@@ -3,8 +3,8 @@ package lighter
 import (
 	"fmt"
 
-	"auto-arbitrage/internal/exchange"
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/internal/exchange"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 var _ exchange.DepositWithdrawProvider = (*lighter)(nil)

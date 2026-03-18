@@ -1,149 +1,314 @@
 package config
 
 import (
-	"sync"
+	"fmt"
+	"time"
 
-	"auto-arbitrage/internal/model"
+	"github.com/spf13/viper"
 )
 
-// MyLocalMysql MySQL连接字符串
-const MyLocalMysql = "root:123456@tcp(127.0.0.1:3306)/taolidb?charset=utf8mb4&parseTime=True&loc=Local"
+type Config struct {
+	Server        ServerConfig
+	SeeingStone   SeeingStoneConfig
+	Threshold     ThresholdConfig
+	Intervals     IntervalsConfig
+	Runner        RunnerConfig
+	TokenRegistry TokenRegistryConfig
+	ChainPrice    ChainPriceConfig
+	Okex          OkexConfig
+	MockMode      bool // 开发模式：使用模拟数据，不请求真实 API
+}
 
-// OkEx API 密钥（用于 swap 操作，固定硬编码，不在 Web API 中暴露）
-const (
-	OkExSecret     = "1969798334B8317CE5C64A538341A5A6"
-	OkExAPIKey     = "09609bdd-16bb-465b-8a09-70382baa555f"
-	OkExPassphrase = "WsmFrq123@"
-)
+// OkexConfig OKEx API 配置（用于 DEX Quote / 链上价格）
+type OkexConfig struct {
+	AppKey     string
+	SecretKey  string
+	Passphrase string
+}
 
-// 套利系统配置
-const (
-	// DefaultTargetThresholdInterval 默认目标价差阈值区间
-	// 表示 AB 阈值和 BA 阈值之和的目标值，用于最优阈值计算
-	DefaultTargetThresholdInterval = 0.5
-)
+type ServerConfig struct {
+	Port int
+}
 
-var (
-	// 缓存 swap 和 broadcast 的 API Key 列表
-	swapKeysCache      []model.OkexKeyRecord
-	broadcastKeysCache []model.OkexKeyRecord
-	keysCacheMutex     sync.RWMutex
-	keysInitialized    bool
-)
+type SeeingStoneConfig struct {
+	APIURL         string
+	APIToken       string
+	RequestTimeout int
+}
 
-// GetOkexKeyMapForSwap 获取 OKEx API Key 列表（用于 Swap，包含所有 API）
-// 线程安全，使用缓存
-func GetOkexKeyMapForSwap() []model.OkexKeyRecord {
-	keysCacheMutex.RLock()
-	if keysInitialized && len(swapKeysCache) > 0 {
-		// 返回缓存的副本，避免外部修改
-		result := make([]model.OkexKeyRecord, len(swapKeysCache))
-		copy(result, swapKeysCache)
-		keysCacheMutex.RUnlock()
-		return result
-	}
-	keysCacheMutex.RUnlock()
+type ThresholdConfig struct {
+	Spread float64
+}
 
-	// 需要初始化，获取写锁
-	keysCacheMutex.Lock()
-	defer keysCacheMutex.Unlock()
+type IntervalsConfig struct {
+	Fetch  int
+	Detect int
+}
 
-	// 双重检查，避免并发初始化
-	if keysInitialized && len(swapKeysCache) > 0 {
-		result := make([]model.OkexKeyRecord, len(swapKeysCache))
-		copy(result, swapKeysCache)
-		return result
-	}
+// RunnerConfig 探测并发与超时配置
+type RunnerConfig struct {
+	DetectMaxConcurrency int // 探测并发上限
+	DetectRouteTimeout   int // 秒，单路探测超时
+}
 
-	// 初始化所有 API Keys（使用硬编码的常量）
-	var allKeys []model.OkexKeyRecord
-	recordMy := model.OkexKeyRecord{
-		Index:        0,
-		CanBroadcast: true,
-		AppKey:       OkExAPIKey,
-		SecretKey:    OkExSecret,
-		Passphrase:   OkExPassphrase,
-	}
-	allKeys = append(allKeys, recordMy)
-	
-	// 如果配置文件中还有额外的密钥，也添加进去
-	globalCfg := GetGlobalConfig()
-	if globalCfg != nil && len(globalCfg.OkEx.KeyList) > 0 {
-		for _, keyRecord := range globalCfg.OkEx.KeyList {
-			// 跳过空密钥
-			if keyRecord.APIKey == "" || keyRecord.Secret == "" {
-				continue
-			}
-			record := model.OkexKeyRecord{
-				Index:        len(allKeys),
-				CanBroadcast: keyRecord.CanBroadcast,
-				AppKey:       keyRecord.APIKey,
-				SecretKey:    keyRecord.Secret,
-				Passphrase:   keyRecord.Passphrase,
-			}
-			allKeys = append(allKeys, record)
+// TokenRegistryConfig Token 信息补全配置
+type TokenRegistryConfig struct {
+	Path                  string
+	SyncInterval          int    // 秒，token 地址增量同步间隔
+	TokenRefreshTTL       int    // 秒，token 信息刷新 TTL（过期后重新请求 CoinGecko）
+	LiquiditySyncInterval int    // 秒，全表流动性同步间隔，默认 4h，控制 10 万/月 请求量
+	PrioritySyncEnabled   bool   // 是否启用优先流动性同步（候选优先）
+	PrioritySyncInterval  int    // 秒，优先流动性同步间隔
+	PriorityTopAssets     int    // 每轮优先资产数（按候选 spread）
+	PriorityMaxRequests   int    // 每轮优先同步最大请求数
+	LiquidityRetryMax     int    // 流动性请求最大重试次数（不含首次）
+	LiquidityBackoffBaseMs int   // 流动性重试退避基础毫秒
+	LiquidityBackoffMaxMs int    // 流动性重试退避最大毫秒
+	LiquidityBackoffJitter float64 // 流动性重试抖动百分比（如 20 表示 ±20%）
+	LiquidityNegativeTTL  int    // 秒，负缓存 TTL（404/无池）
+	CoinGeckoBudgetEnabled bool  // 是否启用 CoinGecko 预算管理
+	CoinGeckoBudgetPath   string // CoinGecko 预算文件路径
+	CoinGeckoMonthlyLimit int    // CoinGecko 月总请求上限
+	CoinGeckoAPIKey       string // CoinGecko Demo/Pro API Key，避免 429 限流
+	CoinGeckoPro          bool   // true 时使用 Pro API (pro-api.coingecko.com)
+}
+
+// ChainPriceConfig 链上价格配置
+type ChainPriceConfig struct {
+	Interval    int // 拉取间隔 (秒)
+	CacheTTL    int // 缓存时长 (秒)
+	Concurrency int // 并发数
+}
+
+func Load() (*Config, error) {
+	viper.SetConfigName("settings")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("config")
+	viper.AddConfigPath(".")
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, fmt.Errorf("read config: %w", err)
 		}
 	}
 
-	// 缓存所有 keys（用于 swap）
-	swapKeysCache = make([]model.OkexKeyRecord, len(allKeys))
-	copy(swapKeysCache, allKeys)
+	// 显式绑定环境变量（.env 通过 godotenv 加载后生效）
+	_ = viper.BindEnv("seeingstone.api_token", "SEEINGSTONE_API_TOKEN")
+	_ = viper.BindEnv("seeingstone.api_url", "SEEINGSTONE_API_URL")
+	_ = viper.BindEnv("seeingstone.request_timeout", "REQUEST_TIMEOUT")
+	_ = viper.BindEnv("server.port", "SERVER_PORT")
+	_ = viper.BindEnv("runner.detect_max_concurrency", "RUN_DETECT_MAX_CONCURRENCY")
+	_ = viper.BindEnv("runner.detect_route_timeout", "RUN_DETECT_ROUTE_TIMEOUT")
+	_ = viper.BindEnv("token_registry.path", "TOKEN_REGISTRY_PATH")
+	_ = viper.BindEnv("token_registry.sync_interval", "TOKEN_SYNC_INTERVAL")
+	_ = viper.BindEnv("token_registry.token_refresh_ttl", "TOKEN_REFRESH_TTL")
+	_ = viper.BindEnv("token_registry.liquidity_sync_interval", "LIQUIDITY_SYNC_INTERVAL")
+	_ = viper.BindEnv("token_registry.priority_sync_enabled", "PRIORITY_LIQUIDITY_SYNC_ENABLED")
+	_ = viper.BindEnv("token_registry.priority_sync_interval", "PRIORITY_LIQUIDITY_SYNC_INTERVAL")
+	_ = viper.BindEnv("token_registry.priority_top_assets", "PRIORITY_LIQUIDITY_TOP_ASSETS")
+	_ = viper.BindEnv("token_registry.priority_max_requests", "PRIORITY_LIQUIDITY_MAX_REQUESTS")
+	_ = viper.BindEnv("token_registry.liquidity_retry_max", "LIQUIDITY_RETRY_MAX")
+	_ = viper.BindEnv("token_registry.liquidity_backoff_base_ms", "LIQUIDITY_BACKOFF_BASE_MS")
+	_ = viper.BindEnv("token_registry.liquidity_backoff_max_ms", "LIQUIDITY_BACKOFF_MAX_MS")
+	_ = viper.BindEnv("token_registry.liquidity_backoff_jitter", "LIQUIDITY_BACKOFF_JITTER")
+	_ = viper.BindEnv("token_registry.liquidity_negative_ttl", "LIQUIDITY_NEGATIVE_TTL")
+	_ = viper.BindEnv("token_registry.coingecko_budget_enabled", "COINGECKO_BUDGET_ENABLED")
+	_ = viper.BindEnv("token_registry.coingecko_budget_path", "COINGECKO_BUDGET_PATH")
+	_ = viper.BindEnv("token_registry.coingecko_monthly_limit", "COINGECKO_MONTHLY_LIMIT")
+	_ = viper.BindEnv("token_registry.coingecko_api_key", "COINGECKO_API_KEY")
+	_ = viper.BindEnv("token_registry.coingecko_pro", "COINGECKO_PRO")
+	_ = viper.BindEnv("chain_price.interval", "CHAIN_PRICE_INTERVAL")
+	_ = viper.BindEnv("chain_price.cache_ttl", "CHAIN_PRICE_CACHE_TTL")
+	_ = viper.BindEnv("chain_price.concurrency", "CHAIN_PRICE_CONCURRENCY")
+	_ = viper.BindEnv("okex.app_key", "OKEX_APP_KEY")
+	_ = viper.BindEnv("okex.secret_key", "OKEX_SECRET_KEY")
+	_ = viper.BindEnv("okex.passphrase", "OKEX_PASSPHRASE")
 
-	// 初始化可广播的 keys
-	var broadcastKeys []model.OkexKeyRecord
-	for _, key := range allKeys {
-		if key.CanBroadcast {
-			broadcastKeys = append(broadcastKeys, key)
-		}
+	// 默认值
+	viper.SetDefault("seeingstone.api_url", "https://seeingstone.cloud")
+	viper.SetDefault("threshold.spread", 0.5)
+	viper.SetDefault("intervals.fetch", 3)
+	viper.SetDefault("intervals.detect", 30)
+	viper.SetDefault("runner.detect_max_concurrency", 64)
+	viper.SetDefault("runner.detect_route_timeout", 10)
+	viper.SetDefault("seeingstone.request_timeout", 60)
+	viper.SetDefault("server.port", 8088)
+	viper.SetDefault("mock_mode", false)
+	viper.SetDefault("token_registry.path", "data/token_registry.json")
+	viper.SetDefault("token_registry.sync_interval", 300)
+	viper.SetDefault("token_registry.token_refresh_ttl", 604800) // 7d
+	viper.SetDefault("token_registry.liquidity_sync_interval", 14400) // 4h，约 500 对 × 6 次/天 ≈ 9 万/月
+	viper.SetDefault("token_registry.priority_sync_enabled", true)
+	viper.SetDefault("token_registry.priority_sync_interval", 300)
+	viper.SetDefault("token_registry.priority_top_assets", 30)
+	viper.SetDefault("token_registry.priority_max_requests", 80)
+	viper.SetDefault("token_registry.liquidity_retry_max", 3)
+	viper.SetDefault("token_registry.liquidity_backoff_base_ms", 500)
+	viper.SetDefault("token_registry.liquidity_backoff_max_ms", 5000)
+	viper.SetDefault("token_registry.liquidity_backoff_jitter", 20.0)
+	viper.SetDefault("token_registry.liquidity_negative_ttl", 86400) // 24h
+	viper.SetDefault("token_registry.coingecko_budget_enabled", true)
+	viper.SetDefault("token_registry.coingecko_budget_path", "data/coingecko_budget.json")
+	viper.SetDefault("token_registry.coingecko_monthly_limit", 100000)
+	viper.SetDefault("chain_price.interval", 3)
+	viper.SetDefault("chain_price.cache_ttl", 30)
+	viper.SetDefault("chain_price.concurrency", 3)
+
+	cfg := &Config{
+		Server: ServerConfig{
+			Port: viper.GetInt("server.port"),
+		},
+		SeeingStone: SeeingStoneConfig{
+			APIURL:         viper.GetString("seeingstone.api_url"),
+			APIToken:       viper.GetString("seeingstone.api_token"),
+			RequestTimeout: viper.GetInt("seeingstone.request_timeout"),
+		},
+		Threshold: ThresholdConfig{
+			Spread: viper.GetFloat64("threshold.spread"),
+		},
+		Intervals: IntervalsConfig{
+			Fetch:  viper.GetInt("intervals.fetch"),
+			Detect: viper.GetInt("intervals.detect"),
+		},
+		Runner: RunnerConfig{
+			DetectMaxConcurrency: viper.GetInt("runner.detect_max_concurrency"),
+			DetectRouteTimeout:   viper.GetInt("runner.detect_route_timeout"),
+		},
+		TokenRegistry: TokenRegistryConfig{
+			Path:                  viper.GetString("token_registry.path"),
+			SyncInterval:          viper.GetInt("token_registry.sync_interval"),
+			TokenRefreshTTL:       viper.GetInt("token_registry.token_refresh_ttl"),
+			LiquiditySyncInterval: viper.GetInt("token_registry.liquidity_sync_interval"),
+			PrioritySyncEnabled:   viper.GetBool("token_registry.priority_sync_enabled"),
+			PrioritySyncInterval:  viper.GetInt("token_registry.priority_sync_interval"),
+			PriorityTopAssets:     viper.GetInt("token_registry.priority_top_assets"),
+			PriorityMaxRequests:   viper.GetInt("token_registry.priority_max_requests"),
+			LiquidityRetryMax:      viper.GetInt("token_registry.liquidity_retry_max"),
+			LiquidityBackoffBaseMs: viper.GetInt("token_registry.liquidity_backoff_base_ms"),
+			LiquidityBackoffMaxMs:  viper.GetInt("token_registry.liquidity_backoff_max_ms"),
+			LiquidityBackoffJitter: viper.GetFloat64("token_registry.liquidity_backoff_jitter"),
+			LiquidityNegativeTTL:   viper.GetInt("token_registry.liquidity_negative_ttl"),
+			CoinGeckoBudgetEnabled: viper.GetBool("token_registry.coingecko_budget_enabled"),
+			CoinGeckoBudgetPath:    viper.GetString("token_registry.coingecko_budget_path"),
+			CoinGeckoMonthlyLimit:  viper.GetInt("token_registry.coingecko_monthly_limit"),
+			CoinGeckoAPIKey:       viper.GetString("token_registry.coingecko_api_key"),
+			CoinGeckoPro:          viper.GetBool("token_registry.coingecko_pro"),
+		},
+		ChainPrice: ChainPriceConfig{
+			Interval:    viper.GetInt("chain_price.interval"),
+			CacheTTL:    viper.GetInt("chain_price.cache_ttl"),
+			Concurrency: viper.GetInt("chain_price.concurrency"),
+		},
+		Okex: OkexConfig{
+			AppKey:     viper.GetString("okex.app_key"),
+			SecretKey:  viper.GetString("okex.secret_key"),
+			Passphrase: viper.GetString("okex.passphrase"),
+		},
+		MockMode: viper.GetBool("mock_mode") || viper.GetBool("MOCK_MODE"),
 	}
-	broadcastKeysCache = make([]model.OkexKeyRecord, len(broadcastKeys))
-	copy(broadcastKeysCache, broadcastKeys)
 
-	keysInitialized = true
-
-	// 返回副本
-	result := make([]model.OkexKeyRecord, len(swapKeysCache))
-	copy(result, swapKeysCache)
-	return result
-}
-
-// GetOkexKeyMapForBroadcast 获取 OKEx API Key 列表（用于广播，只包含可广播的 API）
-// 线程安全，使用缓存
-func GetOkexKeyMapForBroadcast() []model.OkexKeyRecord {
-	keysCacheMutex.RLock()
-	if keysInitialized && len(broadcastKeysCache) > 0 {
-		// 返回缓存的副本，避免外部修改
-		result := make([]model.OkexKeyRecord, len(broadcastKeysCache))
-		copy(result, broadcastKeysCache)
-		keysCacheMutex.RUnlock()
-		return result
+	if cfg.Server.Port == 0 {
+		cfg.Server.Port = 8088
 	}
-	keysCacheMutex.RUnlock()
+	if cfg.SeeingStone.RequestTimeout == 0 {
+		cfg.SeeingStone.RequestTimeout = 60
+	}
+	if cfg.Intervals.Fetch == 0 {
+		cfg.Intervals.Fetch = 3
+	}
+	if cfg.Intervals.Detect == 0 {
+		cfg.Intervals.Detect = 30
+	}
+	if cfg.Runner.DetectMaxConcurrency <= 0 {
+		cfg.Runner.DetectMaxConcurrency = 64
+	}
+	if cfg.Runner.DetectRouteTimeout <= 0 {
+		cfg.Runner.DetectRouteTimeout = 10
+	}
+	if cfg.TokenRegistry.Path == "" {
+		cfg.TokenRegistry.Path = "data/token_registry.json"
+	}
+	if cfg.TokenRegistry.SyncInterval == 0 {
+		cfg.TokenRegistry.SyncInterval = 300
+	}
+	if cfg.TokenRegistry.TokenRefreshTTL == 0 {
+		cfg.TokenRegistry.TokenRefreshTTL = 604800
+	}
+	if cfg.TokenRegistry.LiquiditySyncInterval == 0 {
+		cfg.TokenRegistry.LiquiditySyncInterval = 14400
+	}
+	if cfg.TokenRegistry.PrioritySyncInterval <= 0 {
+		cfg.TokenRegistry.PrioritySyncInterval = 300
+	}
+	if cfg.TokenRegistry.PriorityTopAssets <= 0 {
+		cfg.TokenRegistry.PriorityTopAssets = 30
+	}
+	if cfg.TokenRegistry.PriorityMaxRequests <= 0 {
+		cfg.TokenRegistry.PriorityMaxRequests = 80
+	}
+	if cfg.TokenRegistry.LiquidityRetryMax < 0 {
+		cfg.TokenRegistry.LiquidityRetryMax = 0
+	}
+	if cfg.TokenRegistry.LiquidityBackoffBaseMs <= 0 {
+		cfg.TokenRegistry.LiquidityBackoffBaseMs = 500
+	}
+	if cfg.TokenRegistry.LiquidityBackoffMaxMs <= 0 {
+		cfg.TokenRegistry.LiquidityBackoffMaxMs = 5000
+	}
+	if cfg.TokenRegistry.LiquidityBackoffJitter < 0 {
+		cfg.TokenRegistry.LiquidityBackoffJitter = 0
+	}
+	if cfg.TokenRegistry.LiquidityNegativeTTL <= 0 {
+		cfg.TokenRegistry.LiquidityNegativeTTL = 86400
+	}
+	if cfg.TokenRegistry.CoinGeckoBudgetPath == "" {
+		cfg.TokenRegistry.CoinGeckoBudgetPath = "data/coingecko_budget.json"
+	}
+	if cfg.TokenRegistry.CoinGeckoMonthlyLimit < 0 {
+		cfg.TokenRegistry.CoinGeckoMonthlyLimit = 0
+	}
+	if cfg.ChainPrice.Interval == 0 {
+		cfg.ChainPrice.Interval = 3
+	}
+	if cfg.ChainPrice.CacheTTL == 0 {
+		cfg.ChainPrice.CacheTTL = 30
+	}
+	if cfg.ChainPrice.Concurrency == 0 {
+		cfg.ChainPrice.Concurrency = 3
+	}
 
-	// 需要初始化，先获取所有 keys（这会触发初始化）
-	_ = GetOkexKeyMapForSwap()
-
-	// 再次读取缓存
-	keysCacheMutex.RLock()
-	defer keysCacheMutex.RUnlock()
-
-	result := make([]model.OkexKeyRecord, len(broadcastKeysCache))
-	copy(result, broadcastKeysCache)
-	return result
+	return cfg, nil
 }
 
-// GetOkexKeyMap 获取 OKEx API Key 列表（兼容旧接口）
-// 注意：建议使用 GetOkexKeyMapForSwap() 或 GetOkexKeyMapForBroadcast()
-func GetOkexKeyMap() []model.OkexKeyRecord {
-	return GetOkexKeyMapForSwap()
+func (c *Config) ChainPriceInterval() time.Duration {
+	return time.Duration(c.ChainPrice.Interval) * time.Second
 }
 
-// ClearOkexKeyCache 清除 OKEx 密钥缓存，强制下次获取时重新从 GlobalConfig 读取
-func ClearOkexKeyCache() {
-	keysCacheMutex.Lock()
-	defer keysCacheMutex.Unlock()
-	
-	swapKeysCache = nil
-	broadcastKeysCache = nil
-	keysInitialized = false
+func (c *Config) TokenSyncInterval() time.Duration {
+	return time.Duration(c.TokenRegistry.SyncInterval) * time.Second
+}
+
+func (c *Config) LiquiditySyncInterval() time.Duration {
+	return time.Duration(c.TokenRegistry.LiquiditySyncInterval) * time.Second
+}
+
+func (c *Config) PriorityLiquiditySyncInterval() time.Duration {
+	return time.Duration(c.TokenRegistry.PrioritySyncInterval) * time.Second
+}
+
+func (c *Config) TokenRefreshTTL() time.Duration {
+	return time.Duration(c.TokenRegistry.TokenRefreshTTL) * time.Second
+}
+
+func (c *Config) FetchInterval() time.Duration {
+	return time.Duration(c.Intervals.Fetch) * time.Second
+}
+
+func (c *Config) DetectInterval() time.Duration {
+	return time.Duration(c.Intervals.Detect) * time.Second
+}
+
+func (c *Config) RequestTimeout() time.Duration {
+	return time.Duration(c.SeeingStone.RequestTimeout) * time.Second
 }

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"sync"
 
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // Manager 跨链协议管理器

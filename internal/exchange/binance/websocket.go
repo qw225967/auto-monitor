@@ -7,8 +7,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"auto-arbitrage/internal/model"
-	"auto-arbitrage/internal/utils/logger"
+	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/utils/logger"
 
 	binance_connector "github.com/binance/binance-connector-go"
 )

@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"auto-arbitrage/internal/config"
-	"auto-arbitrage/internal/exchange/binance"
-	"auto-arbitrage/internal/onchain"
-	"auto-arbitrage/internal/trader"
+	"github.com/qw225967/auto-monitor/internal/config"
+	"github.com/qw225967/auto-monitor/internal/exchange/binance"
+	"github.com/qw225967/auto-monitor/internal/onchain"
+	"github.com/qw225967/auto-monitor/internal/trader"
 )
 
 const (

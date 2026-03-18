@@ -21,9 +21,9 @@ import (
 	"os"
 	"testing"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/config"
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/config"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 func TestCCIPBridgeManual(t *testing.T) {

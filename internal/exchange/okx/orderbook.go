@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/url"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/exchange"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/exchange"
 )
 
 const okxOrderBookLimit = 400

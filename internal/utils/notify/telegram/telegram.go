@@ -1,7 +1,7 @@
 package telegram
 
 import (
-	"auto-arbitrage/internal/config"
+	"github.com/qw225967/auto-monitor/internal/config"
 	"bytes"
 	"encoding/json"
 	"fmt"

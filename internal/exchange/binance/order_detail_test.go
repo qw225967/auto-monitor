@@ -3,7 +3,7 @@ package binance
 import (
 	"testing"
 
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // 表驱动测试：订单响应解析（QueryFuturesOrder/QuerySpotOrder 复用的 parseOrderResponse）

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"auto-arbitrage/internal/model"
-	"auto-arbitrage/internal/utils/logger"
+	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/utils/logger"
 
 	gate "github.com/gateio/gatews/go"
 )

@@ -3,13 +3,13 @@ package aster
 import (
 	"sync"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/analytics"
-	"auto-arbitrage/internal/config"
-	"auto-arbitrage/internal/exchange"
-	"auto-arbitrage/internal/model"
-	"auto-arbitrage/internal/utils/logger"
-	"auto-arbitrage/internal/utils/rest"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/analytics"
+	"github.com/qw225967/auto-monitor/internal/config"
+	"github.com/qw225967/auto-monitor/internal/exchange"
+	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/utils/logger"
+	"github.com/qw225967/auto-monitor/internal/utils/rest"
 )
 
 var _ exchange.Exchange = (*aster)(nil)

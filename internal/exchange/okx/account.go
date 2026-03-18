@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/exchange"
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/exchange"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // getAccountBalance 请求 GET /api/v5/account/balance（可选 ccy），需签名

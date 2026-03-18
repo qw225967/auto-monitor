@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"auto-arbitrage/constants"
+	"github.com/qw225967/auto-monitor/constants"
 )
 
 // BuildOKXSign 构建 OKX API 签名

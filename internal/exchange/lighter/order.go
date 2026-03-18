@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // placeOrderInternal 内部下单方法

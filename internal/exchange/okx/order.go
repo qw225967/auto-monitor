@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/exchange"
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/exchange"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // PlaceOrder 统一下单入口，按 MarketType 走现货或合约

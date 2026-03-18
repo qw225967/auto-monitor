@@ -3,7 +3,7 @@ package gate
 import (
 	"testing"
 
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 func TestParseSpotOrderResponse(t *testing.T) {

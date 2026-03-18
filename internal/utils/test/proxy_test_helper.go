@@ -3,7 +3,7 @@ package test
 import (
 	"os"
 
-	"auto-arbitrage/internal/config"
+	"github.com/qw225967/auto-monitor/internal/config"
 )
 
 // SetupProxyForTest 为测试设置代理配置

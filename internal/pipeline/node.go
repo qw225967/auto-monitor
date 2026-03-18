@@ -3,7 +3,7 @@ package pipeline
 import (
 	"errors"
 
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // NodeType 表示节点类型（仅资产持有位置：交易所 / 链上；跨链为边上的行为）

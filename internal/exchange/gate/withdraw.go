@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/exchange"
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/exchange"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 var _ exchange.DepositWithdrawProvider = (*gateExchange)(nil)

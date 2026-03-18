@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"auto-arbitrage/internal/model"
-	"auto-arbitrage/internal/onchain/bridge"
+	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/onchain/bridge"
 )
 
 const maxRouteProbeHops = 4 // 路径最多 4 个节点（含 链→交易所→链→交易所 展开后以便 merge 得到 WithdrawNetworkChainID）

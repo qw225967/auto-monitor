@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // placeSpotOrder 现货下单

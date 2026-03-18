@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"auto-arbitrage/internal/config"
-	"auto-arbitrage/internal/utils/logger"
+	"github.com/qw225967/auto-monitor/internal/config"
+	"github.com/qw225967/auto-monitor/internal/utils/logger"
 
 	"github.com/gorilla/websocket"
 )

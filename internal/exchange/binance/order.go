@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/model"
 
 	binance_connector "github.com/binance/binance-connector-go"
 )

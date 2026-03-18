@@ -3,7 +3,7 @@ package exchange
 import (
 	"errors"
 
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // Exchange 定义了交易所的核心接口

@@ -1,7 +1,7 @@
 package bridge
 
 import (
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // BridgeProtocol 跨链协议接口

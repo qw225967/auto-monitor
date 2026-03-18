@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"auto-arbitrage/internal/utils/logger"
+	"github.com/qw225967/auto-monitor/internal/utils/logger"
 
 	"go.uber.org/zap"
 )

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/model"
-	"auto-arbitrage/internal/utils/logger"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/utils/logger"
 )
 
 // getAccountBalance 获取账户余额（默认查询现货余额）

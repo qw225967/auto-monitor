@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"auto-arbitrage/internal/exchange"
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/internal/exchange"
+	"github.com/qw225967/auto-monitor/internal/model"
 
 	"github.com/ethereum/go-ethereum/common"
 )

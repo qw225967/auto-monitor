@@ -1,7 +1,7 @@
 package aster
 
 import (
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/internal/model"
 	"time"
 )
 

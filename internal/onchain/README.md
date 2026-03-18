@@ -1,95 +1,26 @@
-# Onchain 模块
+# Onchain 能力说明
 
-## 概述
+## 当前保留能力
 
-Onchain 模块提供与区块链网络和去中心化交易所（DEX）交互的功能。主要通过 OKEx DEX 聚合器进行链上 Swap 操作，支持多链交易、Bundler 加速等功能。
+### 1. OK DEX Quote（询价）
+- **QueryDexQuotePrice**：调用 OKX DEX v6 聚合器询价接口，仅询价不交易
+- 输入：fromTokenAddress, toTokenAddress, chainIndex, amount, fromTokenDecimals
+- 返回：原始 API 响应字符串
 
-## 核心功能
+### 2. Bridge（跨链桥）
+- **BridgeToken**：跨链转账
+- **GetBridgeStatus**：查询跨链状态
+- **GetBridgeQuote**：获取跨链报价（费用、时间等）
+- 协议：LayerZero、Wormhole、CCIP 等
 
-- **RPC 连接**：连接区块链网络
-- **Swap 询价**：通过 OKEx 聚合器获取最优交易路径
-- **交易广播**：发起链上交易并广播
-- **成交检测**：监控链上交易确认状态
-- **资产监控**：监控链上钱包余额
-- **Bundler 支持**：支持 Flashbots、48Club 等 Bundler
+## 已移除
+- Swap 兑换（queryDexSwap、StartSwap、StopSwap）
+- 广播交易（BroadcastSwapTx、broadcastTransaction）
+- Bundler 包（Flashbots、FortyEightClub 等）
+- 余额查询（GetBalance、GetAllTokenBalances）
+- 交易状态（GetTxResult、queryTxResult）
+- 授权、签名、Nonce 等交易相关逻辑
 
-## 关键文件
-
-| 文件 | 职责 |
-|------|------|
-| `interface.go` | OnchainClient 接口定义 |
-| `okdex.go` | OKEx DEX 主实现 |
-| `okdex_api.go` | OKEx API 调用 |
-| `okdex_tx.go` | 交易构建和广播 |
-| `okdex_internal.go` | 内部逻辑 |
-| `okdex_utils.go` | 工具函数 |
-| `bundler/` | Bundler 实现目录 |
-
-## API 说明
-
-### OnchainClient 接口
-
-```go
-type OnchainClient interface {
-    Init() error
-    SetPriceCallback(callback PriceCallback)
-    StartSwap(swapInfo *model.SwapInfo)
-    BroadcastSwapTx(direction SwapDirection) (string, error)
-    GetTxResult(txHash, chainIndex string) (model.TradeResult, error)
-    GetBalance() (*model.TokenBalance, error)
-    GetAllTokenBalances(address, chains string, excludeRiskToken bool) ([]model.OkexTokenAsset, error)
-    GetLatestSwapTx() interface{}
-    GetSwapInfo() *model.SwapInfo
-    UpdateSwapInfoAmount(amount string)
-    UpdateSwapInfoSlippage(slippage string)
-    ResetNonce(walletAddress, chainIndex string)
-}
-```
-
-### SwapDirection 类型
-
-```go
-const (
-    SwapDirectionBuy  SwapDirection = "buy"   // USDT -> Coin
-    SwapDirectionSell SwapDirection = "sell"  // Coin -> USDT
-)
-```
-
-## 使用示例
-
-```go
-import "auto-arbitrage/internal/onchain"
-
-// 创建实例
-okdex := onchain.NewOKDex(config)
-okdex.Init()
-
-// 设置价格回调
-okdex.SetPriceCallback(func(price *model.ChainPriceInfo) {
-    fmt.Printf("链上价格: Buy=%s, Sell=%s\n", price.BuyPrice, price.SellPrice)
-})
-
-// 启动 Swap
-swapInfo := &model.SwapInfo{
-    FromTokenSymbol: "USDT",
-    ToTokenSymbol:   "BTC",
-    ChainIndex:      "56",
-    Amount:          "1000",
-}
-okdex.StartSwap(swapInfo)
-```
-
-## 依赖关系
-
-### 依赖的模块
-- `model` - 数据模型
-- `config` - 配置管理
-- `go-ethereum` - 以太坊客户端库
-
-### 被依赖的模块
-- `trader` - OnchainTrader 封装 OnchainClient
-- `position` - 查询链上余额
-
-## 变更历史
-
-参见 [CHANGELOG](../../docs/CHANGELOG.md)
+## 注意
+- `internal/position`、`internal/pipeline` 依赖原完整 OnchainClient 接口，精简后需单独适配
+- 主流程（cmd/server + detector）仅使用 bridge，不受影响

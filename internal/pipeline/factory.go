@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"auto-arbitrage/internal/onchain"
+	"github.com/qw225967/auto-monitor/internal/onchain"
 )
 
 // NodeTypeConstant 节点类型常量（用于工厂函数）

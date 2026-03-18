@@ -1,0 +1,24 @@
+{
+  "BitGet": {
+    "APIKey": "",
+    "Secret": "",
+    "Passphrase": ""
+  },
+  "Bybit": {
+    "APIKey": "",
+    "Secret": ""
+  },
+  "Gate": {
+    "APIKey": "",
+    "Secret": ""
+  },
+  "Binance": {
+    "APIKey": "",
+    "SecretKey": ""
+  },
+  "OKX": {
+    "APIKey": "",
+    "Secret": "",
+    "Passphrase": ""
+  }
+}

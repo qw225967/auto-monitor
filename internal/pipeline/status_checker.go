@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"auto-arbitrage/internal/model"
-	"auto-arbitrage/internal/onchain/bridge"
+	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/onchain/bridge"
 )
 
 // StatusChecker 状态检查器

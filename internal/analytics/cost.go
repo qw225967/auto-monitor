@@ -1,8 +1,8 @@
 package analytics
 
 import (
-	"auto-arbitrage/internal/model"
-	"auto-arbitrage/internal/utils/logger"
+	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/utils/logger"
 )
 
 // 成本相关常量（写死的）

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // assetIndexCache 缓存 symbol->asset 索引，避免重复请求 meta

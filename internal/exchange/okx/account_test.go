@@ -3,10 +3,10 @@ package okx
 import (
 	"testing"
 
-	"auto-arbitrage/internal/config"
-	"auto-arbitrage/internal/exchange"
-	"auto-arbitrage/internal/utils/logger"
-	"auto-arbitrage/internal/utils/test"
+	"github.com/qw225967/auto-monitor/internal/config"
+	"github.com/qw225967/auto-monitor/internal/exchange"
+	"github.com/qw225967/auto-monitor/internal/utils/logger"
+	"github.com/qw225967/auto-monitor/internal/utils/test"
 )
 
 // ⚠️ 使用说明：

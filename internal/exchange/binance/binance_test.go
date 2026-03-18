@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"auto-arbitrage/internal/config"
-	"auto-arbitrage/internal/exchange"
-	"auto-arbitrage/internal/model"
-	"auto-arbitrage/internal/utils/test"
+	"github.com/qw225967/auto-monitor/internal/config"
+	"github.com/qw225967/auto-monitor/internal/exchange"
+	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/utils/test"
 )
 
 func getBinanceTestKeys(t *testing.T) (apiKey, secretKey string) {

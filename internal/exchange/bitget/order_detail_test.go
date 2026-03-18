@@ -3,7 +3,7 @@ package bitget
 import (
 	"testing"
 
-	"auto-arbitrage/internal/model"
+	"github.com/qw225967/auto-monitor/internal/model"
 )
 
 // 表驱动测试：合约订单详情解析（QueryFuturesOrder 使用的解析逻辑）

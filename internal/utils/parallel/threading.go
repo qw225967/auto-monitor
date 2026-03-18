@@ -4,7 +4,7 @@ import (
 	"runtime"
 	"sync"
 
-	"auto-arbitrage/internal/utils/logger"
+	"github.com/qw225967/auto-monitor/internal/utils/logger"
 )
 
 var _logger = logger.GetLoggerInstance().Sugar()

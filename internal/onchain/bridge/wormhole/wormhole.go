@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"auto-arbitrage/constants"
-	"auto-arbitrage/internal/config"
-	"auto-arbitrage/internal/model"
-	"auto-arbitrage/internal/onchain/bridge"
-	"auto-arbitrage/internal/utils/logger"
+	"github.com/qw225967/auto-monitor/constants"
+	"github.com/qw225967/auto-monitor/internal/config"
+	"github.com/qw225967/auto-monitor/internal/model"
+	"github.com/qw225967/auto-monitor/internal/onchain/bridge"
+	"github.com/qw225967/auto-monitor/internal/utils/logger"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
