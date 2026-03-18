@@ -2,6 +2,7 @@ package opportunities
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"sync"
@@ -54,8 +55,11 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		TotalSymbols: len(spreadItems),
 	}
 
+	log.Printf("[Funnel] 入口: %d 个币种 %s", len(spreadItems), symbolsFromSpreadItems(spreadItems))
+
 	negativeSpread := f.filterNegativeSpread(spreadItems)
 	stats.AfterNegativeSpread = len(negativeSpread)
+	log.Printf("[Funnel] 1.负价差筛选后: %d 个 %s", len(negativeSpread), symbolsFromSpreadItems(negativeSpread))
 
 	// 如果没有注册交易所，跳过需要订单簿的漏斗步骤
 	hasExchanges := len(exchanges) > 0
@@ -66,6 +70,7 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		stats.AfterPriceSlope = len(negativeSpread)
 		stats.AfterVolume = len(negativeSpread)
 		stats.AfterBothDepth = len(negativeSpread)
+		log.Printf("[Funnel] 无交易所注册，跳过漏斗2-5，直接输出负价差 %d 个 %s", len(negativeSpread), symbolsFromSpreadItems(negativeSpread))
 
 		// 将所有负价差转换为机会
 		opportunities := f.convertToOpportunities(negativeSpread)
@@ -79,21 +84,63 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 
 	withSpotDepth := f.filterSpotDepth(negativeSpread, exchanges)
 	stats.AfterSpotDepth = len(withSpotDepth)
+	log.Printf("[Funnel] 2.现货深度筛选后: %d 个 %s", len(withSpotDepth), symbolsFromSpreadItems(withSpotDepth))
 
 	withPriceSlope := f.filterPriceSlope(withSpotDepth)
 	stats.AfterPriceSlope = len(withPriceSlope)
+	log.Printf("[Funnel] 3.价格斜率筛选后: %d 个 %s", len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
 
 	withVolume := f.filterVolumeSpike(withPriceSlope)
 	stats.AfterVolume = len(withVolume)
+	log.Printf("[Funnel] 4.量能放大筛选后: %d 个 %s", len(withVolume), symbolsFromSpreadItems(withVolume))
 
 	finalOpportunities := f.filterBothDepth(withVolume, exchanges)
 	stats.AfterBothDepth = len(finalOpportunities)
+	log.Printf("[Funnel] 5.双深度筛选后: %d 个 %s", len(finalOpportunities), symbolsFromOpportunities(finalOpportunities))
 
 	return &model.OpportunitiesResponse{
 		Opportunities: finalOpportunities,
 		FunnelStats:   stats,
 		UpdatedAt:     time.Now().UTC().Format(time.RFC3339),
 	}
+}
+
+func symbolsFromSpreadItems(items []model.SpreadItem) string {
+	if len(items) == 0 {
+		return "[]"
+	}
+	seen := make(map[string]bool)
+	var symbols []string
+	for _, it := range items {
+		key := it.Symbol + ":" + it.BuyExchange + "->" + it.SellExchange
+		if !seen[key] {
+			seen[key] = true
+			symbols = append(symbols, key)
+		}
+	}
+	if len(symbols) > 20 {
+		return fmt.Sprintf("[%s ... 共%d个]", strings.Join(symbols[:20], ","), len(symbols))
+	}
+	return "[" + strings.Join(symbols, ",") + "]"
+}
+
+func symbolsFromOpportunities(items []model.OpportunityItem) string {
+	if len(items) == 0 {
+		return "[]"
+	}
+	seen := make(map[string]bool)
+	var symbols []string
+	for _, it := range items {
+		key := it.Symbol + ":" + it.SpotExchange + "->" + it.FuturesExchange
+		if !seen[key] {
+			seen[key] = true
+			symbols = append(symbols, key)
+		}
+	}
+	if len(symbols) > 20 {
+		return fmt.Sprintf("[%s ... 共%d个]", strings.Join(symbols[:20], ","), len(symbols))
+	}
+	return "[" + strings.Join(symbols, ",") + "]"
 }
 
 // convertToOpportunities 将 SpreadItem 转换为机会（无交易所数据时使用）
