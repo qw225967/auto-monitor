@@ -57,6 +57,26 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	negativeSpread := f.filterNegativeSpread(spreadItems)
 	stats.AfterNegativeSpread = len(negativeSpread)
 
+	// 如果没有注册交易所，跳过需要订单簿的漏斗步骤
+	hasExchanges := len(exchanges) > 0
+
+	if !hasExchanges {
+		// 没有交易所时，跳过漏斗2-5，返回负价差数据作为机会
+		stats.AfterSpotDepth = len(negativeSpread)
+		stats.AfterPriceSlope = len(negativeSpread)
+		stats.AfterVolume = len(negativeSpread)
+		stats.AfterBothDepth = len(negativeSpread)
+
+		// 将所有负价差转换为机会
+		opportunities := f.convertToOpportunities(negativeSpread)
+
+		return &model.OpportunitiesResponse{
+			Opportunities: opportunities,
+			FunnelStats:   stats,
+			UpdatedAt:     time.Now().UTC().Format(time.RFC3339),
+		}
+	}
+
 	withSpotDepth := f.filterSpotDepth(negativeSpread, exchanges)
 	stats.AfterSpotDepth = len(withSpotDepth)
 
@@ -74,6 +94,33 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		FunnelStats:   stats,
 		UpdatedAt:     time.Now().UTC().Format(time.RFC3339),
 	}
+}
+
+// convertToOpportunities 将 SpreadItem 转换为机会（无交易所数据时使用）
+func (f *Finder) convertToOpportunities(items []model.SpreadItem) []model.OpportunityItem {
+	var result []model.OpportunityItem
+	for _, item := range items {
+		spotEx, futuresEx := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
+		result = append(result, model.OpportunityItem{
+			Symbol:                item.Symbol,
+			SpotExchange:          spotEx,
+			FuturesExchange:       futuresEx,
+			SpreadPercent:         item.SpreadPercent,
+			SpotOrderbookDepth:    0,
+			FuturesOrderbookDepth: 0,
+			PriceSlope5m:          0,
+			VolumeSpike:           false,
+			Confidence:            50,
+			UpdatedAt:             time.Now().UTC().Format(time.RFC3339),
+		})
+	}
+
+	// 按价差排序（最负的在前）
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].SpreadPercent < result[j].SpreadPercent
+	})
+
+	return result
 }
 
 func (f *Finder) filterNegativeSpread(items []model.SpreadItem) []model.SpreadItem {

@@ -19,8 +19,8 @@
 
 **命令**：
 ```bash
-# 复制 .env.example 为 .env，填入真实 Token
-cp .env.example .env
+# 复制 .env 为 .env，填入真实 Token
+cp .env .env
 # 编辑 .env: SEEINGSTONE_API_TOKEN=你的token
 
 # 直接启动（无 MOCK_MODE）

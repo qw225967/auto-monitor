@@ -33,7 +33,7 @@ cd frontend && npm install && npm run dev
 
 ```bash
 # 复制配置并填入 Token
-cp .env.example .env
+cp .env .env
 # 编辑 .env，设置 SEEINGSTONE_API_TOKEN=你的JWT
 
 # 后端（不设置 MOCK_MODE 即使用真实 API）
