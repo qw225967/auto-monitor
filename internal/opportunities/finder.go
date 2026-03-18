@@ -20,6 +20,13 @@ const (
 
 	MaxPricePoints     = 1000
 	PriceHistoryWindow = 10 * time.Minute
+	// 每个币现货价保留最近 10 个数据点用于斜率计算
+	SlopePricePoints = 10
+
+	// 漏斗减负：价差阈值（只保留更负的，如 -0.2 表示 <-0.2%）
+	SpreadThresholdStrict = -0.2
+	// 漏斗减负：进入深度筛前最多保留条数（避免 3 万次 API 调用）
+	MaxTokensBeforeDepth = 2000
 )
 
 type ExchangeAdapter interface {
@@ -35,7 +42,7 @@ type Finder struct {
 
 func NewFinder() *Finder {
 	return &Finder{
-		priceHistory: NewPriceHistory(MaxPricePoints, PriceHistoryWindow),
+		priceHistory: NewPriceHistory(SlopePricePoints, PriceHistoryWindow),
 		exchanges:    make(map[string]ExchangeAdapter),
 	}
 }
@@ -61,7 +68,7 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	stats.AfterNegativeSpread = len(negativeSpread)
 	log.Printf("[Funnel] 1.负价差筛选后: %d 个 %s", len(negativeSpread), symbolsFromSpreadItems(negativeSpread))
 
-	// 用价差数据喂入价格历史（用于漏斗3、4的斜率与量能）
+	// 用价差数据喂入价格历史（用于价格斜率与量能）
 	for _, it := range negativeSpread {
 		if it.BuyPrice > 0 {
 			f.priceHistory.Record(it.Symbol, it.BuyExchange, it.BuyPrice, 0)
@@ -71,20 +78,33 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		}
 	}
 
+	// 漏斗减负 1：价差阈值（只保留 spread < -0.5% 等更有价值的）
+	afterSpreadThreshold := f.filterSpreadThreshold(negativeSpread)
+	log.Printf("[Funnel] 1b.价差阈值(<-%.1f%%)后: %d 个", -SpreadThresholdStrict, len(afterSpreadThreshold))
+
+	// 漏斗减负 2：按 symbol 去重，每 symbol 保留价差最负的 1 条
+	deduped := f.dedupeBySymbol(afterSpreadThreshold)
+	log.Printf("[Funnel] 1c.按symbol去重后: %d 个 %s", len(deduped), symbolsFromSpreadItems(deduped))
+
+	// 漏斗减负 3：价格斜率提前（有历史时要求上涨，无数据放行）
+	withPriceSlope := f.filterPriceSlope(deduped)
+	stats.AfterPriceSlope = len(withPriceSlope)
+	log.Printf("[Funnel] 1d.价格斜率(上涨/无数据)后: %d 个 %s", len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
+
+	// 漏斗减负 4：进入深度筛前限量，避免数万次 API 调用
+	capped := f.limitTopBySpread(withPriceSlope, MaxTokensBeforeDepth)
+	log.Printf("[Funnel] 1e.限量(top%d)后: %d 个", MaxTokensBeforeDepth, len(capped))
+
 	// 如果没有注册交易所，跳过需要订单簿的漏斗步骤
 	hasExchanges := len(exchanges) > 0
 
 	if !hasExchanges {
-		// 没有交易所时，跳过漏斗2-5，返回负价差数据作为机会
-		stats.AfterSpotDepth = len(negativeSpread)
-		stats.AfterPriceSlope = len(negativeSpread)
-		stats.AfterVolume = len(negativeSpread)
-		stats.AfterBothDepth = len(negativeSpread)
-		log.Printf("[Funnel] 无交易所注册，跳过漏斗2-5，直接输出负价差 %d 个 %s", len(negativeSpread), symbolsFromSpreadItems(negativeSpread))
-
-		// 将所有负价差转换为机会
-		opportunities := f.convertToOpportunities(negativeSpread)
-
+		stats.AfterSpotDepth = len(capped)
+		stats.AfterPriceSlope = len(capped)
+		stats.AfterVolume = len(capped)
+		stats.AfterBothDepth = len(capped)
+		log.Printf("[Funnel] 无交易所注册，跳过漏斗2-5，直接输出 %d 个 %s", len(capped), symbolsFromSpreadItems(capped))
+		opportunities := f.convertToOpportunities(capped)
 		return &model.OpportunitiesResponse{
 			Opportunities: opportunities,
 			FunnelStats:   stats,
@@ -92,21 +112,17 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		}
 	}
 
-	withSpotDepth := f.filterSpotDepth(negativeSpread, exchanges)
+	withSpotDepth := f.filterSpotDepth(capped, exchanges)
 	stats.AfterSpotDepth = len(withSpotDepth)
 	log.Printf("[Funnel] 2.现货深度筛选后: %d 个 %s", len(withSpotDepth), symbolsFromSpreadItems(withSpotDepth))
 
-	withPriceSlope := f.filterPriceSlope(withSpotDepth)
-	stats.AfterPriceSlope = len(withPriceSlope)
-	log.Printf("[Funnel] 3.价格斜率筛选后: %d 个 %s", len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
-
-	withVolume := f.filterVolumeSpike(withPriceSlope)
+	withVolume := f.filterVolumeSpike(withSpotDepth)
 	stats.AfterVolume = len(withVolume)
-	log.Printf("[Funnel] 4.量能放大筛选后: %d 个 %s", len(withVolume), symbolsFromSpreadItems(withVolume))
+	log.Printf("[Funnel] 3.量能放大筛选后: %d 个 %s", len(withVolume), symbolsFromSpreadItems(withVolume))
 
 	finalOpportunities := f.filterBothDepth(withVolume, exchanges)
 	stats.AfterBothDepth = len(finalOpportunities)
-	log.Printf("[Funnel] 5.双深度筛选后: %d 个 %s", len(finalOpportunities), symbolsFromOpportunities(finalOpportunities))
+	log.Printf("[Funnel] 4.双深度筛选后: %d 个 %s", len(finalOpportunities), symbolsFromOpportunities(finalOpportunities))
 
 	return &model.OpportunitiesResponse{
 		Opportunities: finalOpportunities,
@@ -190,6 +206,46 @@ func (f *Finder) filterNegativeSpread(items []model.SpreadItem) []model.SpreadIt
 	return result
 }
 
+// filterSpreadThreshold 只保留价差更负的（如 <-0.5%）
+func (f *Finder) filterSpreadThreshold(items []model.SpreadItem) []model.SpreadItem {
+	var result []model.SpreadItem
+	for _, item := range items {
+		if item.SpreadPercent < SpreadThresholdStrict {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// dedupeBySymbol 按 symbol 去重，每 symbol 保留价差最负的 1 条
+func (f *Finder) dedupeBySymbol(items []model.SpreadItem) []model.SpreadItem {
+	best := make(map[string]model.SpreadItem)
+	for _, item := range items {
+		key := item.Symbol
+		if existing, ok := best[key]; !ok || item.SpreadPercent < existing.SpreadPercent {
+			best[key] = item
+		}
+	}
+	out := make([]model.SpreadItem, 0, len(best))
+	for _, item := range best {
+		out = append(out, item)
+	}
+	return out
+}
+
+// limitTopBySpread 按价差排序，只保留前 n 个（最负的优先）
+func (f *Finder) limitTopBySpread(items []model.SpreadItem, n int) []model.SpreadItem {
+	if n <= 0 || len(items) <= n {
+		return items
+	}
+	sorted := make([]model.SpreadItem, len(items))
+	copy(sorted, items)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].SpreadPercent < sorted[j].SpreadPercent
+	})
+	return sorted[:n]
+}
+
 func isSpotFuturesPair(buyEx, sellEx string) bool {
 	spotExchanges := map[string]bool{
 		"binance": true, "bybit": true, "bitget": true, "gate": true, "okx": true,
@@ -256,8 +312,8 @@ func (f *Finder) filterPriceSlope(items []model.SpreadItem) []model.SpreadItem {
 	var result []model.SpreadItem
 	for _, item := range items {
 		slope := f.priceHistory.GetSlope(item.Symbol, item.BuyExchange)
-		// 无足够价格历史时 slope=0，放行不过滤；有历史且斜率不足时过滤
-		if slope >= MinPriceSlope || slope == 0 {
+		// 无足够价格历史时 slope=0，放行；有历史时要求价格持续上涨（slope>0）
+		if slope == 0 || slope > 0 {
 			result = append(result, item)
 		}
 	}
