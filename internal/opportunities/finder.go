@@ -24,8 +24,10 @@ const (
 	// 每个币现货价保留最近 600 个数据点用于斜率计算
 	SlopePricePoints = 600
 
-	// 漏斗减负：价差阈值（只保留更负的，如 -0.5 表示 <-0.5%）
-	SpreadThresholdStrict = -0.5
+	// 漏斗减负：价差阈值（只保留更负的，如 -0.2 表示 <-0.2%）
+	SpreadThresholdStrict = -0.2
+	// 漏斗减负：symbol 至少出现次数才进入去重（重复数>3 即至少 4 条）
+	SymbolMinCount = 4
 	// 漏斗减负：进入深度筛前最多保留条数（避免 3 万次 API 调用）
 	MaxTokensBeforeDepth = 2000
 )
@@ -102,13 +104,17 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		log.Printf("[Funnel] 价差含价格: %d/%d 条有 BuyPrice/SellPrice>0", withPrice, len(negativeSpread)*2)
 	}
 
-	// 漏斗减负 1：价差阈值（只保留 spread < -0.5% 等更有价值的）
+	// 漏斗减负 1：价差阈值（只保留 spread < -0.2%）
 	afterSpreadThreshold := f.filterSpreadThreshold(negativeSpread)
 	log.Printf("[Funnel] 1b.价差阈值(<-%.1f%%)后: %d 个", -SpreadThresholdStrict, len(afterSpreadThreshold))
 
-	// 漏斗减负 2：按 symbol 去重，每 symbol 保留价差最负的 1 条
-	deduped := f.dedupeBySymbol(afterSpreadThreshold)
-	log.Printf("[Funnel] 1c.按symbol去重后: %d 个 %s", len(deduped), symbolsFromSpreadItems(deduped))
+	// 漏斗减负 2：symbol 重复数 > 3 才进入（至少 4 条不同路径）
+	afterSymbolCount := f.filterSymbolMinCount(afterSpreadThreshold, SymbolMinCount)
+	log.Printf("[Funnel] 1c.symbol重复>%d后: %d 个", SymbolMinCount-1, len(afterSymbolCount))
+
+	// 漏斗减负 3：按 symbol 去重，每 symbol 保留价差最负的 1 条
+	deduped := f.dedupeBySymbol(afterSymbolCount)
+	log.Printf("[Funnel] 1d.按symbol去重后: %d 个 %s", len(deduped), symbolsFromSpreadItems(deduped))
 
 	// 价格获取诊断：PriceHistory 统计 + 去重后各币是否有价格
 	totalKeys, keysWithPrice := f.priceHistory.StatsCount()
@@ -133,17 +139,17 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	}
 	log.Printf("[Funnel] 价格诊断: PriceHistory keys=%d 有价(5m)=%d, 去重%d币中有价=%d", totalKeys, keysWithPrice, len(deduped), dedupedWithPrice)
 
-	// 漏斗减负 3：价格斜率提前（有历史时要求上涨，无数据放行）
+	// 漏斗减负 4：价格斜率提前（有历史时要求上涨，无数据放行）
 	withPriceSlope, slopeDebug := f.filterPriceSlopeWithDebug(deduped)
 	stats.AfterPriceSlope = len(withPriceSlope)
-	log.Printf("[Funnel] 1d.价格斜率(上涨/无数据)后: %d 个 %s", len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
+	log.Printf("[Funnel] 1e.价格斜率(上涨/无数据)后: %d 个 %s", len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
 	if slopeDebug != "" {
-		log.Printf("[Funnel] 1d.斜率诊断: %s", slopeDebug)
+		log.Printf("[Funnel] 1e.斜率诊断: %s", slopeDebug)
 	}
 
-	// 漏斗减负 4：进入深度筛前限量，避免数万次 API 调用
+	// 漏斗减负 5：进入深度筛前限量，避免数万次 API 调用
 	capped := f.limitTopBySpread(withPriceSlope, MaxTokensBeforeDepth)
-	log.Printf("[Funnel] 1e.限量(top%d)后: %d 个", MaxTokensBeforeDepth, len(capped))
+	log.Printf("[Funnel] 1f.限量(top%d)后: %d 个", MaxTokensBeforeDepth, len(capped))
 
 	// 如果没有注册交易所，跳过需要订单簿的漏斗步骤
 	hasExchanges := len(exchanges) > 0
@@ -265,11 +271,26 @@ func (f *Finder) filterNegativeSpread(items []model.SpreadItem) []model.SpreadIt
 	return result
 }
 
-// filterSpreadThreshold 只保留价差更负的（如 <-0.5%）
+// filterSpreadThreshold 只保留价差更负的（如 <-0.2%）
 func (f *Finder) filterSpreadThreshold(items []model.SpreadItem) []model.SpreadItem {
 	var result []model.SpreadItem
 	for _, item := range items {
 		if item.SpreadPercent < SpreadThresholdStrict {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+// filterSymbolMinCount 只保留 symbol 出现次数 >= minCount 的（重复数>minCount-1）
+func (f *Finder) filterSymbolMinCount(items []model.SpreadItem, minCount int) []model.SpreadItem {
+	count := make(map[string]int)
+	for _, item := range items {
+		count[item.Symbol]++
+	}
+	var result []model.SpreadItem
+	for _, item := range items {
+		if count[item.Symbol] >= minCount {
 			result = append(result, item)
 		}
 	}
