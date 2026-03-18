@@ -15,22 +15,22 @@ import (
 )
 
 const (
-	// BatchTimeout 单轮拉取总超时（含均衡摊开延迟）
-	BatchTimeout = 10 * time.Second
+	// BatchTimeout 单轮拉取总超时（20s 摊开 + 处理时间）
+	BatchTimeout = 30 * time.Second
 	// ReqTimeout 单次请求超时
 	ReqTimeout = 2 * time.Second
 	// MaxConcurrent 最大并发请求数
 	MaxConcurrent = 64
 	// KlineLimit 每次拉取 K 线根数
 	KlineLimit = 100
-	// StaggerWindow 请求摊开的时间窗口（每个币约 3s 一次）
-	StaggerWindow = 3 * time.Second
+	// StaggerWindow 请求摊开的时间窗口，20s 充分查询避免 burst 导致限流/深度失效
+	StaggerWindow = 20 * time.Second
 )
 
 // OnAppendFunc 追加 K 线后的回调，用于同步到 PriceHistory 等
 type OnAppendFunc func(symbol, exchange string, bars []KlinePoint)
 
-// Fetcher K 线拉取器，支持多交易所、分批并发，请求在 3s 内均衡摊开
+// Fetcher K 线拉取器，支持多交易所、分批并发，请求在 20s 内均衡摊开
 type Fetcher struct {
 	client   *http.Client
 	store    *Store
