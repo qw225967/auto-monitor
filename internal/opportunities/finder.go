@@ -30,6 +30,9 @@ const (
 	MaxTokensBeforeDepth = 2000
 )
 
+// 有 K 线数据的交易所（用于斜率回退：BuyExchange 无数据时用这些所的价格趋势）
+var klineExchanges = []string{"binance", "bybit", "okx", "gate", "bitget"}
+
 type ExchangeAdapter interface {
 	GetSpotOrderBook(symbol string) (bids, asks [][]string, err error)
 	GetFuturesOrderBook(symbol string) (bids, asks [][]string, err error)
@@ -372,7 +375,7 @@ func (f *Finder) filterPriceSlopeWithDebug(items []model.SpreadItem) ([]model.Sp
 	var result []model.SpreadItem
 	var debugSample []string
 	for i, item := range items {
-		slope := f.priceHistory.GetSlope(item.Symbol, item.BuyExchange)
+		slope := f.getSlopeForItem(item.Symbol, item.BuyExchange)
 		if slope > MinPriceSlope {
 			result = append(result, item)
 		}
@@ -383,6 +386,27 @@ func (f *Finder) filterPriceSlopeWithDebug(items []model.SpreadItem) ([]model.Sp
 		}
 	}
 	return result, strings.Join(debugSample, "; ")
+}
+
+// getSlopeForItem 获取价格斜率，BuyExchange 无 K 线时用参考交易所（binance/bybit 等）回退
+func (f *Finder) getSlopeForItem(symbol, buyExchange string) float64 {
+	slope := f.priceHistory.GetSlope(symbol, buyExchange)
+	if slope > MinPriceSlope {
+		return slope
+	}
+	for _, ex := range klineExchanges {
+		if strings.EqualFold(ex, buyExchange) {
+			continue
+		}
+		s := f.priceHistory.GetSlope(symbol, ex)
+		if s > MinPriceSlope {
+			return s
+		}
+		if s > slope {
+			slope = s
+		}
+	}
+	return slope
 }
 
 func (f *Finder) filterVolumeSpike(items []model.SpreadItem) []model.SpreadItem {
