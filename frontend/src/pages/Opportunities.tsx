@@ -28,7 +28,7 @@ export function Opportunities() {
 
   if (loading && !data) return <div className="loading">加载中...</div>
   if (error) return <div className="error">{error}</div>
-  if (!data) return null
+  if (!data || !data.opportunities) return <div className="empty-state">暂无数据</div>
 
   return (
     <div className="opportunities-page">
@@ -64,7 +64,7 @@ export function Opportunities() {
 
       <section className="opportunities-list">
         <h2>筛选后的机会</h2>
-        {data.opportunities.length === 0 ? (
+        {(!data.opportunities || data.opportunities.length === 0) ? (
           <div className="empty-state">暂无满足条件的套利机会</div>
         ) : (
           <div className="table-container">
