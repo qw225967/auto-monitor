@@ -14,14 +14,14 @@ import (
 const (
 	MinNegativeSpread   = -1.0
 	MinSpotDepthUSDT   = 10000
-	MinPriceSlope      = 0.0001
+	MinPriceSlope      = 0.01 // 价格斜率阈值，需 > 0.01 才通过
 	VolumeSpikeThreshold = 2.0
 	MinBothDepthUSDT   = 10000
 
 	MaxPricePoints     = 1000
 	PriceHistoryWindow = 10 * time.Minute
-	// 每个币现货价保留最近 10 个数据点用于斜率计算
-	SlopePricePoints = 10
+	// 每个币现货价保留最近 600 个数据点用于斜率计算
+	SlopePricePoints = 600
 
 	// 漏斗减负：价差阈值（只保留更负的，如 -0.2 表示 <-0.2%）
 	SpreadThresholdStrict = -0.2
@@ -312,8 +312,8 @@ func (f *Finder) filterPriceSlope(items []model.SpreadItem) []model.SpreadItem {
 	var result []model.SpreadItem
 	for _, item := range items {
 		slope := f.priceHistory.GetSlope(item.Symbol, item.BuyExchange)
-		// 无足够价格历史时 slope=0，放行；有历史时要求价格持续上涨（slope>0）
-		if slope == 0 || slope > 0 {
+		// 无足够价格历史时 slope=0，放行；有历史时要求斜率 > MinPriceSlope
+		if slope == 0 || slope > MinPriceSlope {
 			result = append(result, item)
 		}
 	}
