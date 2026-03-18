@@ -184,7 +184,7 @@ func isSpotFuturesPair(buyEx, sellEx string) bool {
 	spotExchanges := map[string]bool{
 		"binance": true, "bybit": true, "bitget": true, "gate": true, "okx": true,
 	}
-	return spotExchanges[buyEx] || spotExchanges[sellEx]
+	return spotExchanges[strings.ToLower(buyEx)] || spotExchanges[strings.ToLower(sellEx)]
 }
 
 func (f *Finder) filterSpotDepth(items []model.SpreadItem, exchanges map[string]ExchangeAdapter) []model.SpreadItem {
