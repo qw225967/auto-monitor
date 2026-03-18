@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchOpportunities, normalizeFetchError } from '../api'
 import type { OpportunitiesResponse } from '../types'
 
-const POLL_INTERVAL_MS = 30000
+const POLL_INTERVAL_MS = 3000 // 3s
 
 export function Opportunities() {
   const [data, setData] = useState<OpportunitiesResponse | null>(null)
