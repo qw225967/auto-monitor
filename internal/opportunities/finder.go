@@ -73,6 +73,15 @@ func (f *Finder) FeedKline(symbol, exchange string, bars []kline.KlinePoint) {
 	}
 }
 
+// FeedTicker 将 Ticker 实时价喂入 PriceHistory（每 3s 一轮，响应快于 K 线）
+// 价格用 ticker lastPrice，volume 填 0（量能仍由 K 线提供）
+func (f *Finder) FeedTicker(symbol, exchange string, price float64, ts time.Time) {
+	if price <= 0 {
+		return
+	}
+	f.priceHistory.RecordAt(symbol, exchange, price, 0, ts)
+}
+
 func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesResponse {
 	f.mu.RLock()
 	exchanges := f.exchanges
