@@ -12,16 +12,18 @@ import (
 )
 
 const (
-	MinNegativeSpread   = -1.0
-	MinSpotDepthUSDT   = 10000 // 现货深度阈值（USDT），低于 1w 过滤
-	MinPriceSlope      = 0.002 // 价格斜率阈值，需 > 0.002 才通过（约 1% 涨幅/5 分钟）
+	MinNegativeSpread    = -1.0
+	MinSpotDepthUSDT     = 10000 // 现货深度阈值（USDT），低于 1w 过滤
+	MinPriceSlope        = 0.002 // 短窗口（5分钟）价格斜率阈值，需 > 0.002 才通过
+	MinPriceSlopeLong    = -0.1  // 长窗口（1小时）价格斜率阈值，需 > -0.1 才通过（防止持续下跌）
 	VolumeSpikeThreshold = 2.0
-	MinBothDepthUSDT   = 10000 // 双深度阈值，低于 1w 过滤
+	MinBothDepthUSDT     = 10000 // 双深度阈值，低于 1w 过滤
 
-	MaxPricePoints     = 1000
-	PriceHistoryWindow = 10 * time.Minute
-	// 每个币现货价保留最近 600 个数据点用于斜率计算
-	SlopePricePoints = 600
+	// 价格历史窗口扩展到 70 分钟，确保 1 小时长窗口有足够数据
+	MaxPricePoints     = 5000
+	PriceHistoryWindow = 70 * time.Minute
+	// 每个币现货价保留最近 5000 个数据点用于斜率计算（覆盖 1 小时高频数据）
+	SlopePricePoints = 5000
 
 	// 漏斗减负：价差阈值（只保留更负的，如 -0.2 表示 <-0.2%）
 	SpreadThresholdStrict = -0.2
@@ -133,10 +135,10 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	}
 	log.Printf("[Funnel] 价格诊断: PriceHistory keys=%d 有价(5m)=%d, 去重%d币中有价=%d", totalKeys, keysWithPrice, len(deduped), dedupedWithPrice)
 
-	// 漏斗减负 4：价格斜率（必须 slope > 0.002，斜率为 0 或无数据过滤）
+	// 漏斗减负 4：价格斜率（短窗口5m slope > 0.002 且 长窗口1h slope > -0.1，两者同时满足才通过）
 	withPriceSlope, slopeDebug := f.filterPriceSlopeWithDebug(deduped)
 	stats.AfterPriceSlope = len(withPriceSlope)
-	log.Printf("[Funnel] 1e.价格斜率(上涨/无数据)后: %d 个 %s", len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
+	log.Printf("[Funnel] 1e.价格斜率(5m>%.3f且1h>%.3f)后: %d 个 %s", MinPriceSlope, MinPriceSlopeLong, len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
 	if slopeDebug != "" {
 		log.Printf("[Funnel] 1e.斜率诊断: %s", slopeDebug)
 	}
@@ -168,7 +170,10 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 
 	withVolume := f.filterVolumeSpike(withSpotDepth)
 	stats.AfterVolume = len(withVolume)
-	log.Printf("[Funnel] 3.量能放大筛选后: %d 个 %s", len(withVolume), symbolsFromSpreadItemsWithSlope(withVolume, f.priceHistory.GetSlope))
+	log.Printf("[Funnel] 3.量能放大筛选后: %d 个 %s", len(withVolume), symbolsFromSpreadItemsWithSlope(withVolume, func(symbol, exchange string) float64 {
+		slope, _ := f.priceHistory.GetSlope(symbol, exchange)
+		return slope
+	}))
 
 	finalOpportunities := f.filterBothDepth(withVolume, exchanges)
 	stats.AfterBothDepth = len(finalOpportunities)
@@ -445,22 +450,35 @@ func (f *Finder) filterPriceSlopeWithDebug(items []model.SpreadItem) ([]model.Sp
 	var result []model.SpreadItem
 	var debugSample []string
 	for i, item := range items {
-		slope := f.getSlopeForItem(item.Symbol, item.BuyExchange)
-		if slope > MinPriceSlope {
+		slopeShort, hasShortData := f.priceHistory.GetSlope(item.Symbol, item.BuyExchange)
+		slopeLong, hasLongData := f.priceHistory.GetSlopeLong(item.Symbol, item.BuyExchange)
+
+		// 数据不足时跳过该维度校验（放行），有数据才做阈值判断；随时间积累数据越来越准确
+		shortOk := !hasShortData || slopeShort > MinPriceSlope
+		longOk := !hasLongData || slopeLong > MinPriceSlopeLong
+
+		if shortOk && longOk {
 			result = append(result, item)
 		}
+
 		if i < 5 && len(debugSample) < 3 {
 			pts, withPrice := f.priceHistory.CountPoints(item.Symbol, item.BuyExchange)
-			debugSample = append(debugSample, fmt.Sprintf("%s:%s slope=%.4f pts=%d priceOk=%d",
-				item.Symbol, item.BuyExchange, slope, pts, withPrice))
+			debugSample = append(debugSample, fmt.Sprintf(
+				"%s:%s slope5m=%.4f(data=%v,ok=%v) slope1h=%.4f(data=%v,ok=%v) pts=%d priceOk=%d",
+				item.Symbol, item.BuyExchange,
+				slopeShort, hasShortData, shortOk,
+				slopeLong, hasLongData, longOk,
+				pts, withPrice,
+			))
 		}
 	}
 	return result, strings.Join(debugSample, "; ")
 }
 
-// getSlopeForItem 获取价格斜率；仅用 BuyExchange，斜率为 0 或 <= 阈值的不通过
+// getSlopeForItem 获取短窗口（5分钟）价格斜率，仅用 BuyExchange
 func (f *Finder) getSlopeForItem(symbol, buyExchange string) float64 {
-	return f.priceHistory.GetSlope(symbol, buyExchange)
+	slope, _ := f.priceHistory.GetSlope(symbol, buyExchange)
+	return slope
 }
 
 func (f *Finder) filterVolumeSpike(items []model.SpreadItem) []model.SpreadItem {
@@ -498,7 +516,7 @@ func (f *Finder) filterBothDepth(items []model.SpreadItem, exchanges map[string]
 				SpreadPercent:         item.SpreadPercent,
 				SpotOrderbookDepth:    spotDepth,
 				FuturesOrderbookDepth: futuresDepth,
-				PriceSlope5m:          f.priceHistory.GetSlope(item.Symbol, spotEx),
+				PriceSlope5m:          func() float64 { s, _ := f.priceHistory.GetSlope(item.Symbol, spotEx); return s }(),
 				VolumeSpike:           f.priceHistory.GetVolumeSpike(item.Symbol, spotEx, VolumeSpikeThreshold),
 				Confidence:            confidence,
 				UpdatedAt:             time.Now().UTC().Format(time.RFC3339),
