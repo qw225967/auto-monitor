@@ -104,39 +104,71 @@ func (p *PriceHistory) CountPoints(symbol, exchange string) (total, withPrice in
 	return total, withPrice
 }
 
-func (p *PriceHistory) GetSlope(symbol, exchange string) float64 {
+// GetSlope 返回短窗口（5分钟）内的价格斜率，使用最小二乘法拟合。
+// 斜率单位：归一化价格变化率 / 分钟。
+// hasData 为 false 表示窗口内有效数据点不足（< 2），调用方应跳过该维度的阈值校验。
+func (p *PriceHistory) GetSlope(symbol, exchange string) (slope float64, hasData bool) {
+	return p.GetSlopeInWindow(symbol, exchange, 5*time.Minute)
+}
+
+// GetSlopeLong 返回长窗口（1小时）内的价格斜率，使用最小二乘法拟合。
+// hasData 为 false 表示窗口内有效数据点不足（< 2），调用方应跳过该维度的阈值校验。
+func (p *PriceHistory) GetSlopeLong(symbol, exchange string) (slope float64, hasData bool) {
+	return p.GetSlopeInWindow(symbol, exchange, 60*time.Minute)
+}
+
+// GetSlopeInWindow 在指定时间窗口内，用最小二乘法拟合价格序列，返回归一化斜率（变化率/分钟）。
+// 归一化方式：以窗口内第一个有效价格为基准，计算相对涨跌幅后再做 OLS 拟合。
+// hasData 为 false 时表示数据不足，斜率值无意义，调用方应跳过阈值校验（而非过滤）。
+// 这样保证"有多少数据用多少数据计算，随时间积累越来越准确"的语义。
+func (p *PriceHistory) GetSlopeInWindow(symbol, exchange string, window time.Duration) (slope float64, hasData bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	key := priceHistoryKey(symbol, exchange)
 	points := p.histories[key]
-	if len(points) < 2 {
-		return 0
-	}
 
 	now := time.Now()
-	cutoff := now.Add(-5 * time.Minute)
+	cutoff := now.Add(-window)
 
-	var recentPoints []model.PricePoint
-	for i := len(points) - 1; i >= 0; i-- {
-		if points[i].Timestamp.After(cutoff) && points[i].Price > 0 {
-			recentPoints = append([]model.PricePoint{points[i]}, recentPoints...)
+	// 收集窗口内有效价格点（不要求满窗口，有多少用多少）
+	var windowPoints []model.PricePoint
+	for _, pt := range points {
+		if pt.Timestamp.After(cutoff) && pt.Price > 0 {
+			windowPoints = append(windowPoints, pt)
 		}
 	}
 
-	if len(recentPoints) < 2 {
-		return 0
+	// 至少需要 2 个点才能拟合直线
+	if len(windowPoints) < 2 {
+		return 0, false
 	}
 
-	first := recentPoints[0]
-	last := recentPoints[len(recentPoints)-1]
+	// 以第一个点的价格和时间为基准，构造 OLS 输入
+	basePrice := windowPoints[0].Price
+	baseTime := windowPoints[0].Timestamp
 
-	duration := last.Timestamp.Sub(first.Timestamp).Minutes()
-	if duration <= 0 {
-		return 0
+	// OLS: y = a + b*x，求 b（斜率）
+	// x = 距基准时间的分钟数，y = 相对于基准价格的归一化涨跌幅
+	var sumX, sumY, sumXX, sumXY float64
+	n := float64(len(windowPoints))
+
+	for _, pt := range windowPoints {
+		x := pt.Timestamp.Sub(baseTime).Minutes()
+		y := (pt.Price - basePrice) / basePrice
+		sumX += x
+		sumY += y
+		sumXX += x * x
+		sumXY += x * y
 	}
 
-	return (last.Price - first.Price) / first.Price / duration
+	denominator := n*sumXX - sumX*sumX
+	if denominator == 0 {
+		// 所有点时间戳相同，无法拟合
+		return 0, false
+	}
+
+	return (n*sumXY - sumX*sumY) / denominator, true
 }
 
 func (p *PriceHistory) GetVolumeSpike(symbol, exchange string, threshold float64) bool {
