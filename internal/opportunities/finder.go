@@ -238,6 +238,7 @@ func (f *Finder) convertToOpportunities(items []model.SpreadItem) []model.Opport
 	var result []model.OpportunityItem
 	for _, item := range items {
 		spotEx, futuresEx := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
+		slope, _ := f.priceHistory.GetSlope(item.Symbol, spotEx)
 		result = append(result, model.OpportunityItem{
 			Symbol:                item.Symbol,
 			SpotExchange:          spotEx,
@@ -245,7 +246,7 @@ func (f *Finder) convertToOpportunities(items []model.SpreadItem) []model.Opport
 			SpreadPercent:         item.SpreadPercent,
 			SpotOrderbookDepth:    0,
 			FuturesOrderbookDepth: 0,
-			PriceSlope5m:          0,
+			PriceSlope5m:          slope,
 			VolumeSpike:           false,
 			Confidence:            50,
 			UpdatedAt:             time.Now().UTC().Format(time.RFC3339),
