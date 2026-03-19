@@ -20,8 +20,6 @@ import (
 	"github.com/qw225967/auto-monitor/internal/config"
 	"github.com/qw225967/auto-monitor/internal/detector"
 	"github.com/qw225967/auto-monitor/internal/model"
-	"github.com/qw225967/auto-monitor/constants"
-	"github.com/qw225967/auto-monitor/internal/onchain"
 	"github.com/qw225967/auto-monitor/internal/opportunities"
 	"github.com/qw225967/auto-monitor/internal/opportunities/ticker"
 	"github.com/qw225967/auto-monitor/internal/price"
@@ -499,72 +497,11 @@ func main() {
 		log.Println("[Config] LiquiditySync 跳过: 未配置 COINGECKO_API_KEY")
 	}
 
-	// Ticker C: 链上价格（需 OKEx Key + token registry）
+	// Ticker C: 链上价格（已停用）
+	// 链上 DEX 询价失败率高，暂停该模块，如需恢复请取消下方注释。
 	var chainPriceFetcher *price.ChainPriceFetcher
-	if !cfg.MockMode {
-		oc := onchain.NewOkdex()
-		if err := oc.Init(); err != nil {
-			log.Printf("[Config] ChainPrice 跳过: %v", err)
-		} else {
-			fetcher, err := price.NewChainPriceFetcher(cfg.TokenRegistry.Path, oc,
-				time.Duration(cfg.ChainPrice.CacheTTL)*time.Second)
-			if err != nil {
-				log.Printf("[Config] ChainPrice 创建失败: %v", err)
-			} else {
-				chainPriceFetcher = fetcher
-				// 启动时立即拉取一次链上价格
-				go func() {
-					fetcher.ReloadRegistry()
-					usdtChains := fetcher.ChainsWithUSDT()
-					var pairs []price.AssetChainPair
-					pairByChain := make(map[string]int)
-					for _, asset := range fetcher.GetAllAssets() {
-						for _, chainID := range fetcher.GetAllTokenChains(asset) {
-							if usdtChains[chainID] && constants.OKXChainSupported(chainID) {
-								pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
-								pairByChain[chainID]++
-							}
-						}
-					}
-					if len(pairs) > 0 {
-						prices := fetcher.BatchQueryDexPrices(pairs, cfg.ChainPrice.Concurrency)
-						handler.UpdateChainPrices(prices)
-						chainDist := chainDistribution(prices)
-						reqDist := pairDistribution(pairByChain)
-						log.Printf("[ChainPrice] 启动同步: %d 对中成功 %d 条 %s (请求%s)", len(pairs), len(prices), chainDist, reqDist)
-					} else {
-						log.Printf("[ChainPrice] 无可用 (asset,chain) 对，请先运行 tokensync 补全 token 信息")
-					}
-
-					ticker := time.NewTicker(cfg.ChainPriceInterval())
-					defer ticker.Stop()
-					for range ticker.C {
-						fetcher.ReloadRegistry()
-						usdtChains := fetcher.ChainsWithUSDT()
-						pairs = pairs[:0]
-						pairByChain = make(map[string]int)
-						for _, asset := range fetcher.GetAllAssets() {
-							for _, chainID := range fetcher.GetAllTokenChains(asset) {
-								if usdtChains[chainID] && constants.OKXChainSupported(chainID) {
-									pairs = append(pairs, price.AssetChainPair{Asset: asset, ChainID: chainID})
-									pairByChain[chainID]++
-								}
-							}
-						}
-						if len(pairs) > 0 {
-							prices := fetcher.BatchQueryDexPrices(pairs, cfg.ChainPrice.Concurrency)
-							handler.UpdateChainPrices(prices)
-							chainDist := chainDistribution(prices)
-							reqDist := pairDistribution(pairByChain)
-							log.Printf("[ChainPrice] %d 对中成功 %d 条 %s (请求%s)", len(pairs), len(prices), chainDist, reqDist)
-						}
-					}
-				}()
-				log.Println("[Config] ChainPrice 已启动")
-			}
-		}
-	}
 	_ = chainPriceFetcher
+	log.Println("[Config] ChainPrice 已停用")
 
 	// Ticker B: 30s 全量探测 + 表格组装 (暂时禁用)
 	// go func() {
