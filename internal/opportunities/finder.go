@@ -133,7 +133,7 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	}
 	log.Printf("[Funnel] 价格诊断: PriceHistory keys=%d 有价(5m)=%d, 去重%d币中有价=%d", totalKeys, keysWithPrice, len(deduped), dedupedWithPrice)
 
-	// 漏斗减负 4：价格斜率提前（有历史时要求上涨，无数据放行）
+	// 漏斗减负 4：价格斜率（必须 slope > 0.002，斜率为 0 或无数据过滤）
 	withPriceSlope, slopeDebug := f.filterPriceSlopeWithDebug(deduped)
 	stats.AfterPriceSlope = len(withPriceSlope)
 	log.Printf("[Funnel] 1e.价格斜率(上涨/无数据)后: %d 个 %s", len(withPriceSlope), symbolsFromSpreadItems(withPriceSlope))
@@ -458,25 +458,9 @@ func (f *Finder) filterPriceSlopeWithDebug(items []model.SpreadItem) ([]model.Sp
 	return result, strings.Join(debugSample, "; ")
 }
 
-// getSlopeForItem 获取价格斜率，BuyExchange 无 K 线时用参考交易所（binance/bybit 等）回退
+// getSlopeForItem 获取价格斜率；仅用 BuyExchange，斜率为 0 或 <= 阈值的不通过
 func (f *Finder) getSlopeForItem(symbol, buyExchange string) float64 {
-	slope := f.priceHistory.GetSlope(symbol, buyExchange)
-	if slope > MinPriceSlope {
-		return slope
-	}
-	for _, ex := range klineExchanges {
-		if strings.EqualFold(ex, buyExchange) {
-			continue
-		}
-		s := f.priceHistory.GetSlope(symbol, ex)
-		if s > MinPriceSlope {
-			return s
-		}
-		if s > slope {
-			slope = s
-		}
-	}
-	return slope
+	return f.priceHistory.GetSlope(symbol, buyExchange)
 }
 
 func (f *Finder) filterVolumeSpike(items []model.SpreadItem) []model.SpreadItem {
