@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/qw225967/auto-monitor/internal/model"
-	"github.com/qw225967/auto-monitor/internal/opportunities/kline"
 )
 
 const (
@@ -59,21 +58,7 @@ func (f *Finder) RegisterExchange(name string, adapter ExchangeAdapter) {
 	f.exchanges[name] = adapter
 }
 
-// FeedKline 将 K 线数据喂入 PriceHistory：量用 K 线，价格用 close
-// 最新一根 bar 用 time.Now() 作为记录时间，确保「当前时间获取」；历史 bar 用 bar 自身时间戳
-func (f *Finder) FeedKline(symbol, exchange string, bars []kline.KlinePoint) {
-	now := time.Now()
-	for i, b := range bars {
-		ts := b.Timestamp
-		// 最新一根用当前时间，表示「此刻获取到的价格」
-		if i == len(bars)-1 && now.Sub(b.Timestamp) < 2*time.Minute {
-			ts = now
-		}
-		f.priceHistory.RecordAt(symbol, exchange, b.Close, b.Volume, ts)
-	}
-}
-
-// FeedTicker 将 Ticker 实时价喂入 PriceHistory（每 3s 一轮，响应快于 K 线）
+// FeedTicker 将 Ticker 实时价喂入 PriceHistory（每 3s 一轮，响应快）
 // 价格用 ticker lastPrice，volume 填 0（量能仍由 K 线提供）
 func (f *Finder) FeedTicker(symbol, exchange string, price float64, ts time.Time) {
 	if price <= 0 {

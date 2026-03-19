@@ -23,7 +23,6 @@ import (
 	"github.com/qw225967/auto-monitor/constants"
 	"github.com/qw225967/auto-monitor/internal/onchain"
 	"github.com/qw225967/auto-monitor/internal/opportunities"
-	"github.com/qw225967/auto-monitor/internal/opportunities/kline"
 	"github.com/qw225967/auto-monitor/internal/opportunities/ticker"
 	"github.com/qw225967/auto-monitor/internal/price"
 	"github.com/qw225967/auto-monitor/internal/runner"
@@ -283,13 +282,7 @@ func main() {
 		log.Printf("[Telegram] 未配置 Telegram Bot（exchange_keys.json 或 GlobalConfig），跳过通知功能")
 	}
 
-	// K 线拉取：用于量能；Ticker 拉取：用于实时价格（每交易所 1 次请求，响应快）
-	klineStore := kline.NewStore(600)
-	klineFetcher := kline.NewFetcher(klineStore, nil, []string{"binance", "bybit", "okx", "gate", "bitget"})
-	klineFetcher.SetOnAppend(oppFinder.FeedKline)
-	klineCtx := context.Background()
-	go klineFetcher.RunLoop(klineCtx)
-
+	// Ticker 拉取：实时价格（每交易所 1 次请求，每 3s 一轮）
 	tickerFetcher := ticker.NewFetcher([]string{"binance", "bybit", "okx", "gate", "bitget"})
 	tickerFetcher.SetOnPrice(oppFinder.FeedTicker)
 	tickerCtx := context.Background()
@@ -336,11 +329,8 @@ func main() {
 					oppNotifier.Notify(resp.Opportunities)
 				}
 			}
-			// 更新 K 线 + Ticker 拉取 symbol 列表（负价差去重，最多 500 个）
+			// 更新 Ticker 拉取 symbol 列表（负价差去重，最多 500 个）
 			symbols := opportunities.GetSymbolsForKline(items, 500)
-			if klineFetcher != nil {
-				klineFetcher.SetSymbols(symbols)
-			}
 			if tickerFetcher != nil {
 				tickerFetcher.SetSymbols(symbols)
 			}
@@ -621,10 +611,10 @@ func main() {
 			}
 		}
 
-		// 更新 K 线 symbol 列表
-		if klineFetcher != nil {
+		// 更新 Ticker symbol 列表
+		if tickerFetcher != nil {
 			symbols := opportunities.GetSymbolsForKline(items, 500)
-			klineFetcher.SetSymbols(symbols)
+			tickerFetcher.SetSymbols(symbols)
 		}
 
 		// 搬砖监控（暂时禁用）
