@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { fetchOpportunities, type OpportunitiesResponse } from '../api'
+import { fetchOpportunities, normalizeFetchError } from '../api'
+import type { OpportunitiesResponse } from '../types'
 
-const POLL_INTERVAL_MS = 30000
+const POLL_INTERVAL_MS = 3000 // 3s
 
 export function Opportunities() {
   const [data, setData] = useState<OpportunitiesResponse | null>(null)
@@ -14,7 +15,7 @@ export function Opportunities() {
       const res = await fetchOpportunities()
       setData(res)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
+      setError(normalizeFetchError(e))
     } finally {
       setLoading(false)
     }
@@ -27,7 +28,12 @@ export function Opportunities() {
   }, [])
 
   if (loading && !data) return <div className="loading">加载中...</div>
-  if (error) return <div className="error">{error}</div>
+  if (error && !data) return (
+    <div className="error">
+      {error}
+      <button type="button" className="btn-retry" onClick={() => { setLoading(true); load() }}>重试</button>
+    </div>
+  )
 
   const opportunities = data?.opportunities ?? []
   const funnelStats = data?.funnel_stats

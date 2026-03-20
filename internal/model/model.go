@@ -110,6 +110,8 @@ type OverviewResponse struct {
 	OverviewAgeSec     int64   `json:"overview_age_sec,omitempty"`
 	ChainPricesAgeSec  int64   `json:"chain_prices_age_sec,omitempty"`
 	LiquidityAgeSec    int64   `json:"liquidity_age_sec,omitempty"`
+	// LastDetectError 最近一次通路探测失败时的错误信息（空表示成功或从未探测）
+	LastDetectError string `json:"last_detect_error,omitempty"`
 }
 
 // OpportunityItem 机会发现页面返回的单条记录

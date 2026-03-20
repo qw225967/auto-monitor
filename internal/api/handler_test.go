@@ -38,4 +38,29 @@ func TestGetOverviewIncludesFreshnessMetadata(t *testing.T) {
 	if resp.OverviewAgeSec < 0 || resp.ChainPricesAgeSec < 0 || resp.LiquidityAgeSec < 0 {
 		t.Fatalf("expected non-negative age fields: %+v", resp)
 	}
+	if resp.LastDetectError != "" {
+		t.Fatalf("expected empty LastDetectError after UpdateOverview, got %q", resp.LastDetectError)
+	}
+}
+
+func TestGetOverviewIncludesLastDetectError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := New()
+	h.UpdateOverview(&model.OverviewResponse{Overview: []model.OverviewRow{}})
+	h.SetLastDetectError("context deadline exceeded")
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	h.GetOverview(c)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp model.OverviewResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if resp.LastDetectError != "context deadline exceeded" {
+		t.Fatalf("expected LastDetectError in response, got %q", resp.LastDetectError)
+	}
 }

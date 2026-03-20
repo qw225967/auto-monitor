@@ -12,14 +12,15 @@ import (
 
 // Handler API 处理器
 type Handler struct {
-	mu            sync.RWMutex
-	overview      *model.OverviewResponse
-	overviewUpdatedAt time.Time
-	chainPriceMu  sync.RWMutex
-	chainPrices   map[string]float64 // key: "asset:chainID"
+	mu                 sync.RWMutex
+	overview           *model.OverviewResponse
+	overviewUpdatedAt  time.Time
+	lastDetectError    string // 最近一次 RunDetect 失败时的错误
+	chainPriceMu       sync.RWMutex
+	chainPrices        map[string]float64 // key: "asset:chainID"
 	chainPricesUpdatedAt time.Time
-	liquidityMu   sync.RWMutex
-	liquidity     map[string]float64 // key: "asset:chainID" -> reserve_usd
+	liquidityMu        sync.RWMutex
+	liquidity          map[string]float64 // key: "asset:chainID" -> reserve_usd
 	liquidityUpdatedAt time.Time
 }
 
@@ -32,12 +33,20 @@ func New() *Handler {
 	}
 }
 
-// UpdateOverview 更新概览数据（由 Runner 调用）
+// UpdateOverview 更新概览数据（由 Runner 调用），err 为 nil 时清除 lastDetectError
 func (h *Handler) UpdateOverview(resp *model.OverviewResponse) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.overview = resp
 	h.overviewUpdatedAt = time.Now()
+	h.lastDetectError = ""
+}
+
+// SetLastDetectError 记录最近一次通路探测失败（RunDetect 返回 error 时调用）
+func (h *Handler) SetLastDetectError(err string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.lastDetectError = err
 }
 
 // UpdateChainPrices 更新链上价格缓存（由 ChainPrice Ticker 调用）
@@ -98,6 +107,7 @@ func (h *Handler) GetOverview(c *gin.Context) {
 	h.mu.RLock()
 	resp := h.overview
 	overviewAt := h.overviewUpdatedAt
+	lastErr := h.lastDetectError
 	h.mu.RUnlock()
 	h.chainPriceMu.RLock()
 	chainAt := h.chainPricesUpdatedAt
@@ -137,6 +147,7 @@ func (h *Handler) GetOverview(c *gin.Context) {
 		OverviewAgeSec:       overviewAge,
 		ChainPricesAgeSec:    chainAge,
 		LiquidityAgeSec:      liquidityAge,
+		LastDetectError:      lastErr,
 	}
 	c.JSON(http.StatusOK, out)
 }

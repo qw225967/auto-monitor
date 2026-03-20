@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchOverview, postExchangeKeys, postLiquidityThreshold } from '../api'
+import { fetchOverview, postExchangeKeys, postLiquidityThreshold, normalizeFetchError } from '../api'
 import { OverviewTable } from '../components/OverviewTable'
 import type { OverviewResponse } from '../types'
 
@@ -62,7 +62,7 @@ export function ArbitrageMonitor() {
       const res = await fetchOverview()
       setData(res)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败')
+      setError(normalizeFetchError(e))
     } finally {
       setLoading(false)
     }
@@ -163,7 +163,12 @@ export function ArbitrageMonitor() {
         </section>
       )}
       {loading && !data && <div className="loading">加载中...</div>}
-      {error && <div className="error">{error}</div>}
+      {error && !data && (
+        <div className="error">
+          {error}
+          <button type="button" className="btn-retry" onClick={() => { setLoading(true); load() }}>重试</button>
+        </div>
+      )}
       {data && (
         <>
           <section className="view-controls">
@@ -197,6 +202,11 @@ export function ArbitrageMonitor() {
               </button>
             </div>
           </section>
+          {data.last_detect_error && (
+            <div className="detect-warning">
+              通路探测异常：{data.last_detect_error}（将显示上次成功数据，下一轮自动重试）
+            </div>
+          )}
           <section className="freshness-panel">
             <div className="freshness-item">
               <span className="freshness-label">概览</span>

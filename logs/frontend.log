@@ -1,0 +1,930 @@
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 413 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 361 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+4:51:36 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+4:51:37 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+4:51:42 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+4:51:42 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+4:51:48 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+4:51:48 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+4:52:18 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+3:10:29 PM [vite] hmr update /src/components/OverviewTable.tsx
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 1028 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 864 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 572 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 616 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 466 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 623 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 925 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+Re-optimizing dependencies because lockfile has changed
+
+  VITE v5.4.21  ready in 940 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+Re-optimizing dependencies because lockfile has changed
+
+  VITE v5.4.21  ready in 859 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 746 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 667 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+Re-optimizing dependencies because lockfile has changed
+
+  VITE v5.4.21  ready in 753 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 547 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 597 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 473 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 403 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 391 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+6:42:47 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+6:42:47 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+7:12:23 PM [vite] hmr update /src/App.css
+7:12:23 PM [vite] hmr update /src/App.tsx
+7:12:23 PM [vite] hmr update /src/App.tsx
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 366 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+7:15:05 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 403 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 428 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+7:40:18 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 408 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+10:51:35 PM [vite] hmr update /src/App.css
+10:51:35 PM [vite] hmr update /src/App.tsx
+10:51:35 PM [vite] hmr update /src/App.tsx
+10:51:35 PM [vite] hmr update /src/components/OverviewTable.tsx
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 442 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+10:51:53 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+10:51:53 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+10:51:55 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+10:51:55 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 340 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 426 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+11:05:40 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:05:40 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:16:35 PM [vite] hmr update /src/App.tsx
+11:16:35 PM [vite] hmr update /src/components/OverviewTable.tsx
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 360 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+11:16:49 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:16:50 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 432 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+11:21:08 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 430 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+11:38:24 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:38:24 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:38:29 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:38:30 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:38:30 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:38:34 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:38:35 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 425 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+11:56:48 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:56:51 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:56:51 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:56:57 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 555 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+12:47:06 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+12:47:06 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 475 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 598 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+1:11:50 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:11:50 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:11:53 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:11:53 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:11:56 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:11:56 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 595 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+1:28:36 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:28:36 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:28:40 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:28:41 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:28:46 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:28:46 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:28:52 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:28:52 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:29:22 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:29:27 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:29:27 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:29:52 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:30:22 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:30:27 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:30:27 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:30:52 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 455 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+1:31:22 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:31:27 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:31:27 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 775 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+1:32:27 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:32:28 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 448 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+1:37:58 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 478 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+(node:3828155) Warning: An error event has already been emitted on the socket. Please use the destroy method on the socket while handling a 'clientError' event.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 674 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 437 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+8:44:10 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8080
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+Re-optimizing dependencies because lockfile has changed
+
+  VITE v5.4.21  ready in 758 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 349 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 352 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+3:17:16 PM [vite] hmr update /src/App.css
+3:17:16 PM [vite] hmr update /src/App.tsx
+3:17:16 PM [vite] hmr update /src/components/OverviewTable.tsx
+3:17:16 PM [vite] hmr update /src/components/OverviewTable.tsx
+3:17:16 PM [vite] vite.config.ts changed, restarting server...
+Re-optimizing dependencies because lockfile has changed
+3:17:16 PM [vite] server restarted.
+
+> frontend@0.0.0 dev
+> vite --host
+
+Port 5173 is in use, trying another one...
+
+  VITE v5.4.21  ready in 592 ms
+
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: http://10.7.0.12:5174/
+3:18:42 PM [vite] vite.config.ts changed, restarting server...
+3:18:42 PM [vite] vite.config.ts changed, restarting server...
+3:18:42 PM [vite] server restarted.
+3:18:43 PM [vite] server restarted.
+Killed
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 440 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 399 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+3:23:02 PM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+11:08:46 PM [vite] hmr update /src/App.css
+11:08:46 PM [vite] hmr update /src/App.tsx
+11:08:46 PM [vite] page reload src/main.tsx
+11:08:46 PM [vite] hmr update /src/components/OverviewTable.tsx
+11:08:46 PM [vite] hmr update /src/App.tsx
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 590 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+11:09:30 PM [vite] Internal server error: Failed to resolve import "react-router-dom" from "src/main.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: /root/caiyuangungun/auto-monitor/frontend/src/main.tsx:3:45
+  2  |  import { StrictMode } from "react";
+  3  |  import { createRoot } from "react-dom/client";
+  4  |  import { BrowserRouter, Routes, Route } from "react-router-dom";
+     |                                                ^
+  5  |  import "./index.css";
+  6  |  import { Layout } from "./components/Layout";
+      at TransformPluginContext._formatError (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 3)
+      at async TransformPluginContext.transform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+11:09:30 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/main.tsx". Does the file exist?
+11:09:31 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/components/Layout.tsx". Does the file exist?
+11:09:46 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/main.tsx". Does the file exist?
+11:09:46 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/components/Layout.tsx". Does the file exist?
+11:09:46 PM [vite] Internal server error: Failed to resolve import "react-router-dom" from "src/main.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: /root/caiyuangungun/auto-monitor/frontend/src/main.tsx:3:45
+  2  |  import { StrictMode } from "react";
+  3  |  import { createRoot } from "react-dom/client";
+  4  |  import { BrowserRouter, Routes, Route } from "react-router-dom";
+     |                                                ^
+  5  |  import "./index.css";
+  6  |  import { Layout } from "./components/Layout";
+      at TransformPluginContext._formatError (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 3)
+      at async TransformPluginContext.transform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+11:09:46 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/components/Layout.tsx". Does the file exist?
+11:09:55 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/main.tsx". Does the file exist?
+11:09:55 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/components/Layout.tsx". Does the file exist?
+11:09:55 PM [vite] Internal server error: Failed to resolve import "react-router-dom" from "src/main.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: /root/caiyuangungun/auto-monitor/frontend/src/main.tsx:3:45
+  2  |  import { StrictMode } from "react";
+  3  |  import { createRoot } from "react-dom/client";
+  4  |  import { BrowserRouter, Routes, Route } from "react-router-dom";
+     |                                                ^
+  5  |  import "./index.css";
+  6  |  import { Layout } from "./components/Layout";
+      at TransformPluginContext._formatError (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 3)
+      at async TransformPluginContext.transform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+11:09:55 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/components/Layout.tsx". Does the file exist?
+11:10:05 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/main.tsx". Does the file exist?
+11:10:05 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/components/Layout.tsx". Does the file exist?
+11:10:06 PM [vite] Internal server error: Failed to resolve import "react-router-dom" from "src/main.tsx". Does the file exist?
+  Plugin: vite:import-analysis
+  File: /root/caiyuangungun/auto-monitor/frontend/src/main.tsx:3:45
+  2  |  import { StrictMode } from "react";
+  3  |  import { createRoot } from "react-dom/client";
+  4  |  import { BrowserRouter, Routes, Route } from "react-router-dom";
+     |                                                ^
+  5  |  import "./index.css";
+  6  |  import { Layout } from "./components/Layout";
+      at TransformPluginContext._formatError (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49258:41)
+      at TransformPluginContext.error (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49253:16)
+      at normalizeUrl (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64307:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+      at async file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39
+      at async Promise.all (index 3)
+      at async TransformPluginContext.transform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64366:7)
+      at async PluginContainer.transform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49099:18)
+      at async loadAndTransform (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51978:27)
+      at async viteTransformMiddleware (file:///root/caiyuangungun/auto-monitor/frontend/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:62106:24)
+11:10:06 PM [vite] Pre-transform error: Failed to resolve import "react-router-dom" from "src/components/Layout.tsx". Does the file exist?
+11:11:34 PM [vite] ✨ new dependencies optimized: react-router-dom
+11:11:34 PM [vite] ✨ optimized dependencies changed. reloading
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 403 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+8:32:08 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+8:32:08 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 426 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+8:34:14 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+8:34:14 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+8:42:08 AM [vite] hmr update /src/pages/Opportunities.tsx
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 413 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+8:42:45 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+8:42:45 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+8:42:53 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+8:42:53 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 401 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+9:15:01 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+9:15:02 AM [vite] http proxy error: /api/overview
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+Re-optimizing dependencies because lockfile has changed
+
+  VITE v5.4.21  ready in 437 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+9:22:53 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+9:22:53 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+9:22:57 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+9:22:57 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+9:23:00 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+9:23:01 AM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:38:37 PM [vite] hmr update /src/pages/Opportunities.tsx, /src/pages/ArbitrageMonitor.tsx
+1:38:37 PM [vite] hmr update /src/pages/ArbitrageMonitor.tsx
+1:38:37 PM [vite] hmr update /src/pages/Opportunities.tsx
+1:38:37 PM [vite] hmr update /src/components/OverviewTable.tsx
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 572 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+1:49:25 PM [vite] hmr update /src/pages/Opportunities.tsx
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 345 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+1:49:40 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:49:45 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:49:46 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:49:46 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:49:49 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:49:50 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+1:49:52 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 378 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 349 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 374 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/
+2:18:33 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+2:18:36 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+2:18:36 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+2:18:39 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+2:18:42 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+2:18:45 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+2:18:48 PM [vite] http proxy error: /api/opportunities
+Error: connect ECONNREFUSED 127.0.0.1:8088
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1549:16)
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 360 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://10.7.0.12:5173/

@@ -36,6 +36,8 @@ export interface OverviewResponse {
   overview_age_sec?: number
   chain_prices_age_sec?: number
   liquidity_age_sec?: number
+  /** 最近一次通路探测失败时的错误信息，空表示成功 */
+  last_detect_error?: string
 }
 
 export interface OpportunityItem {
