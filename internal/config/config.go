@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -51,8 +53,29 @@ type RunnerConfig struct {
 }
 
 func Load() (*Config, error) {
-	// 将 .env 注入进程环境，供下方 viper.BindEnv / GetString 使用（文件不存在时忽略）
-	_ = godotenv.Load()
+	if wd, err := os.Getwd(); err != nil {
+		log.Printf("[Config] 获取工作目录失败: %v", err)
+	} else {
+		log.Printf("[Config] 工作目录: %s", wd)
+	}
+
+	// 将 .env 注入进程环境；先 config/ 再根目录（后者覆盖前者，与常见 monorepo 习惯一致）
+	envPaths := []string{"config/.env", ".env"}
+	loadedAny := false
+	for _, path := range envPaths {
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		if err := godotenv.Load(path); err != nil {
+			log.Printf("[Config] 读取 %s 失败: %v", path, err)
+			continue
+		}
+		log.Printf("[Config] 已从 %s 注入环境变量", path)
+		loadedAny = true
+	}
+	if !loadedAny {
+		log.Printf("[Config] 未找到 %v（仅使用已有环境变量与 yaml）", envPaths)
+	}
 
 	viper.SetConfigName("settings")
 	viper.SetConfigType("yaml")
@@ -64,6 +87,9 @@ func Load() (*Config, error) {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("read config: %w", err)
 		}
+		log.Printf("[Config] 未找到 settings.yaml（config/ 或当前目录），仅使用默认值与 .env/环境变量")
+	} else {
+		log.Printf("[Config] 已读取配置文件: %s", viper.ConfigFileUsed())
 	}
 
 	// 显式绑定环境变量（.env 通过 godotenv 加载后生效）
@@ -134,6 +160,19 @@ func Load() (*Config, error) {
 	if cfg.Runner.DetectRouteTimeout <= 0 {
 		cfg.Runner.DetectRouteTimeout = 10
 	}
+
+	tokenInfo := "未设置"
+	if t := cfg.SeeingStone.APIToken; t != "" {
+		tokenInfo = fmt.Sprintf("已设置(len=%d)", len(t))
+	}
+	log.Printf("[Config] SeeingStone: api_url=%s request_timeout=%ds api_token=%s",
+		cfg.SeeingStone.APIURL, cfg.SeeingStone.RequestTimeout, tokenInfo)
+	log.Printf("[Config] server.port=%d threshold.spread=%.6f intervals.fetch=%ds intervals.detect=%ds mock_mode=%v",
+		cfg.Server.Port, cfg.Threshold.Spread, cfg.Intervals.Fetch, cfg.Intervals.Detect, cfg.MockMode)
+	log.Printf("[Config] runner: detect_max_concurrency=%d detect_route_timeout=%ds",
+		cfg.Runner.DetectMaxConcurrency, cfg.Runner.DetectRouteTimeout)
+	okexOK := cfg.Okex.AppKey != "" && cfg.Okex.SecretKey != "" && cfg.Okex.Passphrase != ""
+	log.Printf("[Config] OKEx DEX: 密钥完整=%v (app_key len=%d)", okexOK, len(cfg.Okex.AppKey))
 
 	return cfg, nil
 }
