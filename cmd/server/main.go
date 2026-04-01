@@ -93,6 +93,13 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
+	// 交易所密钥文件（含 Telegram）：必须在 GetExchangeKeys() 之前加载
+	if ek := config.TryLoadExchangeKeys(); ek != nil {
+		log.Printf("[Config] 已加载 exchange_keys（默认路径或 EXCHANGE_KEYS_PATH）")
+	} else {
+		log.Printf("[Config] 未找到或未解析 exchange_keys.json；Telegram 可使用环境变量 TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID")
+	}
+
 	// OKEx Key：用于 DEX Quote / 链上价格
 	if cfg.Okex.AppKey != "" && cfg.Okex.SecretKey != "" && cfg.Okex.Passphrase != "" {
 		config.SetOkexKeyManager(config.NewOkexKeyManagerFromConfig(cfg.Okex.AppKey, cfg.Okex.SecretKey, cfg.Okex.Passphrase))
@@ -120,22 +127,33 @@ func main() {
 	opportunities.RegisterExchangeAdapters(oppFinder) // 注册 Binance/Bybit/OKX/Gate/Bitget 公共订单簿
 	oppHandler := opportunities.NewHandler(oppFinder)
 
-	// Telegram 通知器：优先从 exchange_keys.json 读取，其次 GlobalConfig
+	// Telegram：exchange_keys.json 的 Telegram 段 > GlobalConfig > 环境变量
 	var oppNotifier *opportunities.OpportunityNotifier
 	var tgBotToken, tgChatID string
-	if keys := config.GetExchangeKeys(); keys != nil && keys.Telegram != nil && keys.Telegram.BotToken != "" && keys.Telegram.ChatID != "" {
-		tgBotToken = keys.Telegram.BotToken
-		tgChatID = keys.Telegram.ChatID
-	} else if g := config.GetGlobalConfig(); g != nil && g.Telegram != nil && g.Telegram.BotToken != "" && g.Telegram.ChatID != "" {
-		tgBotToken = g.Telegram.BotToken
-		tgChatID = g.Telegram.ChatID
+	if keys := config.GetExchangeKeys(); keys != nil && keys.Telegram != nil {
+		tgBotToken = strings.TrimSpace(keys.Telegram.BotToken)
+		tgChatID = strings.TrimSpace(keys.Telegram.ChatID)
+	}
+	if g := config.GetGlobalConfig(); g != nil && g.Telegram != nil {
+		if tgBotToken == "" {
+			tgBotToken = strings.TrimSpace(g.Telegram.BotToken)
+		}
+		if tgChatID == "" {
+			tgChatID = strings.TrimSpace(g.Telegram.ChatID)
+		}
+	}
+	if tgBotToken == "" {
+		tgBotToken = strings.TrimSpace(os.Getenv("TELEGRAM_BOT_TOKEN"))
+	}
+	if tgChatID == "" {
+		tgChatID = strings.TrimSpace(os.Getenv("TELEGRAM_CHAT_ID"))
 	}
 	if tgBotToken != "" && tgChatID != "" {
 		tgClient := tg.NewTelegramClient(tgBotToken, tgChatID)
 		oppNotifier = opportunities.NewOpportunityNotifier(tgClient)
-		log.Printf("[Telegram] 机会通知器已启动，ChatID: %s", tgChatID)
+		log.Printf("[Telegram] 机会通知器已启动 ChatID=%s BotToken(len=%d)", tgChatID, len(tgBotToken))
 	} else {
-		log.Printf("[Telegram] 未配置 Bot（可选）：在 exchange_keys.json 或 GlobalConfig 填写 telegram 以启用推送")
+		log.Printf("[Telegram] 未启用：请在 config/exchange_keys.json 增加 \"Telegram\":{\"BotToken\",\"ChatID\"}，或设置 TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID")
 	}
 
 	// Ticker 拉取：实时价格（每交易所 1 次请求，每 3s 一轮）

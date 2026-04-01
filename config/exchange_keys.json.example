@@ -20,5 +20,9 @@
     "APIKey": "",
     "Secret": "",
     "Passphrase": ""
+  },
+  "Telegram": {
+    "BotToken": "",
+    "ChatID": ""
   }
 }
