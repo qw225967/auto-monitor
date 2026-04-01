@@ -67,22 +67,38 @@ func (f *Finder) FeedTicker(symbol, exchange string, price float64, ts time.Time
 	f.priceHistory.RecordAt(symbol, exchange, price, 0, ts)
 }
 
+// orderbookExchange 在买卖两侧中选出「已注册 REST 订单簿适配器」的一方。
+// 避免把 LIGHTER/ASTER/HYPERLIQUID 等无适配器的一侧当成现货侧，导致永远拉不到盘口。
+func orderbookExchange(buyEx, sellEx string, exchanges map[string]ExchangeAdapter) (ex string, ok bool) {
+	spot, fut := determineSpotAndFutures(buyEx, sellEx)
+	for _, cand := range []string{spot, fut, buyEx, sellEx} {
+		c := strings.TrimSpace(cand)
+		if c == "" {
+			continue
+		}
+		if _, has := exchanges[strings.ToLower(c)]; has {
+			return c, true
+		}
+	}
+	return spot, false
+}
+
 // prefetchOrderbookForAnomalies 在层2/3 之前为异常候选拉取现货第一档，写入 depth: 时间序列。
 // 此前深度仅在层4 写入，导致层3 永远「数据不足」。
 func (f *Finder) prefetchOrderbookForAnomalies(items []model.SpreadItem, exchanges map[string]ExchangeAdapter) {
 	for _, item := range items {
-		spotEx, _ := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
-		adapter, ok := exchanges[strings.ToLower(spotEx)]
+		ex, ok := orderbookExchange(item.BuyExchange, item.SellExchange, exchanges)
 		if !ok {
 			continue
 		}
+		adapter := exchanges[strings.ToLower(ex)]
 		bestQty, bestPrice, err := adapter.GetBestBidQty(item.Symbol)
 		if err != nil || bestQty <= 0 {
 			continue
 		}
 		f.priceHistory.RecordOrderbookDepth(item.Symbol, bestQty)
 		if bestPrice > 0 {
-			f.priceHistory.Record(item.Symbol, spotEx, bestPrice, 0)
+			f.priceHistory.Record(item.Symbol, ex, bestPrice, 0)
 		}
 	}
 }
@@ -146,14 +162,19 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	// 层2+3：价格斜率加速比 + 挂单量斜率加速比（hasData=false 必须过滤，不放行）
 	var afterPriceDepth []model.SpreadItem
 	for _, item := range anomalyItems {
-		spotEx, _ := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
+		ex, hasOB := orderbookExchange(item.BuyExchange, item.SellExchange, exchanges)
+		if !hasOB {
+			log.Printf("[Funnel] 层2 %s 无 REST 订单簿适配（buy=%s sell=%s），跳过",
+				item.Symbol, item.BuyExchange, item.SellExchange)
+			continue
+		}
 
-		// 层2：价格加速比，hasData=false 过滤
-		priceAccel, hasPriceData := f.priceHistory.GetPriceSlopeAccel(item.Symbol, spotEx)
+		// 层2：价格加速比，hasData=false 过滤（价格 key 与 Ticker/预拉盘口一致）
+		priceAccel, hasPriceData := f.priceHistory.GetPriceSlopeAccel(item.Symbol, ex)
 		if !hasPriceData {
-			t5, p5 := f.priceHistory.CountPoints(item.Symbol, spotEx)
-			log.Printf("[Funnel] 层2 %s 价格数据不足（近5min ticker 点=%d 有效价=%d，需≥2；现货侧=%s）",
-				item.Symbol, t5, p5, spotEx)
+			t5, p5 := f.priceHistory.CountPoints(item.Symbol, ex)
+			log.Printf("[Funnel] 层2 %s 价格数据不足（近5min ticker 点=%d 有效价=%d，需≥2；计价侧=%s）",
+				item.Symbol, t5, p5, ex)
 			continue
 		}
 		if priceAccel < f.priceAccelThreshold {
@@ -184,10 +205,11 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	var finalOpportunities []model.OpportunityItem
 	for _, item := range afterPriceDepth {
 		spotEx, futuresEx := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
-		adapter, ok := exchanges[strings.ToLower(spotEx)]
+		ex, ok := orderbookExchange(item.BuyExchange, item.SellExchange, exchanges)
 		if !ok {
 			continue
 		}
+		adapter := exchanges[strings.ToLower(ex)]
 
 		// 拉取第一档 bid 挂单量及最优买价
 		bestQty, bestPrice, err := adapter.GetBestBidQty(item.Symbol)
@@ -196,7 +218,7 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 			f.priceHistory.RecordOrderbookDepth(item.Symbol, bestQty)
 			// 将最优买价补充进价格历史（提升实时性）
 			if bestPrice > 0 {
-				f.priceHistory.Record(item.Symbol, spotEx, bestPrice, 0)
+				f.priceHistory.Record(item.Symbol, ex, bestPrice, 0)
 			}
 		}
 
@@ -207,7 +229,7 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 			continue
 		}
 
-		priceAccel, _ := f.priceHistory.GetPriceSlopeAccel(item.Symbol, spotEx)
+		priceAccel, _ := f.priceHistory.GetPriceSlopeAccel(item.Symbol, ex)
 		depthAccel, _ := f.priceHistory.GetDepthSlopeAccel(item.Symbol)
 		confidence := f.calculateConfidence(item.SpreadAnomaly, priceAccel, depthAccel, volumeAccel)
 
