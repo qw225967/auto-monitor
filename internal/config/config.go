@@ -17,6 +17,7 @@ type Config struct {
 	Intervals   IntervalsConfig
 	Runner      RunnerConfig
 	Okex        OkexConfig
+	Funnel      FunnelConfig
 	MockMode    bool // 开发模式：使用模拟数据，不请求真实 API
 }
 
@@ -102,6 +103,13 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("okex.app_key", "OKEX_APP_KEY")
 	_ = viper.BindEnv("okex.secret_key", "OKEX_SECRET_KEY")
 	_ = viper.BindEnv("okex.passphrase", "OKEX_PASSPHRASE")
+	_ = viper.BindEnv("funnel.price_accel_threshold", "FUNNEL_PRICE_ACCEL_THRESHOLD")
+	_ = viper.BindEnv("funnel.depth_accel_threshold", "FUNNEL_DEPTH_ACCEL_THRESHOLD")
+	_ = viper.BindEnv("funnel.volume_accel_threshold", "FUNNEL_VOLUME_ACCEL_THRESHOLD")
+	_ = viper.BindEnv("funnel.anomaly_stddev_k", "FUNNEL_ANOMALY_STDDEV_K")
+	_ = viper.BindEnv("funnel.active_normal_rounds", "FUNNEL_ACTIVE_NORMAL_ROUNDS")
+	_ = viper.BindEnv("funnel.watch_pool_not_seen_rounds", "FUNNEL_WATCH_POOL_NOT_SEEN_ROUNDS")
+	_ = viper.BindEnv("funnel.watch_pool_min_history", "FUNNEL_WATCH_POOL_MIN_HISTORY")
 
 	// 默认值
 	viper.SetDefault("seeingstone.api_url", "https://seeingstone.cloud")
@@ -113,6 +121,14 @@ func Load() (*Config, error) {
 	viper.SetDefault("seeingstone.request_timeout", 60)
 	viper.SetDefault("server.port", 8088)
 	viper.SetDefault("mock_mode", false)
+	defF := DefaultFunnelConfig()
+	viper.SetDefault("funnel.price_accel_threshold", defF.PriceAccelThreshold)
+	viper.SetDefault("funnel.depth_accel_threshold", defF.DepthAccelThreshold)
+	viper.SetDefault("funnel.volume_accel_threshold", defF.VolumeAccelThreshold)
+	viper.SetDefault("funnel.anomaly_stddev_k", defF.AnomalyStdDevK)
+	viper.SetDefault("funnel.active_normal_rounds", defF.ActiveNormalRounds)
+	viper.SetDefault("funnel.watch_pool_not_seen_rounds", defF.WatchPoolNotSeenRounds)
+	viper.SetDefault("funnel.watch_pool_min_history", defF.WatchPoolMinHistory)
 
 	cfg := &Config{
 		Server: ServerConfig{
@@ -139,6 +155,15 @@ func Load() (*Config, error) {
 			SecretKey:  viper.GetString("okex.secret_key"),
 			Passphrase: viper.GetString("okex.passphrase"),
 		},
+		Funnel: mergeFunnel(FunnelConfig{
+			PriceAccelThreshold:    viper.GetFloat64("funnel.price_accel_threshold"),
+			DepthAccelThreshold:    viper.GetFloat64("funnel.depth_accel_threshold"),
+			VolumeAccelThreshold:   viper.GetFloat64("funnel.volume_accel_threshold"),
+			AnomalyStdDevK:         viper.GetFloat64("funnel.anomaly_stddev_k"),
+			ActiveNormalRounds:     viper.GetInt("funnel.active_normal_rounds"),
+			WatchPoolNotSeenRounds: viper.GetInt("funnel.watch_pool_not_seen_rounds"),
+			WatchPoolMinHistory:    viper.GetInt("funnel.watch_pool_min_history"),
+		}),
 		MockMode: viper.GetBool("mock_mode") || viper.GetBool("MOCK_MODE"),
 	}
 
@@ -173,6 +198,10 @@ func Load() (*Config, error) {
 		cfg.Runner.DetectMaxConcurrency, cfg.Runner.DetectRouteTimeout)
 	okexOK := cfg.Okex.AppKey != "" && cfg.Okex.SecretKey != "" && cfg.Okex.Passphrase != ""
 	log.Printf("[Config] OKEx DEX: 密钥完整=%v (app_key len=%d)", okexOK, len(cfg.Okex.AppKey))
+	f := cfg.Funnel
+	log.Printf("[Config] funnel: price_accel>=%.2f depth_accel>=%.2f volume_accel>=%.2f anomaly>=%.2fσ active_normal_rounds=%d not_seen_rounds=%d min_history=%d",
+		f.PriceAccelThreshold, f.DepthAccelThreshold, f.VolumeAccelThreshold,
+		f.AnomalyStdDevK, f.ActiveNormalRounds, f.WatchPoolNotSeenRounds, f.WatchPoolMinHistory)
 
 	return cfg, nil
 }

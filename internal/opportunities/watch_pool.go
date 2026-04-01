@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/qw225967/auto-monitor/internal/config"
 	"github.com/qw225967/auto-monitor/internal/model"
 )
 
@@ -16,18 +17,6 @@ const (
 
 	// WatchPoolDebugSize 调试环形缓冲区大小
 	WatchPoolDebugSize = 10
-
-	// WatchPoolMinHistory 触发异常检测所需的最少历史轮次
-	WatchPoolMinHistory = 5
-
-	// AnomalyStdDevK 异常检测的标准差倍数阈值（2σ）
-	AnomalyStdDevK = 2.0
-
-	// ActiveNormalRounds 连续正常多少轮后退出活跃状态并移入冷却
-	ActiveNormalRounds = 10
-
-	// WatchPoolNotSeenRounds 超过多少轮未出现则从监控池清理
-	WatchPoolNotSeenRounds = 30
 )
 
 // WatchPool 监控池：维护 [-1%, 1%] 区间内 symbol 的 Welford 在线统计，
@@ -36,13 +25,32 @@ type WatchPool struct {
 	mu      sync.Mutex
 	entries map[string]*model.WatchPoolEntry
 	cooling map[string]*model.CoolingEntry
+	p       watchPoolParams
 }
 
-// NewWatchPool 创建监控池
-func NewWatchPool() *WatchPool {
+type watchPoolParams struct {
+	minHistory     int
+	anomalyStdDevK float64
+	activeNormal   int
+	notSeenRounds  int
+}
+
+func watchPoolParamsFromConfig(fc config.FunnelConfig) watchPoolParams {
+	return watchPoolParams{
+		minHistory:     fc.WatchPoolMinHistory,
+		anomalyStdDevK: fc.AnomalyStdDevK,
+		activeNormal:   fc.ActiveNormalRounds,
+		notSeenRounds:  fc.WatchPoolNotSeenRounds,
+	}
+}
+
+// NewWatchPool 创建监控池（params 来自 config.Funnel）
+func NewWatchPool(fc config.FunnelConfig) *WatchPool {
+	p := watchPoolParamsFromConfig(fc)
 	return &WatchPool{
 		entries: make(map[string]*model.WatchPoolEntry),
 		cooling: make(map[string]*model.CoolingEntry),
+		p:       p,
 	}
 }
 
@@ -111,14 +119,14 @@ func (wp *WatchPool) Update(items []model.SpreadItem) []model.SpreadItem {
 			entry.SpreadDebug = entry.SpreadDebug[len(entry.SpreadDebug)-WatchPoolDebugSize:]
 		}
 
-		// 活跃状态管理：连续回归正常 ActiveNormalRounds 轮则移入冷却
+		// 活跃状态管理：连续回归正常 active_normal_rounds 轮则移入冷却
 		if entry.IsActive {
 			if spread >= WatchPoolSpreadMin && spread <= WatchPoolSpreadMax {
 				entry.NormalRounds++
 			} else {
 				entry.NormalRounds = 0
 			}
-			if entry.NormalRounds >= ActiveNormalRounds {
+			if entry.NormalRounds >= wp.p.activeNormal {
 				duration := now.Sub(entry.ActiveSince)
 				log.Printf("[WatchPool] %s 行情结束，移入冷却列表（持续%.0f秒）", symbol, duration.Seconds())
 				wp.cooling[symbol] = &model.CoolingEntry{
@@ -136,7 +144,7 @@ func (wp *WatchPool) Update(items []model.SpreadItem) []model.SpreadItem {
 	for symbol, entry := range wp.entries {
 		if _, seen := currentMap[symbol]; !seen {
 			entry.MissedRounds++
-			if entry.MissedRounds >= WatchPoolNotSeenRounds {
+			if entry.MissedRounds >= wp.p.notSeenRounds {
 				log.Printf("[WatchPool] %s 连续%d轮未出现，移入冷却列表", symbol, entry.MissedRounds)
 				wp.cooling[symbol] = &model.CoolingEntry{
 					Symbol:     symbol,
@@ -161,7 +169,7 @@ func (wp *WatchPool) Update(items []model.SpreadItem) []model.SpreadItem {
 
 // DetectAnomalies 对监控池内的 items 做 2σ 突变检测。
 // 用 entry.LastSpread（监控池记录的最新价差）做检测，而非传入的 item.SpreadPercent。
-// 数据不足（< WatchPoolMinHistory）的 symbol 直接跳过（不放行）。
+// 数据不足（历史轮次 < min_history）的 symbol 直接跳过（不放行）。
 func (wp *WatchPool) DetectAnomalies(items []model.SpreadItem) []model.SpreadItem {
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
@@ -179,7 +187,7 @@ func (wp *WatchPool) DetectAnomalies(items []model.SpreadItem) []model.SpreadIte
 		}
 
 		// 数据积累期：历史不足，跳过（不放行）
-		if entry.SpreadCount < WatchPoolMinHistory {
+		if entry.SpreadCount < wp.p.minHistory {
 			continue
 		}
 
@@ -192,7 +200,7 @@ func (wp *WatchPool) DetectAnomalies(items []model.SpreadItem) []model.SpreadIte
 		}
 
 		deviationSigma := math.Abs(entry.LastSpread-entry.SpreadMean) / stdDev
-		if deviationSigma >= AnomalyStdDevK {
+		if deviationSigma >= wp.p.anomalyStdDevK {
 			if !entry.IsActive {
 				entry.IsActive = true
 				entry.ActiveSince = time.Now()
@@ -225,6 +233,11 @@ func (wp *WatchPool) GetWatchPoolSize() int {
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
 	return len(wp.entries)
+}
+
+// anomalyK 返回当前配置的 σ 阈值（供日志使用）
+func (wp *WatchPool) anomalyK() float64 {
+	return wp.p.anomalyStdDevK
 }
 
 // KickToCooling 将 symbol 踢入冷却列表（由外部漏斗层调用）

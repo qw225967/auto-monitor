@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/qw225967/auto-monitor/internal/config"
 	"github.com/qw225967/auto-monitor/internal/model"
 )
 
@@ -16,15 +17,6 @@ const (
 	MaxPricePoints     = 5000
 	PriceHistoryWindow = 45 * time.Minute
 	SlopePricePoints   = 5000
-
-	// 层2：价格斜率加速比阈值（短1min/长5min >= 1.5，且短斜率 > 0）
-	PriceAccelThreshold = 1.5
-
-	// 层3：挂单量斜率加速比阈值（与层2相同逻辑）
-	DepthAccelThreshold = 1.5
-
-	// 层4：挂单量猛增倍数阈值（短1min/长5min >= 2.0 表示挂单突然活跃）
-	VolumeAccelThreshold = 2.0
 
 	// 兼容旧代码引用（GetSymbolsForKline 等）
 	MinNegativeSpread = -1.0
@@ -39,17 +31,24 @@ type ExchangeAdapter interface {
 }
 
 type Finder struct {
-	priceHistory *PriceHistory
-	watchPool    *WatchPool
-	exchanges    map[string]ExchangeAdapter
-	mu           sync.RWMutex
+	priceHistory         *PriceHistory
+	watchPool            *WatchPool
+	exchanges            map[string]ExchangeAdapter
+	mu                   sync.RWMutex
+	priceAccelThreshold  float64
+	depthAccelThreshold  float64
+	volumeAccelThreshold float64
 }
 
-func NewFinder() *Finder {
+// NewFinder 创建 Finder；funnel 参数来自 config.Load().Funnel
+func NewFinder(fc config.FunnelConfig) *Finder {
 	return &Finder{
-		priceHistory: NewPriceHistory(SlopePricePoints, PriceHistoryWindow),
-		watchPool:    NewWatchPool(),
-		exchanges:    make(map[string]ExchangeAdapter),
+		priceHistory:         NewPriceHistory(SlopePricePoints, PriceHistoryWindow),
+		watchPool:            NewWatchPool(fc),
+		exchanges:            make(map[string]ExchangeAdapter),
+		priceAccelThreshold:  fc.PriceAccelThreshold,
+		depthAccelThreshold:  fc.DepthAccelThreshold,
+		volumeAccelThreshold: fc.VolumeAccelThreshold,
 	}
 }
 
@@ -71,10 +70,10 @@ func (f *Finder) FeedTicker(symbol, exchange string, price float64, ts time.Time
 // Find 四层漏斗主入口：
 //
 //	层0: 监控池更新（维护 [-1%,1%] 区间的 symbol，Welford 积累历史）
-//	层1: 价差突变检测（|spread - mean| / stdDev >= 2σ）
-//	层2: 价格斜率加速比（短1min/长5min >= 1.5，且短斜率 > 0，hasData=false 必须过滤）
-//	层3: 挂单量斜率加速比（同层2逻辑，hasData=false 必须过滤）
-//	层4: 挂单量猛增检测（拉取第一档 bid，短1min/长5min >= 2.0）
+//	层1: 价差突变检测（|spread - mean| / stdDev >= anomaly_stddev_k）
+//	层2: 价格斜率加速比（hasData=false 必须过滤）
+//	层3: 挂单量斜率加速比（hasData=false 必须过滤）
+//	层4: 挂单量猛增检测（拉取第一档 bid，再比 volume_accel_threshold）
 func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesResponse {
 	f.mu.RLock()
 	exchanges := f.exchanges
@@ -103,7 +102,8 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	// 层1：价差突变检测（2σ）
 	anomalyItems := f.watchPool.DetectAnomalies(poolItems)
 	stats.AfterSpreadAnomaly = len(anomalyItems)
-	log.Printf("[Funnel] 层1 价差突变(2σ): %d → %d %s", len(poolItems), len(anomalyItems), symbolsFromSpreadItems(anomalyItems))
+	log.Printf("[Funnel] 层1 价差突变(σ≥%.2f): %d → %d %s",
+		f.watchPool.anomalyK(), len(poolItems), len(anomalyItems), symbolsFromSpreadItems(anomalyItems))
 
 	coolingList := f.watchPool.GetCooling()
 	stats.CoolingPoolSize = len(coolingList)
@@ -131,8 +131,8 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 			log.Printf("[Funnel] 层2 %s 价格数据不足，过滤", item.Symbol)
 			continue
 		}
-		if priceAccel < PriceAccelThreshold {
-			log.Printf("[Funnel] 层2 %s 价格加速比不足: %.2f < %.1f", item.Symbol, priceAccel, PriceAccelThreshold)
+		if priceAccel < f.priceAccelThreshold {
+			log.Printf("[Funnel] 层2 %s 价格加速比不足: %.2f < %.2f", item.Symbol, priceAccel, f.priceAccelThreshold)
 			continue
 		}
 
@@ -142,8 +142,8 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 			log.Printf("[Funnel] 层3 %s 挂单量数据不足，过滤", item.Symbol)
 			continue
 		}
-		if depthAccel < DepthAccelThreshold {
-			log.Printf("[Funnel] 层3 %s 挂单量加速比不足: %.2f < %.1f", item.Symbol, depthAccel, DepthAccelThreshold)
+		if depthAccel < f.depthAccelThreshold {
+			log.Printf("[Funnel] 层3 %s 挂单量加速比不足: %.2f < %.2f", item.Symbol, depthAccel, f.depthAccelThreshold)
 			continue
 		}
 
@@ -173,10 +173,10 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 			}
 		}
 
-		// 挂单量猛增检测（短1min/长5min >= VolumeAccelThreshold）
+		// 挂单量猛增检测（与 volume_accel_threshold 比较）
 		volumeAccel, hasVolumeData := f.priceHistory.GetDepthSlopeAccel(item.Symbol)
-		if !hasVolumeData || volumeAccel < VolumeAccelThreshold {
-			log.Printf("[Funnel] 层4 %s 挂单量未猛增: accel=%.2f hasData=%v", item.Symbol, volumeAccel, hasVolumeData)
+		if !hasVolumeData || volumeAccel < f.volumeAccelThreshold {
+			log.Printf("[Funnel] 层4 %s 挂单量未猛增: accel=%.2f hasData=%v (阈值%.2f)", item.Symbol, volumeAccel, hasVolumeData, f.volumeAccelThreshold)
 			continue
 		}
 
@@ -199,8 +199,8 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	}
 
 	stats.AfterDepthVolume = len(finalOpportunities)
-	log.Printf("[Funnel] 层4 挂单量猛增(>=%.1f): %d → %d %s",
-		VolumeAccelThreshold, len(afterPriceDepth), len(finalOpportunities), symbolsFromOpportunities(finalOpportunities))
+	log.Printf("[Funnel] 层4 挂单量猛增(>=%.2f): %d → %d %s",
+		f.volumeAccelThreshold, len(afterPriceDepth), len(finalOpportunities), symbolsFromOpportunities(finalOpportunities))
 
 	sort.Slice(finalOpportunities, func(i, j int) bool {
 		return finalOpportunities[i].Confidence > finalOpportunities[j].Confidence
@@ -343,33 +343,37 @@ func (f *Finder) calculateConfidence(spreadAnomaly, priceAccel, depthAccel, volu
 		score += 15
 	}
 
-	// 价格加速比
+	pa := f.priceAccelThreshold
+	da := f.depthAccelThreshold
+	va := f.volumeAccelThreshold
+
+	// 价格加速比（档位随配置的入场阈值缩放）
 	switch {
-	case priceAccel >= 3.0:
+	case priceAccel >= 3*pa:
 		score += 30
-	case priceAccel >= 2.0:
+	case priceAccel >= 2*pa:
 		score += 22
-	case priceAccel >= 1.5:
+	case priceAccel >= pa:
 		score += 15
 	}
 
 	// 挂单量加速比（层3）
 	switch {
-	case depthAccel >= 3.0:
+	case depthAccel >= 3*da:
 		score += 25
-	case depthAccel >= 2.0:
+	case depthAccel >= 2*da:
 		score += 18
-	case depthAccel >= 1.5:
+	case depthAccel >= da:
 		score += 12
 	}
 
 	// 挂单量猛增倍数（层4）
 	switch {
-	case volumeAccel >= 5.0:
+	case volumeAccel >= 3*va:
 		score += 15
-	case volumeAccel >= 3.0:
+	case volumeAccel >= 2*va:
 		score += 10
-	case volumeAccel >= 2.0:
+	case volumeAccel >= va:
 		score += 5
 	}
 
