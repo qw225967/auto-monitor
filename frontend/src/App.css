@@ -1,12 +1,17 @@
 .app {
   min-height: 100vh;
-  background: #0f1419;
+  background:
+    radial-gradient(ellipse 100% 60% at 50% -15%, rgba(56, 139, 253, 0.14), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 0%, rgba(163, 113, 247, 0.08), transparent 45%),
+    #0f1419;
   color: #e6edf3;
 }
 
 .header {
-  padding: 1.5rem 2rem;
+  padding: 1.25rem 2rem 1.5rem;
   border-bottom: 1px solid #21262d;
+  background: rgba(13, 17, 23, 0.75);
+  backdrop-filter: blur(10px);
 }
 
 .header-row {
@@ -18,7 +23,12 @@
 .header h1 {
   margin: 0;
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  background: linear-gradient(120deg, #e6edf3 0%, #8b949e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .btn-config {
@@ -160,7 +170,8 @@
 
 .nav-tabs a.active {
   color: #e6edf3;
-  background: #238636;
+  background: linear-gradient(145deg, #238636, #2ea043);
+  box-shadow: 0 2px 8px rgba(35, 134, 54, 0.35);
 }
 
 .main {

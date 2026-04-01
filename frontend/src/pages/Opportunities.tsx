@@ -43,7 +43,7 @@ function buildFunnelSteps(f: FunnelStats): FunnelStep[] {
     {
       key: 'anomaly',
       label: '价差突变',
-      sub: '相对历史 2σ 异常',
+      sub: '相对历史分布（σ）',
       value: f.after_spread_anomaly,
     },
     {
