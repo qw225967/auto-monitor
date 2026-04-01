@@ -201,6 +201,12 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	log.Printf("[Funnel] 层2+3 价格/挂单量加速比: %d → %d %s",
 		len(anomalyItems), len(afterPriceDepth), symbolsFromSpreadItems(afterPriceDepth))
 
+	// 层4：对层2+3 通过项再拉一次盘口，用 GetDepthSlopeAccel（与层3 同一指标）与 volume_accel_threshold 比较；
+	// 阈值通常高于 depth_accel_threshold，相当于「二次收紧」。无通过项时本层不会执行。
+	if len(afterPriceDepth) == 0 {
+		log.Printf("[Funnel] 层4 挂单量猛增: 跳过（层2+3 为 0 条，本层不拉盘、不判 accel）")
+	}
+
 	// 层4：挂单量猛增检测（拉取第一档 bid，记录历史，计算加速比）
 	var finalOpportunities []model.OpportunityItem
 	for _, item := range afterPriceDepth {
@@ -248,8 +254,10 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	}
 
 	stats.AfterDepthVolume = len(finalOpportunities)
-	log.Printf("[Funnel] 层4 挂单量猛增(>=%.2f): %d → %d %s",
-		f.volumeAccelThreshold, len(afterPriceDepth), len(finalOpportunities), symbolsFromOpportunities(finalOpportunities))
+	if len(afterPriceDepth) > 0 {
+		log.Printf("[Funnel] 层4 挂单量猛增(深度加速比>=%.2f，与层3同指标、阈值更高): %d → %d %s",
+			f.volumeAccelThreshold, len(afterPriceDepth), len(finalOpportunities), symbolsFromOpportunities(finalOpportunities))
+	}
 
 	sort.Slice(finalOpportunities, func(i, j int) bool {
 		return finalOpportunities[i].Confidence > finalOpportunities[j].Confidence
