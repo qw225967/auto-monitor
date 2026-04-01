@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
@@ -50,6 +51,9 @@ type RunnerConfig struct {
 }
 
 func Load() (*Config, error) {
+	// 将 .env 注入进程环境，供下方 viper.BindEnv / GetString 使用（文件不存在时忽略）
+	_ = godotenv.Load()
+
 	viper.SetConfigName("settings")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("config")
