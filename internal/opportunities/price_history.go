@@ -1,6 +1,7 @@
 package opportunities
 
 import (
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -104,34 +105,43 @@ func (p *PriceHistory) CountPoints(symbol, exchange string) (total, withPrice in
 	return total, withPrice
 }
 
-// GetSlope 返回短窗口（5分钟）内的价格斜率，使用最小二乘法拟合。
-// 斜率单位：归一化价格变化率 / 分钟。
-// hasData 为 false 表示窗口内有效数据点不足（< 2），调用方应跳过该维度的阈值校验。
-func (p *PriceHistory) GetSlope(symbol, exchange string) (slope float64, hasData bool) {
-	return p.GetSlopeInWindow(symbol, exchange, 5*time.Minute)
+// recordRaw 通用时序数据存储（内部方法，直接用 key 存储，不做 symbol:exchange 转换）
+func (p *PriceHistory) recordRaw(key string, value float64, ts time.Time) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.histories[key] = append(p.histories[key], model.PricePoint{
+		Price:     value,
+		Timestamp: ts,
+	})
+
+	now := time.Now()
+	cutoff := now.Add(-p.windowSize)
+	points := p.histories[key]
+	i := 0
+	for ; i < len(points); i++ {
+		if points[i].Timestamp.After(cutoff) {
+			break
+		}
+	}
+	if i > 0 {
+		p.histories[key] = points[i:]
+	}
+
+	if len(p.histories[key]) > p.maxPoints {
+		p.histories[key] = p.histories[key][len(p.histories[key])-p.maxPoints:]
+	}
 }
 
-// GetSlopeLong 返回长窗口（1小时）内的价格斜率，使用最小二乘法拟合。
-// hasData 为 false 表示窗口内有效数据点不足（< 2），调用方应跳过该维度的阈值校验。
-func (p *PriceHistory) GetSlopeLong(symbol, exchange string) (slope float64, hasData bool) {
-	return p.GetSlopeInWindow(symbol, exchange, 60*time.Minute)
-}
-
-// GetSlopeInWindow 在指定时间窗口内，用最小二乘法拟合价格序列，返回归一化斜率（变化率/分钟）。
-// 归一化方式：以窗口内第一个有效价格为基准，计算相对涨跌幅后再做 OLS 拟合。
-// hasData 为 false 时表示数据不足，斜率值无意义，调用方应跳过阈值校验（而非过滤）。
-// 这样保证"有多少数据用多少数据计算，随时间积累越来越准确"的语义。
-func (p *PriceHistory) GetSlopeInWindow(symbol, exchange string, window time.Duration) (slope float64, hasData bool) {
+// GetSlopeInWindowByKey 按原始 key 在指定时间窗口内计算斜率（OLS 最小二乘法）
+func (p *PriceHistory) GetSlopeInWindowByKey(key string, window time.Duration) (slope float64, hasData bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	key := priceHistoryKey(symbol, exchange)
 	points := p.histories[key]
-
 	now := time.Now()
 	cutoff := now.Add(-window)
 
-	// 收集窗口内有效价格点（不要求满窗口，有多少用多少）
 	var windowPoints []model.PricePoint
 	for _, pt := range points {
 		if pt.Timestamp.After(cutoff) && pt.Price > 0 {
@@ -139,17 +149,13 @@ func (p *PriceHistory) GetSlopeInWindow(symbol, exchange string, window time.Dur
 		}
 	}
 
-	// 至少需要 2 个点才能拟合直线
 	if len(windowPoints) < 2 {
 		return 0, false
 	}
 
-	// 以第一个点的价格和时间为基准，构造 OLS 输入
 	basePrice := windowPoints[0].Price
 	baseTime := windowPoints[0].Timestamp
 
-	// OLS: y = a + b*x，求 b（斜率）
-	// x = 距基准时间的分钟数，y = 相对于基准价格的归一化涨跌幅
 	var sumX, sumY, sumXX, sumXY float64
 	n := float64(len(windowPoints))
 
@@ -164,46 +170,61 @@ func (p *PriceHistory) GetSlopeInWindow(symbol, exchange string, window time.Dur
 
 	denominator := n*sumXX - sumX*sumX
 	if denominator == 0 {
-		// 所有点时间戳相同，无法拟合
 		return 0, false
 	}
 
 	return (n*sumXY - sumX*sumY) / denominator, true
 }
 
-func (p *PriceHistory) GetVolumeSpike(symbol, exchange string, threshold float64) bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+// RecordOrderbookDepth 记录 top50 挂单量（USDT 计价）
+func (p *PriceHistory) RecordOrderbookDepth(symbol string, totalQty float64) {
+	p.recordRaw("depth:"+symbol, totalQty, time.Now())
+}
 
+// GetPriceSlopeAccel 计算价格斜率加速比（短窗口5min / 长窗口30min）。
+// 判断"价格不下跌且突然上涨"：短斜率 > 0 且 短/长 >= 阈值。
+// hasData=false 时表示数据不足，调用方必须过滤（不放行）。
+func (p *PriceHistory) GetPriceSlopeAccel(symbol, exchange string) (accel float64, hasData bool) {
 	key := priceHistoryKey(symbol, exchange)
-	points := p.histories[key]
-	if len(points) < 2 {
-		return false
+	shortSlope, hasShort := p.GetSlopeInWindowByKey(key, 5*time.Minute)
+	longSlope, hasLong := p.GetSlopeInWindowByKey(key, 30*time.Minute)
+
+	if !hasShort || !hasLong {
+		return 0, false // 数据不足，调用方必须过滤
 	}
-
-	now := time.Now()
-	oneMinAgo := now.Add(-1 * time.Minute)
-	sixMinAgo := now.Add(-6 * time.Minute)
-
-	var recentVol, olderVol float64
-	var recentCount, olderCount int
-
-	for i := len(points) - 1; i >= 0; i-- {
-		if points[i].Timestamp.After(oneMinAgo) {
-			recentVol += points[i].Volume
-			recentCount++
-		} else if points[i].Timestamp.After(sixMinAgo) {
-			olderVol += points[i].Volume
-			olderCount++
-		}
+	// 短斜率 <= 0 表示价格下跌或横盘，不符合"突然上涨"条件
+	if shortSlope <= 0 {
+		return 0, true
 	}
-
-	if recentCount == 0 || olderCount == 0 {
-		return false
+	if longSlope == 0 {
+		return 2.0, true // 长期横盘突然上涨，视为加速
 	}
+	if longSlope < 0 {
+		// 长期下跌但短期上涨，加速比取绝对值（方向反转）
+		return shortSlope / math.Abs(longSlope), true
+	}
+	return shortSlope / longSlope, true
+}
 
-	recentAvg := recentVol / float64(recentCount)
-	olderAvg := olderVol / float64(olderCount)
+// GetDepthSlopeAccel 计算挂单量斜率加速比（短窗口5min / 长窗口30min）。
+// 数据源：第一档 bid 挂单量（一手量，非 USDT 总深度）。
+// hasData=false 时表示数据不足，调用方必须过滤（不放行）。
+func (p *PriceHistory) GetDepthSlopeAccel(symbol string) (accel float64, hasData bool) {
+	key := "depth:" + symbol
+	shortSlope, hasShort := p.GetSlopeInWindowByKey(key, 5*time.Minute)
+	longSlope, hasLong := p.GetSlopeInWindowByKey(key, 30*time.Minute)
 
-	return recentAvg/olderAvg > threshold
+	if !hasShort || !hasLong {
+		return 0, false // 数据不足，调用方必须过滤
+	}
+	if shortSlope <= 0 {
+		return 0, true
+	}
+	if longSlope == 0 {
+		return 2.0, true // 长期横盘突然上涨，视为加速
+	}
+	if longSlope < 0 {
+		return shortSlope / math.Abs(longSlope), true
+	}
+	return shortSlope / longSlope, true
 }

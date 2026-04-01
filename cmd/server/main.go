@@ -4,13 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 	"net/http"
 	"os"
 	"os/signal"
-	"sort"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -18,75 +15,12 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/qw225967/auto-monitor/internal/api"
 	"github.com/qw225967/auto-monitor/internal/config"
-	"github.com/qw225967/auto-monitor/internal/detector"
 	"github.com/qw225967/auto-monitor/internal/model"
 	"github.com/qw225967/auto-monitor/internal/opportunities"
 	"github.com/qw225967/auto-monitor/internal/opportunities/ticker"
-	"github.com/qw225967/auto-monitor/internal/price"
-	"github.com/qw225967/auto-monitor/internal/runner"
 	"github.com/qw225967/auto-monitor/internal/source/seeingstone"
-	"github.com/qw225967/auto-monitor/internal/tokenregistry"
 	tg "github.com/qw225967/auto-monitor/internal/utils/notify/telegram"
 )
-
-type assetPriorityMetric struct {
-	Hits      float64
-	MaxSpread float64
-	LastSeen  time.Time
-}
-
-type assetPriorityTracker struct {
-	mu       sync.RWMutex
-	metrics  map[string]*assetPriorityMetric
-	decay    float64
-	staleTTL time.Duration
-}
-
-func newAssetPriorityTracker(decay float64, staleTTL time.Duration) *assetPriorityTracker {
-	if decay <= 0 || decay >= 1 {
-		decay = 0.9
-	}
-	if staleTTL <= 0 {
-		staleTTL = 1 * time.Hour
-	}
-	return &assetPriorityTracker{
-		metrics:  make(map[string]*assetPriorityMetric),
-		decay:    decay,
-		staleTTL: staleTTL,
-	}
-}
-
-func (t *assetPriorityTracker) Observe(items []model.SpreadItem, now time.Time) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	for asset, m := range t.metrics {
-		if now.Sub(m.LastSeen) > t.staleTTL*2 {
-			delete(t.metrics, asset)
-			continue
-		}
-		m.Hits *= t.decay
-		m.MaxSpread *= t.decay
-	}
-
-	for _, it := range items {
-		asset, _ := tokenregistry.SymbolToAsset(it.Symbol)
-		asset = strings.ToUpper(strings.TrimSpace(asset))
-		if asset == "" {
-			continue
-		}
-		m := t.metrics[asset]
-		if m == nil {
-			m = &assetPriorityMetric{}
-			t.metrics[asset] = m
-		}
-		m.Hits += 1
-		if it.SpreadPercent > m.MaxSpread {
-			m.MaxSpread = it.SpreadPercent
-		}
-		m.LastSeen = now
-	}
-}
 
 // chainDistribution 返回链分布摘要，如 "链分布: ETH=50 BSC=20"
 func chainDistribution(prices map[string]float64) string {
@@ -139,65 +73,6 @@ func pairDistribution(byChain map[string]int) string {
 	return " " + strings.Join(parts, " ")
 }
 
-func (t *assetPriorityTracker) TopAssets(topN int, now time.Time) []string {
-	if topN <= 0 {
-		return nil
-	}
-
-	type score struct {
-		asset string
-		val   float64
-	}
-
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	maxHits := 0.0
-	maxSpread := 0.0
-	for _, m := range t.metrics {
-		if now.Sub(m.LastSeen) > t.staleTTL {
-			continue
-		}
-		if m.Hits > maxHits {
-			maxHits = m.Hits
-		}
-		if m.MaxSpread > maxSpread {
-			maxSpread = m.MaxSpread
-		}
-	}
-	if maxHits <= 0 {
-		maxHits = 1
-	}
-	if maxSpread <= 0 {
-		maxSpread = 1
-	}
-
-	var rows []score
-	for a, m := range t.metrics {
-		age := now.Sub(m.LastSeen)
-		if age > t.staleTTL {
-			continue
-		}
-		freshness := 1.0 - math.Min(1.0, float64(age)/float64(t.staleTTL))
-		v := 0.55*(m.Hits/maxHits) + 0.35*(m.MaxSpread/maxSpread) + 0.10*freshness
-		rows = append(rows, score{asset: a, val: v})
-	}
-	sort.Slice(rows, func(i, j int) bool {
-		if rows[i].val == rows[j].val {
-			return rows[i].asset < rows[j].asset
-		}
-		return rows[i].val > rows[j].val
-	})
-	if len(rows) > topN {
-		rows = rows[:topN]
-	}
-	out := make([]string, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, r.asset)
-	}
-	return out
-}
-
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
@@ -218,13 +93,6 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	// 交易所 API 密钥（config/exchange_keys.json，用于充提网络查询等）
-	if keys := config.TryLoadExchangeKeys(); keys != nil {
-		log.Println("[Config] 已加载交易所密钥: Bitget/Bybit/Gate 等")
-	} else {
-		log.Println("[Config] 未找到 exchange_keys.json，充提网络将使用公开 API（Binance/OKX 需密钥）")
-	}
-
 	// OKEx Key：用于 DEX Quote / 链上价格
 	if cfg.Okex.AppKey != "" && cfg.Okex.SecretKey != "" && cfg.Okex.Passphrase != "" {
 		config.SetOkexKeyManager(config.NewOkexKeyManagerFromConfig(cfg.Okex.AppKey, cfg.Okex.SecretKey, cfg.Okex.Passphrase))
@@ -243,16 +111,6 @@ func main() {
 		})
 		fetchSpread = ssAdapter.FetchSpread
 	}
-
-		// 路由探测：初始化跨链桥管理器，仅展示经 GetBridgeQuote 验证的跨链协议
-		bridgeMgr := detector.NewBridgeManagerForDetect()
-		det := detector.NewArbitrageAdapter(bridgeMgr)
-
-	// Runner
-	runner.NewWithOptions(det, cfg.Threshold.Spread, runner.Options{
-		DetectConcurrency: cfg.Runner.DetectMaxConcurrency,
-		DetectTimeout:     time.Duration(cfg.Runner.DetectRouteTimeout) * time.Second,
-	})
 
 	// API
 	handler := api.New()
@@ -295,11 +153,6 @@ func main() {
 	router.POST("/api/config/exchange-keys", handler.PostExchangeKeys)
 	router.POST("/api/config/liquidity-threshold", handler.PostLiquidityThreshold)
 
-	// 缓存：最新价差数据
-	var cachedItems []model.SpreadItem
-	var cacheMu sync.RWMutex
-	priorityTracker := newAssetPriorityTracker(0.9, 2*time.Hour)
-
 	// Ticker A: 10s 拉取价差
 	go func() {
 		ticker := time.NewTicker(cfg.FetchInterval())
@@ -312,10 +165,6 @@ func main() {
 				log.Printf("[Fetch] %v", err)
 				continue
 			}
-			cacheMu.Lock()
-			cachedItems = items
-			cacheMu.Unlock()
-			priorityTracker.Observe(items, time.Now())
 			log.Printf("[Fetch] got %d items", len(items))
 
 			// 更新机会发现数据
@@ -334,174 +183,6 @@ func main() {
 			}
 		}
 	}()
-
-	// Ticker D: Token 信息补全（仅非 Mock 且配置了 API Token 时）
-	if !cfg.MockMode && cfg.SeeingStone.APIToken != "" {
-		go func() {
-			// 启动时立即执行一次
-			ctx0, cancel0 := context.WithTimeout(context.Background(), 5*time.Minute)
-			if updated, err := tokenregistry.RunSync(ctx0, tokenregistry.SyncConfig{
-				RegistryPath:     cfg.TokenRegistry.Path,
-				APIURL:           cfg.SeeingStone.APIURL,
-				APIToken:         cfg.SeeingStone.APIToken,
-				RequestTimeout:   cfg.RequestTimeout(),
-				UseAllSymbols:    true,
-				CoingeckoDelay:   10 * time.Second,
-				TokenRefreshTTL:  cfg.TokenRefreshTTL(),
-				BudgetPath:       cfg.TokenRegistry.CoinGeckoBudgetPath,
-				BudgetEnabled:    cfg.TokenRegistry.CoinGeckoBudgetEnabled,
-				BudgetMonthlyLimit: cfg.TokenRegistry.CoinGeckoMonthlyLimit,
-				CoinGeckoAPIKey:  cfg.TokenRegistry.CoinGeckoAPIKey,
-				CoinGeckoPro:     cfg.TokenRegistry.CoinGeckoPro,
-			}); err == nil && updated > 0 {
-				log.Printf("[TokenSync] 启动同步: 更新 %d 条", updated)
-			}
-			cancel0()
-
-			ticker := time.NewTicker(cfg.TokenSyncInterval())
-			defer ticker.Stop()
-			for range ticker.C {
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-				updated, err := tokenregistry.RunSync(ctx, tokenregistry.SyncConfig{
-					RegistryPath:    cfg.TokenRegistry.Path,
-					APIURL:          cfg.SeeingStone.APIURL,
-					APIToken:        cfg.SeeingStone.APIToken,
-					RequestTimeout:  cfg.RequestTimeout(),
-					UseAllSymbols:   true,
-					CoingeckoDelay:  10 * time.Second,
-					TokenRefreshTTL: cfg.TokenRefreshTTL(),
-					BudgetPath:      cfg.TokenRegistry.CoinGeckoBudgetPath,
-					BudgetEnabled:   cfg.TokenRegistry.CoinGeckoBudgetEnabled,
-					BudgetMonthlyLimit: cfg.TokenRegistry.CoinGeckoMonthlyLimit,
-					CoinGeckoAPIKey: cfg.TokenRegistry.CoinGeckoAPIKey,
-					CoinGeckoPro:    cfg.TokenRegistry.CoinGeckoPro,
-				})
-				cancel()
-				if err != nil {
-					log.Printf("[TokenSync] %v", err)
-					continue
-				}
-				if updated > 0 {
-					log.Printf("[TokenSync] 更新 %d 条，保存至 %s", updated, cfg.TokenRegistry.Path)
-				}
-			}
-		}()
-	}
-	if cfg.MockMode {
-		log.Println("[Config] TokenSync 跳过（MockMode）")
-	}
-
-	// 流动性：从 registry 加载初始值，启动时立即同步一次，并定时全表同步（需 API Key）
-	if cfg.TokenRegistry.CoinGeckoAPIKey != "" {
-		store := tokenregistry.NewStorage(cfg.TokenRegistry.Path)
-		if rd, err := store.Load(); err == nil {
-			handler.UpdateLiquidity(tokenregistry.LiquidityMapFromRegistry(rd))
-			log.Println("[Config] 已从 registry 加载流动性缓存")
-		}
-		go func() {
-			// 启动时立即执行一次流动性同步
-			log.Println("[LiquiditySync] 启动中...")
-			ctx0, cancel0 := context.WithTimeout(context.Background(), 2*time.Hour)
-			liquidity, err := tokenregistry.RunLiquiditySync(ctx0, tokenregistry.LiquiditySyncConfig{
-				RegistryPath:    cfg.TokenRegistry.Path,
-				CoinGeckoAPIKey: cfg.TokenRegistry.CoinGeckoAPIKey,
-				CoinGeckoPro:    cfg.TokenRegistry.CoinGeckoPro,
-				DelayPerRequest: 1 * time.Second,
-				MaxRetries:      cfg.TokenRegistry.LiquidityRetryMax,
-				BackoffBase:     time.Duration(cfg.TokenRegistry.LiquidityBackoffBaseMs) * time.Millisecond,
-				BackoffMax:      time.Duration(cfg.TokenRegistry.LiquidityBackoffMaxMs) * time.Millisecond,
-				BackoffJitter:   cfg.TokenRegistry.LiquidityBackoffJitter,
-				NegativeTTL:     time.Duration(cfg.TokenRegistry.LiquidityNegativeTTL) * time.Second,
-				BudgetPath:      cfg.TokenRegistry.CoinGeckoBudgetPath,
-				BudgetEnabled:   cfg.TokenRegistry.CoinGeckoBudgetEnabled,
-				BudgetMonthlyLimit: cfg.TokenRegistry.CoinGeckoMonthlyLimit,
-			})
-			cancel0()
-			if err == nil {
-				handler.UpdateLiquidity(liquidity)
-				log.Printf("[LiquiditySync] 启动同步完成，%d 条流动性", len(liquidity))
-			} else {
-				log.Printf("[LiquiditySync] 启动同步失败: %v", err)
-			}
-			ticker := time.NewTicker(cfg.LiquiditySyncInterval())
-			defer ticker.Stop()
-			for range ticker.C {
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
-				liquidity, err := tokenregistry.RunLiquiditySync(ctx, tokenregistry.LiquiditySyncConfig{
-					RegistryPath:    cfg.TokenRegistry.Path,
-					CoinGeckoAPIKey: cfg.TokenRegistry.CoinGeckoAPIKey,
-					CoinGeckoPro:    cfg.TokenRegistry.CoinGeckoPro,
-					DelayPerRequest: 1 * time.Second,
-					MaxRetries:      cfg.TokenRegistry.LiquidityRetryMax,
-					BackoffBase:     time.Duration(cfg.TokenRegistry.LiquidityBackoffBaseMs) * time.Millisecond,
-					BackoffMax:      time.Duration(cfg.TokenRegistry.LiquidityBackoffMaxMs) * time.Millisecond,
-					BackoffJitter:   cfg.TokenRegistry.LiquidityBackoffJitter,
-					NegativeTTL:     time.Duration(cfg.TokenRegistry.LiquidityNegativeTTL) * time.Second,
-					BudgetPath:      cfg.TokenRegistry.CoinGeckoBudgetPath,
-					BudgetEnabled:   cfg.TokenRegistry.CoinGeckoBudgetEnabled,
-					BudgetMonthlyLimit: cfg.TokenRegistry.CoinGeckoMonthlyLimit,
-				})
-				cancel()
-				if err != nil {
-					log.Printf("[LiquiditySync] %v", err)
-					continue
-				}
-				handler.UpdateLiquidity(liquidity)
-			}
-		}()
-		if cfg.TokenRegistry.PrioritySyncEnabled {
-			go func() {
-				ticker := time.NewTicker(cfg.PriorityLiquiditySyncInterval())
-				defer ticker.Stop()
-				for range ticker.C {
-					cacheMu.RLock()
-					items := make([]model.SpreadItem, len(cachedItems))
-					copy(items, cachedItems)
-					cacheMu.RUnlock()
-
-					assets := priorityTracker.TopAssets(cfg.TokenRegistry.PriorityTopAssets, time.Now())
-					if len(assets) == 0 {
-						continue
-					}
-
-					ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
-					liquidity, err := tokenregistry.RunLiquiditySync(ctx, tokenregistry.LiquiditySyncConfig{
-						RegistryPath:      cfg.TokenRegistry.Path,
-						CoinGeckoAPIKey:   cfg.TokenRegistry.CoinGeckoAPIKey,
-						CoinGeckoPro:      cfg.TokenRegistry.CoinGeckoPro,
-						DelayPerRequest:   1 * time.Second,
-						MaxRetries:        cfg.TokenRegistry.LiquidityRetryMax,
-						BackoffBase:       time.Duration(cfg.TokenRegistry.LiquidityBackoffBaseMs) * time.Millisecond,
-						BackoffMax:        time.Duration(cfg.TokenRegistry.LiquidityBackoffMaxMs) * time.Millisecond,
-						BackoffJitter:     cfg.TokenRegistry.LiquidityBackoffJitter,
-						NegativeTTL:       time.Duration(cfg.TokenRegistry.LiquidityNegativeTTL) * time.Second,
-						BudgetPath:        cfg.TokenRegistry.CoinGeckoBudgetPath,
-						BudgetEnabled:     cfg.TokenRegistry.CoinGeckoBudgetEnabled,
-						BudgetMonthlyLimit: cfg.TokenRegistry.CoinGeckoMonthlyLimit,
-						IncludeAssets:     assets,
-						MaxRequests:       cfg.TokenRegistry.PriorityMaxRequests,
-					})
-					cancel()
-					if err != nil {
-						log.Printf("[PriorityLiquiditySync] %v", err)
-						continue
-					}
-					handler.UpdateLiquidity(liquidity)
-					log.Printf("[PriorityLiquiditySync] 更新完成，assets=%d map=%d", len(assets), len(liquidity))
-				}
-			}()
-			log.Printf("[Config] PriorityLiquiditySync 已启动，间隔 %v", cfg.PriorityLiquiditySyncInterval())
-		}
-		log.Printf("[Config] LiquiditySync 已启动，间隔 %v", cfg.LiquiditySyncInterval())
-	} else {
-		log.Println("[Config] LiquiditySync 跳过: 未配置 COINGECKO_API_KEY")
-	}
-
-	// Ticker C: 链上价格（已停用）
-	// 链上 DEX 询价失败率高，暂停该模块，如需恢复请取消下方注释。
-	var chainPriceFetcher *price.ChainPriceFetcher
-	_ = chainPriceFetcher
-	log.Println("[Config] ChainPrice 已停用")
 
 	// Ticker B: 30s 全量探测 + 表格组装 (暂时禁用)
 	// go func() {
@@ -533,11 +214,6 @@ func main() {
 	items, _ := fetchSpread(ctx)
 	cancel()
 	if len(items) > 0 {
-		cacheMu.Lock()
-		cachedItems = items
-		cacheMu.Unlock()
-		priorityTracker.Observe(items, time.Now())
-
 		// 更新机会发现数据（启动时）
 		if oppFinder != nil {
 			resp := oppFinder.Find(items)

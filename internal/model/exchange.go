@@ -211,18 +211,6 @@ type WithdrawResponse struct {
 	CreateTime time.Time // 创建时间
 }
 
-// WithdrawNetworkInfo 某资产在交易所支持的提现网络（用于路由探测）
-type WithdrawNetworkInfo struct {
-	Network         string // 交易所 API 网络名（如 ETH, BSC）
-	ChainID         string // 对应链 ID（如 "1", "56"），用于与跨链协议对齐
-	WithdrawEnable  bool   // 是否支持提现
-	WithdrawFee     string // 提现手续费
-	WithdrawMin     string // 最小提现量
-	WithdrawMax     string // 最大提现量
-	IsDefault       bool   // 是否默认网络
-	ContractAddress string // 代币在该链上的合约地址（交易所 API 返回，可能为空）
-}
-
 // DepositAddress 充币地址
 type DepositAddress struct {
 	Asset   string // 资产名称

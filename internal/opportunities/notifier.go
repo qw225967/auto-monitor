@@ -12,12 +12,12 @@ import (
 
 // OpportunityNotifier 机会发现通知器
 type OpportunityNotifier struct {
-	mu               sync.RWMutex
-	tgClient         *tg.TelegramClient
-	activeOpps       map[string]*OpportunityState // key: "symbol:spotEx:futuresEx"
-	disappearTimeout time.Duration                 // 消失超时时间（默认1分钟）
-	lastNotifyTime   time.Time
-	minNotifyInterval time.Duration                 // 最小通知间隔
+	mu                sync.RWMutex
+	tgClient          *tg.TelegramClient
+	activeOpps        map[string]*OpportunityState // key: "symbol:spotEx:futuresEx"
+	disappearTimeout  time.Duration                // 消失超时时间（默认1分钟）
+	lastNotifyTime    time.Time
+	minNotifyInterval time.Duration // 最小通知间隔
 }
 
 // OpportunityState 机会状态
@@ -31,11 +31,11 @@ type OpportunityState struct {
 // NewOpportunityNotifier 创建机会通知器
 func NewOpportunityNotifier(tgClient *tg.TelegramClient) *OpportunityNotifier {
 	return &OpportunityNotifier{
-		tgClient:         tgClient,
-		activeOpps:       make(map[string]*OpportunityState),
-		disappearTimeout: 1 * time.Minute,
+		tgClient:          tgClient,
+		activeOpps:        make(map[string]*OpportunityState),
+		disappearTimeout:  1 * time.Minute,
 		minNotifyInterval: 10 * time.Second,
-		lastNotifyTime:   time.Time{},
+		lastNotifyTime:    time.Time{},
 	}
 }
 
@@ -75,7 +75,7 @@ func (n *OpportunityNotifier) Notify(opps []model.OpportunityItem) {
 			n.sendAppearNotification(state)
 			state.Notified = true
 
-			log.Printf("[OpportunityNotifier] 新机会出现: %s %s-%s 价差: %.2f%%", 
+			log.Printf("[OpportunityNotifier] 新机会出现: %s %s-%s 价差: %.2f%%",
 				opp.Symbol, opp.SpotExchange, opp.FuturesExchange, opp.SpreadPercent)
 		} else {
 			// 更新已存在的机会
@@ -106,10 +106,10 @@ func (n *OpportunityNotifier) sendAppearNotification(state *OpportunityState) {
 📈 现货交易所: %s
 📉 合约交易所: %s
 💵 价差: <b>%.2f%%</b>
-📊 现货深度: %.2f USDT
-📊 合约深度: %.2f USDT
-📐 5分钟斜率: %.4f%%
-🔊 量能放大: %s
+📊 一手挂单量: %.4f
+📐 价差偏离: %.4fσ
+🚀 价格加速比: %.2f
+🔊 挂单量猛增倍数: %.2f
 ⭐ 置信度: %d%%
 
 ⏰ 发现时间: %s`,
@@ -118,9 +118,9 @@ func (n *OpportunityNotifier) sendAppearNotification(state *OpportunityState) {
 		opp.FuturesExchange,
 		opp.SpreadPercent,
 		opp.SpotOrderbookDepth,
-		opp.FuturesOrderbookDepth,
-		opp.PriceSlope5m * 100,
-		boolToEmoji(opp.VolumeSpike),
+		opp.SpreadAnomaly,
+		opp.PriceAccelRatio,
+		opp.VolumeAccelScore,
 		opp.Confidence,
 		opp.UpdatedAt,
 	)
@@ -158,12 +158,4 @@ func (n *OpportunityNotifier) sendDisappearNotification(state *OpportunityState)
 	} else {
 		log.Printf("[OpportunityNotifier] 已发送机会消失通知: %s", opp.Symbol)
 	}
-}
-
-// boolToEmoji 布尔值转emoji
-func boolToEmoji(b bool) string {
-	if b {
-		return "是 🔥"
-	}
-	return "否"
 }
