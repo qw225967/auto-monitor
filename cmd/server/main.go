@@ -135,7 +135,7 @@ func main() {
 		oppNotifier = opportunities.NewOpportunityNotifier(tgClient)
 		log.Printf("[Telegram] 机会通知器已启动，ChatID: %s", tgChatID)
 	} else {
-		log.Printf("[Telegram] 未配置 Telegram Bot（exchange_keys.json 或 GlobalConfig），跳过通知功能")
+		log.Printf("[Telegram] 未配置 Bot（可选）：在 exchange_keys.json 或 GlobalConfig 填写 telegram 以启用推送")
 	}
 
 	// Ticker 拉取：实时价格（每交易所 1 次请求，每 3s 一轮）
@@ -209,10 +209,15 @@ func main() {
 	// 	}
 	// }()
 
-	// 启动时立即拉取一次
+	// 启动时立即拉取一次（错误会打日志，避免静默失败）
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.RequestTimeout())
-	items, _ := fetchSpread(ctx)
+	items, errStartup := fetchSpread(ctx)
 	cancel()
+	if errStartup != nil {
+		log.Printf("[Fetch] startup: %v", errStartup)
+	} else {
+		log.Printf("[Fetch] startup: %d items", len(items))
+	}
 	if len(items) > 0 {
 		// 更新机会发现数据（启动时）
 		if oppFinder != nil {
