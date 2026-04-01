@@ -92,11 +92,12 @@ type OpportunityItem struct {
 // FunnelStats 漏斗筛选统计
 type FunnelStats struct {
 	TotalSymbols       int `json:"total_symbols"`
-	WatchPoolSize      int `json:"watch_pool_size"`
+	AfterSpreadInRange int `json:"after_spread_in_range"` // 本轮价差在 [-1%,1%] 且参与监控池的条数
+	WatchPoolSize      int `json:"watch_pool_size"`       // 当前监控池内 symbol 总数
 	CoolingPoolSize    int `json:"cooling_pool_size"`
-	AfterSpreadAnomaly int `json:"after_spread_anomaly"`
-	AfterPriceAccel    int `json:"after_price_accel"`
-	AfterDepthVolume   int `json:"after_depth_volume"`
+	AfterSpreadAnomaly int `json:"after_spread_anomaly"` // 层1：价差突变 2σ
+	AfterPriceAccel    int `json:"after_price_accel"`    // 层2+3：价格+挂单量斜率加速
+	AfterDepthVolume   int `json:"after_depth_volume"`    // 层4：挂单量猛增 → 最终机会
 }
 
 // WatchPoolEntry 监控池中单个 symbol 的状态（Welford 在线算法）

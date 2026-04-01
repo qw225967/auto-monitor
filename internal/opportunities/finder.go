@@ -96,6 +96,7 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 
 	// 层0：监控池更新，返回在池内的 items
 	poolItems := f.watchPool.Update(spreadItems)
+	stats.AfterSpreadInRange = len(poolItems)
 	stats.WatchPoolSize = f.watchPool.GetWatchPoolSize()
 	log.Printf("[Funnel] 层0 监控池: 入口%d → 池内%d (池大小=%d)", len(spreadItems), len(poolItems), stats.WatchPoolSize)
 

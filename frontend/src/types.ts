@@ -46,20 +46,31 @@ export interface OpportunityItem {
   futures_exchange: string
   spread_percent: number
   spot_orderbook_depth: number
-  futures_orderbook_depth: number
-  price_slope_5m: number
-  volume_spike: boolean
+  /** 价差相对历史均值的 σ 倍数（突变强度） */
+  spread_anomaly?: number
+  /** 价格斜率加速比（短窗/长窗） */
+  price_accel_ratio?: number
+  /** 挂单量斜率加速比（层4 阈值判定用） */
+  volume_accel_score?: number
   confidence: number
   updated_at: string
 }
 
 export interface FunnelStats {
+  /** 本轮 API 返回的价差条目总数 */
   total_symbols: number
-  after_negative_spread: number
-  after_spot_depth: number
-  after_price_slope: number
-  after_volume: number
-  after_both_depth: number
+  /** 本轮价差在 [-1%, 1%] 且进入监控池统计的条数（旧版后端可能缺失） */
+  after_spread_in_range?: number
+  /** 当前监控池内 symbol 数量 */
+  watch_pool_size?: number
+  /** 冷却列表中的 symbol 数 */
+  cooling_pool_size?: number
+  /** 层1：价差突变（2σ） */
+  after_spread_anomaly: number
+  /** 层2+3：价格斜率 + 挂单量斜率加速 */
+  after_price_accel: number
+  /** 层4：挂单量猛增 → 最终机会数 */
+  after_depth_volume: number
 }
 
 export interface OpportunitiesResponse {
