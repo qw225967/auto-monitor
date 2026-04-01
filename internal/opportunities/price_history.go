@@ -86,11 +86,19 @@ func (p *PriceHistory) StatsCount() (totalKeys, keysWithPriceIn5m int) {
 	return totalKeys, keysWithPriceIn5m
 }
 
-// CountPoints 返回总点数及 Price>0 的点数（用于诊断）
+// CountPoints 返回近 5 分钟内总点数及 Price>0 的点数（用于诊断层2）
 func (p *PriceHistory) CountPoints(symbol, exchange string) (total, withPrice int) {
+	return p.countPointsForKey(priceHistoryKey(symbol, exchange))
+}
+
+// CountDepthPoints 返回近 5 分钟内 depth:symbol 序列点数（用于诊断层3）
+func (p *PriceHistory) CountDepthPoints(symbol string) (total, withValue int) {
+	return p.countPointsForKey("depth:" + symbol)
+}
+
+func (p *PriceHistory) countPointsForKey(key string) (total, withPositive int) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	key := priceHistoryKey(symbol, exchange)
 	points := p.histories[key]
 	now := time.Now()
 	cutoff := now.Add(-5 * time.Minute)
@@ -98,11 +106,11 @@ func (p *PriceHistory) CountPoints(symbol, exchange string) (total, withPrice in
 		if pt.Timestamp.After(cutoff) {
 			total++
 			if pt.Price > 0 {
-				withPrice++
+				withPositive++
 			}
 		}
 	}
-	return total, withPrice
+	return total, withPositive
 }
 
 // recordRaw 通用时序数据存储（内部方法，直接用 key 存储，不做 symbol:exchange 转换）

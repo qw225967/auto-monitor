@@ -67,6 +67,26 @@ func (f *Finder) FeedTicker(symbol, exchange string, price float64, ts time.Time
 	f.priceHistory.RecordAt(symbol, exchange, price, 0, ts)
 }
 
+// prefetchOrderbookForAnomalies 在层2/3 之前为异常候选拉取现货第一档，写入 depth: 时间序列。
+// 此前深度仅在层4 写入，导致层3 永远「数据不足」。
+func (f *Finder) prefetchOrderbookForAnomalies(items []model.SpreadItem, exchanges map[string]ExchangeAdapter) {
+	for _, item := range items {
+		spotEx, _ := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
+		adapter, ok := exchanges[strings.ToLower(spotEx)]
+		if !ok {
+			continue
+		}
+		bestQty, bestPrice, err := adapter.GetBestBidQty(item.Symbol)
+		if err != nil || bestQty <= 0 {
+			continue
+		}
+		f.priceHistory.RecordOrderbookDepth(item.Symbol, bestQty)
+		if bestPrice > 0 {
+			f.priceHistory.Record(item.Symbol, spotEx, bestPrice, 0)
+		}
+	}
+}
+
 // Find 四层漏斗主入口：
 //
 //	层0: 监控池更新（维护 [-1%,1%] 区间的 symbol，Welford 积累历史）
@@ -120,6 +140,9 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		}
 	}
 
+	// 层2/3 之前：对异常候选预拉现货盘口，写入深度时间序列（否则层3 从未有过 depth 样本）
+	f.prefetchOrderbookForAnomalies(anomalyItems, exchanges)
+
 	// 层2+3：价格斜率加速比 + 挂单量斜率加速比（hasData=false 必须过滤，不放行）
 	var afterPriceDepth []model.SpreadItem
 	for _, item := range anomalyItems {
@@ -128,7 +151,9 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		// 层2：价格加速比，hasData=false 过滤
 		priceAccel, hasPriceData := f.priceHistory.GetPriceSlopeAccel(item.Symbol, spotEx)
 		if !hasPriceData {
-			log.Printf("[Funnel] 层2 %s 价格数据不足，过滤", item.Symbol)
+			t5, p5 := f.priceHistory.CountPoints(item.Symbol, spotEx)
+			log.Printf("[Funnel] 层2 %s 价格数据不足（近5min ticker 点=%d 有效价=%d，需≥2；现货侧=%s）",
+				item.Symbol, t5, p5, spotEx)
 			continue
 		}
 		if priceAccel < f.priceAccelThreshold {
@@ -139,7 +164,9 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		// 层3：挂单量加速比，hasData=false 过滤
 		depthAccel, hasDepthData := f.priceHistory.GetDepthSlopeAccel(item.Symbol)
 		if !hasDepthData {
-			log.Printf("[Funnel] 层3 %s 挂单量数据不足，过滤", item.Symbol)
+			t5, d5 := f.priceHistory.CountDepthPoints(item.Symbol)
+			log.Printf("[Funnel] 层3 %s 挂单量数据不足（近5min 深度样本=%d 有效=%d，需≥2；本轮已预拉盘口）",
+				item.Symbol, t5, d5)
 			continue
 		}
 		if depthAccel < f.depthAccelThreshold {
