@@ -16,6 +16,8 @@ type FunnelConfig struct {
 	WatchPoolNotSeenRounds int `mapstructure:"watch_pool_not_seen_rounds"`
 	// 至少积累多少轮价差样本后才参与 σ 突变检测
 	WatchPoolMinHistory int `mapstructure:"watch_pool_min_history"`
+	// 现货第一档买价名义金额下限（USDT，qty×bestBidPrice）；0 表示不限制。用于过滤极薄盘口噪声
+	MinBidNotionalUSDT float64 `mapstructure:"min_bid_notional_usdt"`
 }
 
 // DefaultFunnelConfig 与当前产品默认一致的漏斗参数（偏敏感，易出机会；可按环境收紧）
@@ -28,6 +30,7 @@ func DefaultFunnelConfig() FunnelConfig {
 		ActiveNormalRounds:     45,
 		WatchPoolNotSeenRounds: 60,
 		WatchPoolMinHistory:    5,
+		MinBidNotionalUSDT:     500,
 	}
 }
 
@@ -55,5 +58,6 @@ func mergeFunnel(v FunnelConfig) FunnelConfig {
 	if v.WatchPoolMinHistory > 0 {
 		def.WatchPoolMinHistory = v.WatchPoolMinHistory
 	}
+	// MinBidNotionalUSDT 在 config.Load 用 viper.IsSet 单独处理，避免未配置时被 0 覆盖默认值
 	return def
 }

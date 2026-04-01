@@ -38,6 +38,7 @@ type Finder struct {
 	priceAccelThreshold  float64
 	depthAccelThreshold  float64
 	volumeAccelThreshold float64
+	minBidNotionalUSDT   float64 // 现货第一档名义下限（USDT），0=不限制
 }
 
 // NewFinder 创建 Finder；funnel 参数来自 config.Load().Funnel
@@ -49,6 +50,7 @@ func NewFinder(fc config.FunnelConfig) *Finder {
 		priceAccelThreshold:  fc.PriceAccelThreshold,
 		depthAccelThreshold:  fc.DepthAccelThreshold,
 		volumeAccelThreshold: fc.VolumeAccelThreshold,
+		minBidNotionalUSDT:   fc.MinBidNotionalUSDT,
 	}
 }
 
@@ -83,6 +85,17 @@ func orderbookExchange(buyEx, sellEx string, exchanges map[string]ExchangeAdapte
 	return spot, false
 }
 
+// bidNotionalOK 第一档买价名义是否达到下限（qty×price，USDT）；min<=0 表示不限制。
+func bidNotionalOK(qty, price, minUSDT float64) bool {
+	if minUSDT <= 0 {
+		return true
+	}
+	if qty <= 0 || price <= 0 {
+		return false
+	}
+	return qty*price >= minUSDT
+}
+
 // prefetchOrderbookForAnomalies 在层2/3 之前为异常候选拉取现货第一档，写入 depth: 时间序列。
 // 此前深度仅在层4 写入，导致层3 永远「数据不足」。
 func (f *Finder) prefetchOrderbookForAnomalies(items []model.SpreadItem, exchanges map[string]ExchangeAdapter) {
@@ -94,6 +107,9 @@ func (f *Finder) prefetchOrderbookForAnomalies(items []model.SpreadItem, exchang
 		adapter := exchanges[strings.ToLower(ex)]
 		bestQty, bestPrice, err := adapter.GetBestBidQty(item.Symbol)
 		if err != nil || bestQty <= 0 {
+			continue
+		}
+		if !bidNotionalOK(bestQty, bestPrice, f.minBidNotionalUSDT) {
 			continue
 		}
 		f.priceHistory.RecordOrderbookDepth(item.Symbol, bestQty)
@@ -219,13 +235,20 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 
 		// 拉取第一档 bid 挂单量及最优买价
 		bestQty, bestPrice, obErr := adapter.GetBestBidQty(item.Symbol)
-		if obErr == nil && bestQty > 0 {
+		notional := bestQty * bestPrice
+		if obErr == nil && bestQty > 0 && bidNotionalOK(bestQty, bestPrice, f.minBidNotionalUSDT) {
 			// 记录挂单量历史（用于斜率计算）
 			f.priceHistory.RecordOrderbookDepth(item.Symbol, bestQty)
 			// 将最优买价补充进价格历史（提升实时性）
 			if bestPrice > 0 {
 				f.priceHistory.Record(item.Symbol, ex, bestPrice, 0)
 			}
+		}
+
+		if f.minBidNotionalUSDT > 0 && !bidNotionalOK(bestQty, bestPrice, f.minBidNotionalUSDT) {
+			log.Printf("[Funnel] 层4 %s 第一档名义过小: bid_notional=%.2f USDT < min=%.2f (qty=%.8f price=%.8f obErr=%v)",
+				item.Symbol, notional, f.minBidNotionalUSDT, bestQty, bestPrice, obErr)
+			continue
 		}
 
 		// 挂单量猛增检测：GetDepthSlopeAccel = 短窗5m 与 长窗30m 深度斜率之比（与层3 同一套计算）

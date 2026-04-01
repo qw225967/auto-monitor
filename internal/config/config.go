@@ -110,6 +110,7 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("funnel.active_normal_rounds", "FUNNEL_ACTIVE_NORMAL_ROUNDS")
 	_ = viper.BindEnv("funnel.watch_pool_not_seen_rounds", "FUNNEL_WATCH_POOL_NOT_SEEN_ROUNDS")
 	_ = viper.BindEnv("funnel.watch_pool_min_history", "FUNNEL_WATCH_POOL_MIN_HISTORY")
+	_ = viper.BindEnv("funnel.min_bid_notional_usdt", "FUNNEL_MIN_BID_NOTIONAL_USDT")
 
 	// 默认值
 	viper.SetDefault("seeingstone.api_url", "https://seeingstone.cloud")
@@ -129,6 +130,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("funnel.active_normal_rounds", defF.ActiveNormalRounds)
 	viper.SetDefault("funnel.watch_pool_not_seen_rounds", defF.WatchPoolNotSeenRounds)
 	viper.SetDefault("funnel.watch_pool_min_history", defF.WatchPoolMinHistory)
+	viper.SetDefault("funnel.min_bid_notional_usdt", defF.MinBidNotionalUSDT)
 
 	cfg := &Config{
 		Server: ServerConfig{
@@ -167,6 +169,13 @@ func Load() (*Config, error) {
 		MockMode: viper.GetBool("mock_mode") || viper.GetBool("MOCK_MODE"),
 	}
 
+	// 买一最小名义 USDT：未在 yaml/env 中设置时保留 mergeFunnel 默认（避免 GetFloat64 未键=0 覆盖默认 500）
+	if viper.IsSet("funnel.min_bid_notional_usdt") {
+		cfg.Funnel.MinBidNotionalUSDT = viper.GetFloat64("funnel.min_bid_notional_usdt")
+	} else {
+		cfg.Funnel.MinBidNotionalUSDT = DefaultFunnelConfig().MinBidNotionalUSDT
+	}
+
 	if cfg.Server.Port == 0 {
 		cfg.Server.Port = 8088
 	}
@@ -202,6 +211,7 @@ func Load() (*Config, error) {
 	log.Printf("[Config] funnel: price_accel>=%.2f depth_accel>=%.2f volume_accel>=%.2f anomaly>=%.2fσ active_normal_rounds=%d not_seen_rounds=%d min_history=%d",
 		f.PriceAccelThreshold, f.DepthAccelThreshold, f.VolumeAccelThreshold,
 		f.AnomalyStdDevK, f.ActiveNormalRounds, f.WatchPoolNotSeenRounds, f.WatchPoolMinHistory)
+	log.Printf("[Config] funnel: min_bid_notional_usdt=%.2f (0=关闭)", f.MinBidNotionalUSDT)
 
 	return cfg, nil
 }

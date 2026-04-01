@@ -29,6 +29,8 @@ funnel:
   active_normal_rounds: 45      # 异常回归正常后连续多少轮才移入冷却（× fetch 间隔≈秒）
   watch_pool_not_seen_rounds: 60
   watch_pool_min_history: 5
+  # 现货第一档买价名义下限（USDT = 量×价），过滤极薄盘口；0 表示不限制
+  min_bid_notional_usdt: 500
 
 token_registry:
   path: data/token_registry.json
