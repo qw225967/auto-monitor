@@ -218,8 +218,8 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		adapter := exchanges[strings.ToLower(ex)]
 
 		// 拉取第一档 bid 挂单量及最优买价
-		bestQty, bestPrice, err := adapter.GetBestBidQty(item.Symbol)
-		if err == nil && bestQty > 0 {
+		bestQty, bestPrice, obErr := adapter.GetBestBidQty(item.Symbol)
+		if obErr == nil && bestQty > 0 {
 			// 记录挂单量历史（用于斜率计算）
 			f.priceHistory.RecordOrderbookDepth(item.Symbol, bestQty)
 			// 将最优买价补充进价格历史（提升实时性）
@@ -228,16 +228,20 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 			}
 		}
 
-		// 挂单量猛增检测（与 volume_accel_threshold 比较）
+		// 挂单量猛增检测：GetDepthSlopeAccel = 短窗5m 与 长窗30m 深度斜率之比（与层3 同一套计算）
 		volumeAccel, hasVolumeData := f.priceHistory.GetDepthSlopeAccel(item.Symbol)
 		if !hasVolumeData || volumeAccel < f.volumeAccelThreshold {
-			log.Printf("[Funnel] 层4 %s 挂单量未猛增: accel=%.2f hasData=%v (阈值%.2f)", item.Symbol, volumeAccel, hasVolumeData, f.volumeAccelThreshold)
+			log.Printf("[Funnel] 层4 %s 挂单量加速比 depth_accel=%.4f 阈值≥%.2f hasData=%v 计价侧=%s 本轮bestBidQty=%.8f obErr=%v",
+				item.Symbol, volumeAccel, f.volumeAccelThreshold, hasVolumeData, ex, bestQty, obErr)
 			continue
 		}
 
 		priceAccel, _ := f.priceHistory.GetPriceSlopeAccel(item.Symbol, ex)
 		depthAccel, _ := f.priceHistory.GetDepthSlopeAccel(item.Symbol)
 		confidence := f.calculateConfidence(item.SpreadAnomaly, priceAccel, depthAccel, volumeAccel)
+
+		log.Printf("[Funnel] 层4 %s 挂单量猛增通过: depth_accel=%.4f (≥%.2f) 计价侧=%s bestBidQty=%.8f 价差σ=%.2f",
+			item.Symbol, volumeAccel, f.volumeAccelThreshold, ex, bestQty, item.SpreadAnomaly)
 
 		finalOpportunities = append(finalOpportunities, model.OpportunityItem{
 			Symbol:             item.Symbol,
