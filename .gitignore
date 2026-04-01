@@ -7,7 +7,7 @@ exchange_keys.json
 
 # Build
 bin/
-server
+/server
 
 # Scripts
 logs/

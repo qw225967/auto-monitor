@@ -116,7 +116,7 @@ func main() {
 	handler := api.New()
 
 	// 机会发现
-	oppFinder := opportunities.NewFinder()
+	oppFinder := opportunities.NewFinder(cfg.Funnel)
 	opportunities.RegisterExchangeAdapters(oppFinder) // 注册 Binance/Bybit/OKX/Gate/Bitget 公共订单簿
 	oppHandler := opportunities.NewHandler(oppFinder)
 
