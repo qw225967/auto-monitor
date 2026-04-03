@@ -386,6 +386,117 @@
   margin: 0 auto;
 }
 
+.backtest-section {
+  margin-bottom: 1.75rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(145deg, #161b22 0%, #0d1117 100%);
+  border-radius: 12px;
+  border: 1px solid #21262d;
+}
+
+.backtest-section__head {
+  margin-bottom: 1rem;
+}
+
+.backtest-section__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.backtest-section__desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #8b949e;
+  max-width: 60ch;
+}
+
+.backtest-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.backtest-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #8b949e;
+}
+
+.backtest-form__input {
+  min-width: 12rem;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.875rem;
+  color: #e6edf3;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+
+.backtest-form__btn {
+  padding: 0.45rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0d1117;
+  background: #58a6ff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.backtest-form__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.backtest-error {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.1);
+  border-radius: 6px;
+}
+
+.backtest-warnings {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  color: #d29922;
+}
+
+.backtest-meta {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  color: #8b949e;
+}
+
+.backtest-signals-list {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  color: #c9d1d9;
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.backtest-charts {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.backtest-chart {
+  width: 100%;
+  height: 280px;
+}
+
 .funnel-panel {
   margin-bottom: 1.75rem;
   padding: 0;

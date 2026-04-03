@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { BacktestSection } from '../components/BacktestSection'
 import { fetchOpportunities, normalizeFetchError } from '../api'
 import type { FunnelStats, OpportunitiesResponse } from '../types'
 
@@ -120,6 +121,8 @@ export function Opportunities() {
 
   return (
     <div className="opportunities-page">
+      <BacktestSection />
+
       <section className="funnel-panel funnel-panel--elevated">
         <div className="funnel-panel__head">
           <div>

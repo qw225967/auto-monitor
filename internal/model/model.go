@@ -137,3 +137,30 @@ type PricePoint struct {
 	Timestamp time.Time `json:"timestamp"`
 	Volume    float64   `json:"volume"`
 }
+
+// BacktestSeriesPoint 回测时序点（价差或价格）
+type BacktestSeriesPoint struct {
+	T string  `json:"t"` // RFC3339
+	V float64 `json:"v"`
+}
+
+// BacktestSignal 回测信号点（标在曲线上）
+type BacktestSignal struct {
+	T              string  `json:"t"` // RFC3339
+	Layer          string  `json:"layer"`
+	Message        string  `json:"message"`
+	SpreadPercent  float64 `json:"spread_percent,omitempty"`
+	Confidence     int     `json:"confidence,omitempty"`
+}
+
+// BacktestResponse POST /api/backtest/run 响应
+type BacktestResponse struct {
+	Symbol       string                `json:"symbol"`
+	Granularity  string                `json:"granularity"` // e.g. "1m"
+	Warnings     []string              `json:"warnings,omitempty"`
+	SpreadSeries []BacktestSeriesPoint `json:"spread_series"`
+	PriceSeries  []BacktestSeriesPoint `json:"price_series"`
+	Signals      []BacktestSignal      `json:"signals"`
+	SpotExchange string                `json:"spot_exchange"`
+	FutExchange  string                `json:"futures_exchange"`
+}

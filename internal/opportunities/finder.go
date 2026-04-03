@@ -126,7 +126,16 @@ func (f *Finder) prefetchOrderbookForAnomalies(items []model.SpreadItem, exchang
 //	层2: 价格斜率加速比（hasData=false 必须过滤）
 //	层3: 挂单量斜率加速比（hasData=false 必须过滤）
 //	层4: 挂单量猛增检测（拉取第一档 bid，再比 volume_accel_threshold）
+// Find 使用当前真实时间执行漏斗（线上调用）。
 func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesResponse {
+	return f.FindAt(spreadItems, time.Now())
+}
+
+// FindAt 在指定时间 now 执行漏斗（用于回测）；会设置 PriceHistory 虚拟时钟到 now，返回前恢复。
+func (f *Finder) FindAt(spreadItems []model.SpreadItem, now time.Time) *model.OpportunitiesResponse {
+	f.priceHistory.SetClock(func() time.Time { return now })
+	defer f.priceHistory.SetClock(nil)
+
 	f.mu.RLock()
 	exchanges := f.exchanges
 	f.mu.RUnlock()
@@ -138,21 +147,21 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	// 喂入价格历史（用于加速比计算）
 	for _, it := range spreadItems {
 		if it.BuyPrice > 0 {
-			f.priceHistory.Record(it.Symbol, it.BuyExchange, it.BuyPrice, 0)
+			f.priceHistory.RecordAt(it.Symbol, it.BuyExchange, it.BuyPrice, 0, now)
 		}
 		if it.SellPrice > 0 {
-			f.priceHistory.Record(it.Symbol, it.SellExchange, it.SellPrice, 0)
+			f.priceHistory.RecordAt(it.Symbol, it.SellExchange, it.SellPrice, 0, now)
 		}
 	}
 
 	// 层0：监控池更新，返回在池内的 items
-	poolItems := f.watchPool.Update(spreadItems)
+	poolItems := f.watchPool.Update(spreadItems, now)
 	stats.AfterSpreadInRange = len(poolItems)
 	stats.WatchPoolSize = f.watchPool.GetWatchPoolSize()
 	log.Printf("[Funnel] 层0 监控池: 入口%d → 池内%d (池大小=%d)", len(spreadItems), len(poolItems), stats.WatchPoolSize)
 
 	// 层1：价差突变检测（2σ）
-	anomalyItems := f.watchPool.DetectAnomalies(poolItems)
+	anomalyItems := f.watchPool.DetectAnomalies(poolItems, now)
 	stats.AfterSpreadAnomaly = len(anomalyItems)
 	log.Printf("[Funnel] 层1 价差突变(σ≥%.2f): %d → %d %s",
 		f.watchPool.anomalyK(), len(poolItems), len(anomalyItems), symbolsFromSpreadItems(anomalyItems))
@@ -163,12 +172,12 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 	// 降级模式：无交易所注册时，跳过层2-4，直接输出层1结果
 	if len(exchanges) == 0 {
 		log.Printf("[Funnel] 无交易所注册，降级模式：直接输出层1结果 %d 个", len(anomalyItems))
-		opportunities := f.buildOpportunitiesFromSpread(anomalyItems)
+		opportunities := f.buildOpportunitiesFromSpread(anomalyItems, now)
 		return &model.OpportunitiesResponse{
 			Opportunities:  opportunities,
 			FunnelStats:    stats,
 			CoolingSymbols: coolingList,
-			UpdatedAt:      time.Now().UTC().Format(time.RFC3339),
+			UpdatedAt:      now.UTC().Format(time.RFC3339),
 		}
 	}
 
@@ -276,7 +285,7 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 			PriceAccelRatio:    priceAccel,
 			VolumeAccelScore:   volumeAccel,
 			Confidence:         confidence,
-			UpdatedAt:          time.Now().UTC().Format(time.RFC3339),
+			UpdatedAt:          now.UTC().Format(time.RFC3339),
 		})
 	}
 
@@ -294,7 +303,7 @@ func (f *Finder) Find(spreadItems []model.SpreadItem) *model.OpportunitiesRespon
 		Opportunities:  finalOpportunities,
 		FunnelStats:    stats,
 		CoolingSymbols: coolingList,
-		UpdatedAt:      time.Now().UTC().Format(time.RFC3339),
+		UpdatedAt:      now.UTC().Format(time.RFC3339),
 	}
 }
 
@@ -337,7 +346,7 @@ func symbolsFromOpportunities(items []model.OpportunityItem) string {
 }
 
 // buildOpportunitiesFromSpread 降级模式：将 SpreadItem 直接转为 OpportunityItem（无交易所数据时使用）
-func (f *Finder) buildOpportunitiesFromSpread(items []model.SpreadItem) []model.OpportunityItem {
+func (f *Finder) buildOpportunitiesFromSpread(items []model.SpreadItem, now time.Time) []model.OpportunityItem {
 	var result []model.OpportunityItem
 	for _, item := range items {
 		spotEx, futuresEx := determineSpotAndFutures(item.BuyExchange, item.SellExchange)
@@ -351,7 +360,7 @@ func (f *Finder) buildOpportunitiesFromSpread(items []model.SpreadItem) []model.
 			PriceAccelRatio:  priceAccel,
 			VolumeAccelScore: 0,
 			Confidence:       50,
-			UpdatedAt:        time.Now().UTC().Format(time.RFC3339),
+			UpdatedAt:        now.UTC().Format(time.RFC3339),
 		})
 	}
 	sort.Slice(result, func(i, j int) bool {

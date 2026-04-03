@@ -59,11 +59,9 @@ func NewWatchPool(fc config.FunnelConfig) *WatchPool {
 //  1. 构建本轮 symbol->item 映射（取价差绝对值最小的一条）
 //  2. 处理本轮出现的 symbol（冷却回归、新加入、Welford 更新、活跃状态管理）
 //  3. 处理本轮未出现的 symbol（MissedRounds 计数，超限移入冷却）
-func (wp *WatchPool) Update(items []model.SpreadItem) []model.SpreadItem {
+func (wp *WatchPool) Update(items []model.SpreadItem, now time.Time) []model.SpreadItem {
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
-
-	now := time.Now()
 
 	// Step A: 构建本轮 symbol->item 映射（只纳入区间内的 symbol）
 	currentMap := make(map[string]model.SpreadItem)
@@ -148,7 +146,7 @@ func (wp *WatchPool) Update(items []model.SpreadItem) []model.SpreadItem {
 				log.Printf("[WatchPool] %s 连续%d轮未出现，移入冷却列表", symbol, entry.MissedRounds)
 				wp.cooling[symbol] = &model.CoolingEntry{
 					Symbol:     symbol,
-					KickedAt:   time.Now(),
+					KickedAt:   now,
 					LastSpread: entry.LastSpread,
 					Reason:     "not_seen",
 				}
@@ -170,7 +168,7 @@ func (wp *WatchPool) Update(items []model.SpreadItem) []model.SpreadItem {
 // DetectAnomalies 对监控池内的 items 做 2σ 突变检测。
 // 用 entry.LastSpread（监控池记录的最新价差）做检测，而非传入的 item.SpreadPercent。
 // 数据不足（历史轮次 < min_history）的 symbol 直接跳过（不放行）。
-func (wp *WatchPool) DetectAnomalies(items []model.SpreadItem) []model.SpreadItem {
+func (wp *WatchPool) DetectAnomalies(items []model.SpreadItem, now time.Time) []model.SpreadItem {
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
 
@@ -203,7 +201,7 @@ func (wp *WatchPool) DetectAnomalies(items []model.SpreadItem) []model.SpreadIte
 		if deviationSigma >= wp.p.anomalyStdDevK {
 			if !entry.IsActive {
 				entry.IsActive = true
-				entry.ActiveSince = time.Now()
+				entry.ActiveSince = now
 				entry.NormalRounds = 0
 			}
 			item.SpreadAnomaly = deviationSigma

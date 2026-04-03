@@ -168,6 +168,7 @@ func main() {
 	router.Use(gin.Recovery(), corsMiddleware())
 	router.GET("/api/overview", handler.GetOverview)
 	router.GET("/api/opportunities", oppHandler.GetOpportunities)
+	router.POST("/api/backtest/run", handler.PostBacktestRun)
 	router.POST("/api/config/exchange-keys", handler.PostExchangeKeys)
 	router.POST("/api/config/liquidity-threshold", handler.PostLiquidityThreshold)
 

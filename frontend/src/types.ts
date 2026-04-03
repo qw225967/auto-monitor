@@ -78,3 +78,27 @@ export interface OpportunitiesResponse {
   funnel_stats: FunnelStats
   updated_at: string
 }
+
+export interface BacktestSeriesPoint {
+  t: string
+  v: number
+}
+
+export interface BacktestSignal {
+  t: string
+  layer: string
+  message: string
+  spread_percent?: number
+  confidence?: number
+}
+
+export interface BacktestResponse {
+  symbol: string
+  granularity: string
+  warnings?: string[]
+  spread_series: BacktestSeriesPoint[]
+  price_series: BacktestSeriesPoint[]
+  signals: BacktestSignal[]
+  spot_exchange: string
+  futures_exchange: string
+}
