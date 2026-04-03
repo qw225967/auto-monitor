@@ -19,6 +19,8 @@ type PriceHistory struct {
 	histories  map[string][]model.PricePoint
 	maxPoints  int
 	windowSize time.Duration
+	// clock 若非 nil，RecordAt/窗口裁剪/斜率窗口均用其返回值（用于回测）；nil 表示 time.Now
+	clock func() time.Time
 }
 
 func NewPriceHistory(maxPoints int, windowSize time.Duration) *PriceHistory {
@@ -29,8 +31,22 @@ func NewPriceHistory(maxPoints int, windowSize time.Duration) *PriceHistory {
 	}
 }
 
+// SetClock 设置虚拟时钟（回测用）；传 nil 恢复为真实时间。
+func (p *PriceHistory) SetClock(f func() time.Time) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.clock = f
+}
+
+func (p *PriceHistory) now() time.Time {
+	if p.clock != nil {
+		return p.clock()
+	}
+	return time.Now()
+}
+
 func (p *PriceHistory) Record(symbol, exchange string, price, volume float64) {
-	p.RecordAt(symbol, exchange, price, volume, time.Now())
+	p.RecordAt(symbol, exchange, price, volume, p.now())
 }
 
 // RecordAt 在指定时间戳记录（K 线用此接口只填 volume，price 填 0）
@@ -46,7 +62,7 @@ func (p *PriceHistory) RecordAt(symbol, exchange string, price, volume float64, 
 		Volume:    volume,
 	})
 
-	now := time.Now()
+	now := p.now()
 	cutoff := now.Add(-p.windowSize)
 	points := p.histories[key]
 	i := 0
@@ -68,7 +84,7 @@ func (p *PriceHistory) RecordAt(symbol, exchange string, price, volume float64, 
 func (p *PriceHistory) StatsCount() (totalKeys, keysWithPriceIn5m int) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	now := time.Now()
+	now := p.now()
 	cutoff := now.Add(-5 * time.Minute)
 	for _, points := range p.histories {
 		totalKeys++
@@ -86,23 +102,31 @@ func (p *PriceHistory) StatsCount() (totalKeys, keysWithPriceIn5m int) {
 	return totalKeys, keysWithPriceIn5m
 }
 
-// CountPoints 返回总点数及 Price>0 的点数（用于诊断）
+// CountPoints 返回近 5 分钟内总点数及 Price>0 的点数（用于诊断层2）
 func (p *PriceHistory) CountPoints(symbol, exchange string) (total, withPrice int) {
+	return p.countPointsForKey(priceHistoryKey(symbol, exchange))
+}
+
+// CountDepthPoints 返回近 5 分钟内 depth:symbol 序列点数（用于诊断层3）
+func (p *PriceHistory) CountDepthPoints(symbol string) (total, withValue int) {
+	return p.countPointsForKey("depth:" + symbol)
+}
+
+func (p *PriceHistory) countPointsForKey(key string) (total, withPositive int) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	key := priceHistoryKey(symbol, exchange)
 	points := p.histories[key]
-	now := time.Now()
+	now := p.now()
 	cutoff := now.Add(-5 * time.Minute)
 	for _, pt := range points {
 		if pt.Timestamp.After(cutoff) {
 			total++
 			if pt.Price > 0 {
-				withPrice++
+				withPositive++
 			}
 		}
 	}
-	return total, withPrice
+	return total, withPositive
 }
 
 // recordRaw 通用时序数据存储（内部方法，直接用 key 存储，不做 symbol:exchange 转换）
@@ -115,7 +139,7 @@ func (p *PriceHistory) recordRaw(key string, value float64, ts time.Time) {
 		Timestamp: ts,
 	})
 
-	now := time.Now()
+	now := p.now()
 	cutoff := now.Add(-p.windowSize)
 	points := p.histories[key]
 	i := 0
@@ -139,7 +163,7 @@ func (p *PriceHistory) GetSlopeInWindowByKey(key string, window time.Duration) (
 	defer p.mu.RUnlock()
 
 	points := p.histories[key]
-	now := time.Now()
+	now := p.now()
 	cutoff := now.Add(-window)
 
 	var windowPoints []model.PricePoint
@@ -178,7 +202,12 @@ func (p *PriceHistory) GetSlopeInWindowByKey(key string, window time.Duration) (
 
 // RecordOrderbookDepth 记录 top50 挂单量（USDT 计价）
 func (p *PriceHistory) RecordOrderbookDepth(symbol string, totalQty float64) {
-	p.recordRaw("depth:"+symbol, totalQty, time.Now())
+	p.recordRaw("depth:"+symbol, totalQty, p.now())
+}
+
+// RecordOrderbookDepthAt 指定时间戳记录深度（回测用）
+func (p *PriceHistory) RecordOrderbookDepthAt(symbol string, totalQty float64, ts time.Time) {
+	p.recordRaw("depth:"+symbol, totalQty, ts)
 }
 
 // GetPriceSlopeAccel 计算价格斜率加速比（短窗口5min / 长窗口30min）。

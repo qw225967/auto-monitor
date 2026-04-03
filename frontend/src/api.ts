@@ -1,7 +1,8 @@
-import type { OverviewResponse, OpportunitiesResponse } from './types'
+import type { BacktestResponse, OverviewResponse, OpportunitiesResponse } from './types'
 
 const API_BASE = '/api'
 const FETCH_TIMEOUT_MS = 25000 // 略大于 30s 探测周期，避免正常请求被误判超时
+const BACKTEST_TIMEOUT_MS = 120000
 
 /** 带超时的 fetch，超时抛出 TimeoutError */
 async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
@@ -47,6 +48,27 @@ export async function fetchOpportunities(): Promise<OpportunitiesResponse> {
     throw new Error(`HTTP ${res.status}`)
   }
   return res.json()
+}
+
+export async function postBacktestRun(body: {
+  symbol: string
+  from: string
+  to: string
+}): Promise<BacktestResponse> {
+  const res = await fetchWithTimeout(
+    `${API_BASE}/backtest/run`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    BACKTEST_TIMEOUT_MS,
+  )
+  const data = (await res.json()) as BacktestResponse & { error?: string }
+  if (!res.ok) {
+    throw new Error(data.error || `HTTP ${res.status}`)
+  }
+  return data
 }
 
 /** 提交交易所密钥（仅存后端内存，不落盘） */

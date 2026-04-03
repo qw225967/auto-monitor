@@ -1,11 +1,14 @@
 package api
 
 import (
+	"context"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/qw225967/auto-monitor/internal/backtest"
 	"github.com/qw225967/auto-monitor/internal/config"
 	"github.com/qw225967/auto-monitor/internal/model"
 )
@@ -188,4 +191,48 @@ func (h *Handler) PostLiquidityThreshold(c *gin.Context) {
 	}
 	config.SetLiquidityThreshold(body.Threshold)
 	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "已保存", "threshold": body.Threshold})
+}
+
+// PostBacktestRun 回测：symbol + 起止时间（RFC3339），返回价差/价格序列与信号点（Binance 现货+U本位 1m K 线）
+func (h *Handler) PostBacktestRun(c *gin.Context) {
+	var body struct {
+		Symbol string `json:"symbol"`
+		From   string `json:"from"`
+		To     string `json:"to"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 JSON"})
+		return
+	}
+	body.Symbol = strings.TrimSpace(strings.ToUpper(body.Symbol))
+	if body.Symbol == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "symbol 不能为空"})
+		return
+	}
+	from, err := time.Parse(time.RFC3339, body.From)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "from 需为 RFC3339 时间"})
+		return
+	}
+	to, err := time.Parse(time.RFC3339, body.To)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "to 需为 RFC3339 时间"})
+		return
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "配置加载失败"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Minute)
+	defer cancel()
+
+	out, err := backtest.Run(ctx, cfg.Funnel, body.Symbol, from, to, http.DefaultClient)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, out)
 }

@@ -92,11 +92,12 @@ type OpportunityItem struct {
 // FunnelStats 漏斗筛选统计
 type FunnelStats struct {
 	TotalSymbols       int `json:"total_symbols"`
-	WatchPoolSize      int `json:"watch_pool_size"`
+	AfterSpreadInRange int `json:"after_spread_in_range"` // 本轮价差在 [-1%,1%] 且参与监控池的条数
+	WatchPoolSize      int `json:"watch_pool_size"`       // 当前监控池内 symbol 总数
 	CoolingPoolSize    int `json:"cooling_pool_size"`
-	AfterSpreadAnomaly int `json:"after_spread_anomaly"`
-	AfterPriceAccel    int `json:"after_price_accel"`
-	AfterDepthVolume   int `json:"after_depth_volume"`
+	AfterSpreadAnomaly int `json:"after_spread_anomaly"` // 层1：价差突变 2σ
+	AfterPriceAccel    int `json:"after_price_accel"`    // 层2+3：价格+挂单量斜率加速
+	AfterDepthVolume   int `json:"after_depth_volume"`    // 层4：挂单量猛增 → 最终机会
 }
 
 // WatchPoolEntry 监控池中单个 symbol 的状态（Welford 在线算法）
@@ -135,4 +136,31 @@ type PricePoint struct {
 	Price     float64   `json:"price"`
 	Timestamp time.Time `json:"timestamp"`
 	Volume    float64   `json:"volume"`
+}
+
+// BacktestSeriesPoint 回测时序点（价差或价格）
+type BacktestSeriesPoint struct {
+	T string  `json:"t"` // RFC3339
+	V float64 `json:"v"`
+}
+
+// BacktestSignal 回测信号点（标在曲线上）
+type BacktestSignal struct {
+	T              string  `json:"t"` // RFC3339
+	Layer          string  `json:"layer"`
+	Message        string  `json:"message"`
+	SpreadPercent  float64 `json:"spread_percent,omitempty"`
+	Confidence     int     `json:"confidence,omitempty"`
+}
+
+// BacktestResponse POST /api/backtest/run 响应
+type BacktestResponse struct {
+	Symbol       string                `json:"symbol"`
+	Granularity  string                `json:"granularity"` // e.g. "1m"
+	Warnings     []string              `json:"warnings,omitempty"`
+	SpreadSeries []BacktestSeriesPoint `json:"spread_series"`
+	PriceSeries  []BacktestSeriesPoint `json:"price_series"`
+	Signals      []BacktestSignal      `json:"signals"`
+	SpotExchange string                `json:"spot_exchange"`
+	FutExchange  string                `json:"futures_exchange"`
 }

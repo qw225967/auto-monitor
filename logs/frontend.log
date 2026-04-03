@@ -928,3 +928,12 @@ Error: connect ECONNREFUSED 127.0.0.1:8088
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: http://10.7.0.12:5173/
+
+> frontend@0.0.0 dev
+> vite --host
+
+
+  VITE v5.4.21  ready in 141 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.0.101:5173/

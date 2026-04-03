@@ -20,6 +20,18 @@ runner:
   detect_max_concurrency: 64 # 通路探测并发上限
   detect_route_timeout: 10    # 单路探测超时 (秒)
 
+# 机会发现漏斗（可环境变量 FUNNEL_* 覆盖，见 internal/config/config.go）
+funnel:
+  price_accel_threshold: 1.0    # 层2：价格斜率加速比下限（短/长窗）
+  depth_accel_threshold: 1.0    # 层3：挂单量斜率加速比下限
+  volume_accel_threshold: 1.5   # 层4：挂单量「猛增」加速比下限
+  anomaly_stddev_k: 2.5         # 层1：价差相对历史的 σ 倍数下限（越大越严）
+  active_normal_rounds: 45      # 异常回归正常后连续多少轮才移入冷却（× fetch 间隔≈秒）
+  watch_pool_not_seen_rounds: 60
+  watch_pool_min_history: 5
+  # 现货第一档买价名义下限（USDT = 量×价），过滤极薄盘口；0 表示不限制
+  min_bid_notional_usdt: 500
+
 token_registry:
   path: data/token_registry.json
   sync_interval: 300   # Token 信息补全间隔 (秒)，全量 symbol 增量更新
@@ -51,6 +63,6 @@ chain_price:
 #   secret_key: ""
 #   passphrase: ""
 
-# 交易所 API 密钥：复制 config/exchange_keys.json.example 为 exchange_keys.json 并填写
+# 交易所 API 密钥：复制 config/exchange_keys.json 为 exchange_keys.json 并填写
 # 格式: { "BitGet": { "APIKey": "", "Secret": "", "Passphrase": "" }, "Bybit": {...}, "Gate": {...}, ... }
 # 环境变量 EXCHANGE_KEYS_PATH 可指定路径
