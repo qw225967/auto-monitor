@@ -3,6 +3,15 @@ import { useEffect, useRef, useState } from 'react'
 import { normalizeFetchError, postBacktestRun } from '../api'
 import type { BacktestResponse } from '../types'
 
+/** 纯白、无描边/阴影，避免 ECharts 默认的描边在深色底上发糊 */
+const whiteLabel = {
+  color: '#ffffff',
+  textBorderWidth: 0,
+  textBorderColor: 'transparent',
+  textShadowBlur: 0,
+  textShadowColor: 'transparent',
+} as const
+
 function useBacktestCharts(data: BacktestResponse | null) {
   const spreadRef = useRef<HTMLDivElement>(null)
   const priceRef = useRef<HTMLDivElement>(null)
@@ -17,23 +26,50 @@ function useBacktestCharts(data: BacktestResponse | null) {
     const markLineData = data.signals.map((s) => ({
       xAxis: s.t,
       lineStyle: { color: '#e67e22', type: 'dashed' },
-      label: { show: true, formatter: `${s.layer} · σ机会`, fontSize: 10 },
+      label: {
+        show: true,
+        formatter: `${s.layer} · σ机会`,
+        fontSize: 10,
+        ...whiteLabel,
+        backgroundColor: 'transparent',
+        padding: [2, 4],
+      },
     }))
 
     const baseGrid = { left: 56, right: 24, bottom: 72, top: 36 }
     const baseX = {
       type: 'category' as const,
       data: times,
-      axisLabel: { rotate: 35, fontSize: 10 },
+      axisLabel: { rotate: 35, fontSize: 10, ...whiteLabel },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.35)' } },
     }
+    const baseY = (name: string) => ({
+      type: 'value' as const,
+      name,
+      nameTextStyle: { ...whiteLabel, fontSize: 11 },
+      axisLabel: { ...whiteLabel, fontSize: 10 },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.35)' } },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+    })
 
     const sChart = echarts.init(spreadRef.current)
     sChart.setOption({
-      title: { text: '价差 %（现货 vs U 本位）', left: 'center', textStyle: { fontSize: 14 } },
-      tooltip: { trigger: 'axis' },
+      textStyle: { ...whiteLabel },
+      title: {
+        text: '价差 %（现货 vs U 本位）',
+        left: 'center',
+        textStyle: { fontSize: 14, fontWeight: 500, ...whiteLabel },
+      },
+      tooltip: {
+        trigger: 'axis',
+        textStyle: { ...whiteLabel },
+        backgroundColor: 'rgba(13,17,23,0.92)',
+        borderColor: 'rgba(255,255,255,0.12)',
+        borderWidth: 1,
+      },
       grid: baseGrid,
       xAxis: baseX,
-      yAxis: { type: 'value', name: '%' },
+      yAxis: baseY('%'),
       series: [
         {
           name: '价差',
@@ -54,11 +90,22 @@ function useBacktestCharts(data: BacktestResponse | null) {
 
     const pChart = echarts.init(priceRef.current)
     pChart.setOption({
-      title: { text: '现货收盘价（Binance）', left: 'center', textStyle: { fontSize: 14 } },
-      tooltip: { trigger: 'axis' },
+      textStyle: { ...whiteLabel },
+      title: {
+        text: '现货收盘价（Binance）',
+        left: 'center',
+        textStyle: { fontSize: 14, fontWeight: 500, ...whiteLabel },
+      },
+      tooltip: {
+        trigger: 'axis',
+        textStyle: { ...whiteLabel },
+        backgroundColor: 'rgba(13,17,23,0.92)',
+        borderColor: 'rgba(255,255,255,0.12)',
+        borderWidth: 1,
+      },
       grid: baseGrid,
       xAxis: baseX,
-      yAxis: { type: 'value', name: 'USDT' },
+      yAxis: baseY('USDT'),
       series: [
         {
           name: '价格',

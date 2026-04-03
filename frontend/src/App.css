@@ -474,14 +474,19 @@
 .backtest-meta {
   margin: 0 0 0.75rem;
   font-size: 0.8125rem;
-  color: #8b949e;
+  color: #ffffff;
+}
+
+.backtest-meta strong {
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .backtest-signals-list {
   margin: 0 0 1rem;
   padding-left: 1.25rem;
   font-size: 0.8125rem;
-  color: #c9d1d9;
+  color: #ffffff;
   max-height: 10rem;
   overflow-y: auto;
 }
