@@ -12,6 +12,19 @@ const whiteLabel = {
   textShadowColor: 'transparent',
 } as const
 
+/** 横轴时间戳过长时缩短展示，减少占位与重叠感 */
+function formatAxisTime(raw: string): string {
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) {
+    return raw.length > 18 ? `${raw.slice(0, 16)}…` : raw
+  }
+  const M = d.getMonth() + 1
+  const day = d.getDate()
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `${M}/${day} ${h}:${m}`
+}
+
 function useBacktestCharts(data: BacktestResponse | null) {
   const spreadRef = useRef<HTMLDivElement>(null)
   const priceRef = useRef<HTMLDivElement>(null)
@@ -23,24 +36,30 @@ function useBacktestCharts(data: BacktestResponse | null) {
     const spreadVals = data.spread_series.map((p) => p.v)
     const priceVals = data.price_series.map((p) => p.v)
 
+    // 竖线保留；文字在密集时严重重叠，详情见上方信号列表与 tooltip
     const markLineData = data.signals.map((s) => ({
       xAxis: s.t,
       lineStyle: { color: '#e67e22', type: 'dashed' },
-      label: {
-        show: true,
-        formatter: `${s.layer} · σ机会`,
-        fontSize: 10,
-        ...whiteLabel,
-        backgroundColor: 'transparent',
-        padding: [2, 4],
-      },
     }))
 
-    const baseGrid = { left: 56, right: 24, bottom: 72, top: 36 }
+    const maxAxisLabels = 14
+    const n = times.length
+    const tickStep = n <= maxAxisLabels ? 1 : Math.max(1, Math.ceil(n / maxAxisLabels))
+
+    const baseGridTop = { left: 56, right: 24, bottom: 56, top: 36 }
+    const baseGridBottom = { left: 56, right: 24, bottom: 88, top: 36 }
+
     const baseX = {
       type: 'category' as const,
       data: times,
-      axisLabel: { rotate: 35, fontSize: 10, ...whiteLabel },
+      axisLabel: {
+        rotate: n > 40 ? 28 : 0,
+        fontSize: 10,
+        ...whiteLabel,
+        hideOverlap: true,
+        interval: (index: number) => index % tickStep === 0,
+        formatter: (value: string) => formatAxisTime(value),
+      },
       axisLine: { lineStyle: { color: 'rgba(255,255,255,0.35)' } },
     }
     const baseY = (name: string) => ({
@@ -67,7 +86,9 @@ function useBacktestCharts(data: BacktestResponse | null) {
         borderColor: 'rgba(255,255,255,0.12)',
         borderWidth: 1,
       },
-      grid: baseGrid,
+      axisPointer: { link: [{ xAxisIndex: 'all' }] },
+      dataZoom: [{ type: 'inside', xAxisIndex: 0, filterMode: 'none' }],
+      grid: baseGridTop,
       xAxis: baseX,
       yAxis: baseY('%'),
       series: [
@@ -81,6 +102,7 @@ function useBacktestCharts(data: BacktestResponse | null) {
           markLine: data.signals.length
             ? {
                 symbol: 'none',
+                label: { show: false },
                 data: markLineData,
               }
             : undefined,
@@ -103,7 +125,25 @@ function useBacktestCharts(data: BacktestResponse | null) {
         borderColor: 'rgba(255,255,255,0.12)',
         borderWidth: 1,
       },
-      grid: baseGrid,
+      axisPointer: { link: [{ xAxisIndex: 'all' }] },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        {
+          type: 'slider',
+          xAxisIndex: 0,
+          height: 22,
+          bottom: 10,
+          filterMode: 'none',
+          textStyle: { ...whiteLabel },
+          borderColor: 'rgba(255,255,255,0.2)',
+          handleStyle: { color: '#58a6ff' },
+          dataBackground: {
+            lineStyle: { color: 'rgba(88,166,255,0.35)' },
+            areaStyle: { color: 'rgba(88,166,255,0.08)' },
+          },
+        },
+      ],
+      grid: baseGridBottom,
       xAxis: baseX,
       yAxis: baseY('USDT'),
       series: [
@@ -117,12 +157,15 @@ function useBacktestCharts(data: BacktestResponse | null) {
           markLine: data.signals.length
             ? {
                 symbol: 'none',
+                label: { show: false },
                 data: markLineData,
               }
             : undefined,
         },
       ],
     })
+
+    const connectGroupId = echarts.connect([sChart, pChart])
 
     const ro = new ResizeObserver(() => {
       sChart.resize()
@@ -133,6 +176,7 @@ function useBacktestCharts(data: BacktestResponse | null) {
 
     return () => {
       ro.disconnect()
+      echarts.disconnect(connectGroupId)
       sChart.dispose()
       pChart.dispose()
     }
